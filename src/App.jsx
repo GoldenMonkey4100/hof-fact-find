@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import './styles.css';
 import { getBrokerEmail } from './utils';
-
-// Import step components (these would be actual imports in production)
-// import Step0LoanStrategy from './Step0-LoanStrategy';
-// import Step1Applicants from './Step1-Applicants';
-// import Step2Employment from './Step2-Employment';
-// import Step3AssetsLiabilities from './Step3-AssetsLiabilities';
-// import Step4Review from './Step4-Review';
+import Step0LoanStrategy from './Step0-LoanStrategy-Polished';
+import Step1Applicants from './Step1-Applicants-Polished';
+import Step2Employment from './Step2-Employment-Polished';
+import Step3AssetsLiabilities from './Step3-AssetsLiabilities-Polished';
+import Step4Review from './Step4-Review-Polished';
 
 const FactFindApp = () => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -34,7 +32,10 @@ const FactFindApp = () => {
       loanType: '',
       repaymentType: '',
       interestOnlyPeriod: '',
-      splits: [],
+      split1Amount: '',
+      split1Type: '',
+      split2Amount: '',
+      split2Type: '',
       ratePreference: '',
       hasOffset: false,
       hasRedraw: false
@@ -124,64 +125,17 @@ const FactFindApp = () => {
   };
 
   const renderStepContent = () => {
-    // In production, render actual imported components
-    const placeholderStyle = {
-      padding: '60px 20px',
-      textAlign: 'center',
-      color: 'var(--text-secondary)'
-    };
-
     switch (currentStep) {
       case 0:
-        return (
-          <div style={placeholderStyle}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏠</div>
-            <h3 style={{ fontSize: '20px', fontWeight: '500', marginBottom: '8px', color: 'var(--text-primary)' }}>
-              Step 0: Loan Strategy
-            </h3>
-            <p>Component will render here</p>
-          </div>
-        );
+        return <Step0LoanStrategy formData={formData} updateFormData={updateFormData} />;
       case 1:
-        return (
-          <div style={placeholderStyle}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
-            <h3 style={{ fontSize: '20px', fontWeight: '500', marginBottom: '8px', color: 'var(--text-primary)' }}>
-              Step 1: Applicants
-            </h3>
-            <p>Component will render here</p>
-          </div>
-        );
+        return <Step1Applicants formData={formData} updateFormData={updateFormData} />;
       case 2:
-        return (
-          <div style={placeholderStyle}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>💼</div>
-            <h3 style={{ fontSize: '20px', fontWeight: '500', marginBottom: '8px', color: 'var(--text-primary)' }}>
-              Step 2: Employment & Income
-            </h3>
-            <p>Component will render here</p>
-          </div>
-        );
+        return <Step2Employment formData={formData} updateFormData={updateFormData} />;
       case 3:
-        return (
-          <div style={placeholderStyle}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>💰</div>
-            <h3 style={{ fontSize: '20px', fontWeight: '500', marginBottom: '8px', color: 'var(--text-primary)' }}>
-              Step 3: Assets & Liabilities
-            </h3>
-            <p>Component will render here</p>
-          </div>
-        );
+        return <Step3AssetsLiabilities formData={formData} updateFormData={updateFormData} />;
       case 4:
-        return (
-          <div style={placeholderStyle}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>✓</div>
-            <h3 style={{ fontSize: '20px', fontWeight: '500', marginBottom: '8px', color: 'var(--text-primary)' }}>
-              Step 4: Review & Submit
-            </h3>
-            <p>Component will render here</p>
-          </div>
-        );
+        return <Step4Review formData={formData} updateFormData={updateFormData} onSubmit={handleSubmit} />;
       default:
         return null;
     }

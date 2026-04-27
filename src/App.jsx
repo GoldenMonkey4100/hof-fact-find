@@ -123,64 +123,17 @@ const FactFindApp = () => {
   };
 
   const renderStepContent = () => {
-    // In production, render actual imported components
-    const placeholderStyle = {
-      padding: '60px 20px',
-      textAlign: 'center',
-      color: 'var(--text-secondary)'
-    };
-
     switch (currentStep) {
       case 0:
-        return (
-          <div style={placeholderStyle}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏠</div>
-            <h3 style={{ fontSize: '20px', fontWeight: '500', marginBottom: '8px', color: 'var(--text-primary)' }}>
-              Step 0: Loan Strategy
-            </h3>
-            <p>Component will render here</p>
-          </div>
-        );
+        return <Step0LoanStrategy formData={formData} updateFormData={updateFormData} />;
       case 1:
-        return (
-          <div style={placeholderStyle}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
-            <h3 style={{ fontSize: '20px', fontWeight: '500', marginBottom: '8px', color: 'var(--text-primary)' }}>
-              Step 1: Applicants
-            </h3>
-            <p>Component will render here</p>
-          </div>
-        );
+        return <Step1Applicants formData={formData} updateFormData={updateFormData} />;
       case 2:
-        return (
-          <div style={placeholderStyle}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>💼</div>
-            <h3 style={{ fontSize: '20px', fontWeight: '500', marginBottom: '8px', color: 'var(--text-primary)' }}>
-              Step 2: Employment & Income
-            </h3>
-            <p>Component will render here</p>
-          </div>
-        );
+        return <Step2Employment formData={formData} updateFormData={updateFormData} />;
       case 3:
-        return (
-          <div style={placeholderStyle}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>💰</div>
-            <h3 style={{ fontSize: '20px', fontWeight: '500', marginBottom: '8px', color: 'var(--text-primary)' }}>
-              Step 3: Assets & Liabilities
-            </h3>
-            <p>Component will render here</p>
-          </div>
-        );
+        return <Step3AssetsLiabilities formData={formData} updateFormData={updateFormData} />;
       case 4:
-        return (
-          <div style={placeholderStyle}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>✓</div>
-            <h3 style={{ fontSize: '20px', fontWeight: '500', marginBottom: '8px', color: 'var(--text-primary)' }}>
-              Step 4: Review & Submit
-            </h3>
-            <p>Component will render here</p>
-          </div>
-        );
+        return <Step4Review formData={formData} />;
       default:
         return null;
     }

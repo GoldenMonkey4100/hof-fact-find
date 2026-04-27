@@ -298,6 +298,19 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
                   </>
                 )}
 
+                {/* Superannuation — provider field */}
+                {asset.type === 'Superannuation' && (
+                  <div className="mb-3">
+                    <label>Provider</label>
+                    <input
+                      type="text"
+                      value={asset.provider || ''}
+                      onChange={(e) => updateAsset(applicantIndex, assetIndex, 'provider', e.target.value)}
+                      placeholder="e.g. Australian Super, REST, Host Plus"
+                    />
+                  </div>
+                )}
+
                 {/* Value field for non-Investment Property assets */}
                 {asset.type !== 'Investment Property' && (
                   <div>
@@ -308,6 +321,30 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
                       onChange={(e) => updateAsset(applicantIndex, assetIndex, 'value', parseCurrency(e.target.value))}
                       placeholder="50,000"
                     />
+                  </div>
+                )}
+
+                {/* Vehicle — make & model fields */}
+                {asset.type === 'Vehicle' && (
+                  <div className="grid grid-cols-2 mb-3" style={{ marginTop: '12px' }}>
+                    <div>
+                      <label>Make</label>
+                      <input
+                        type="text"
+                        value={asset.vehicleMake || ''}
+                        onChange={(e) => updateAsset(applicantIndex, assetIndex, 'vehicleMake', e.target.value)}
+                        placeholder="e.g. Toyota"
+                      />
+                    </div>
+                    <div>
+                      <label>Model</label>
+                      <input
+                        type="text"
+                        value={asset.vehicleModel || ''}
+                        onChange={(e) => updateAsset(applicantIndex, assetIndex, 'vehicleModel', e.target.value)}
+                        placeholder="e.g. Camry"
+                      />
+                    </div>
                   </div>
                 )}
               </div>

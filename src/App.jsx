@@ -32,6 +32,7 @@ const FactFindApp = () => {
       loanType: '',
       repaymentType: '',
       interestOnlyPeriod: '',
+      fixedRatePeriod: '',
       split1Amount: '',
       split1Type: '',
       split2Amount: '',
@@ -328,34 +329,6 @@ const FactFindApp = () => {
           )}
         </div>
 
-        {/* Help Footer */}
-        <div style={{ 
-          marginTop: '32px',
-          padding: '20px',
-          textAlign: 'center',
-          fontSize: 'var(--text-sm)',
-          color: 'var(--text-secondary)',
-          background: 'var(--bg-primary)',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--border-primary)'
-        }}>
-          <p style={{ margin: '0 0 8px 0' }}>
-            Need help? Contact your Partnership Manager or email{' '}
-            <a 
-              href="mailto:helpdesk@connective.com.au" 
-              style={{ 
-                color: 'var(--color-primary)', 
-                textDecoration: 'none',
-                fontWeight: 'var(--font-medium)'
-              }}
-            >
-              helpdesk@connective.com.au
-            </a>
-          </p>
-          <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-            Powered by Mercury Nexus CRM • Secure & Encrypted
-          </p>
-        </div>
       </div>
     </div>
   );

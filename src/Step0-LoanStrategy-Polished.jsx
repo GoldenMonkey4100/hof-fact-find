@@ -24,6 +24,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
       loanTerm: '',
       loanType: '',
       repaymentType: '',
+      fixedRatePeriod: '',
       interestOnlyPeriod: '',
       split1Amount: '',
       split1Type: '',
@@ -62,35 +63,39 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
     updateFormData('brokerEmail', getBrokerEmail(brokerName));
   };
 
-  // Change 2: Currency handlers with LVR auto-calc
+  // Atomic multi-field update — prevents stale closure race condition
+  const updateSecurityFields = (index, updates) => {
+    const securities = [...formData.securities];
+    securities[index] = { ...securities[index], ...updates };
+    updateFormData('securities', securities);
+  };
+
   const handlePropertyValueChange = (index, value) => {
     const parsed = parseCurrency(value);
-    updateSecurity(index, 'propertyValue', parsed);
     const security = formData.securities[index];
-    if (security.loanAmount) {
-      updateSecurity(index, 'lvr', calculateLVR(parsed, security.loanAmount));
-    }
+    const updates = { propertyValue: parsed };
+    if (security.loanAmount && parsed) updates.lvr = calculateLVR(parsed, security.loanAmount);
+    updateSecurityFields(index, updates);
   };
 
   const handleLoanAmountChange = (index, value) => {
     const parsed = parseCurrency(value);
-    updateSecurity(index, 'loanAmount', parsed);
     const security = formData.securities[index];
-    if (security.propertyValue) {
-      updateSecurity(index, 'lvr', calculateLVR(security.propertyValue, parsed));
-    }
+    const updates = { loanAmount: parsed };
+    if (security.propertyValue && parsed) updates.lvr = calculateLVR(security.propertyValue, parsed);
+    updateSecurityFields(index, updates);
   };
 
-  // Change 3: LVR 3-way editing
   const handleLVRChange = (index, value) => {
     const lvrValue = value.replace(/[^0-9.]/g, '');
-    updateSecurity(index, 'lvr', lvrValue);
     const security = formData.securities[index];
+    const updates = { lvr: lvrValue };
     if (security.propertyValue && lvrValue) {
-      updateSecurity(index, 'loanAmount', calculateLoanAmount(security.propertyValue, lvrValue));
+      updates.loanAmount = calculateLoanAmount(security.propertyValue, lvrValue);
     } else if (security.loanAmount && lvrValue) {
-      updateSecurity(index, 'propertyValue', calculatePropertyValue(security.loanAmount, lvrValue));
+      updates.propertyValue = calculatePropertyValue(security.loanAmount, lvrValue);
     }
+    updateSecurityFields(index, updates);
   };
 
   // Change 5: Lender multi-select toggle
@@ -369,7 +374,6 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                 Loan Structure
               </h4>
 
-              {/* Change 4: Repayment Type now appears before Loan Type */}
               <div className="grid grid-cols-2 mb-4">
                 <div>
                   <label>Loan Term (years)</label>
@@ -394,13 +398,60 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                 </div>
               </div>
 
-              {/* Change 6: Split in dollar values */}
+              {/* Fixed Rate Period — only shown when Fixed is selected */}
+              {security.repaymentType === 'Fixed' && (
+                <div className="mb-4">
+                  <label>Fixed Rate Period (years)</label>
+                  <select
+                    value={security.fixedRatePeriod || ''}
+                    onChange={(e) => updateSecurity(index, 'fixedRatePeriod', e.target.value)}
+                  >
+                    <option value="">Select...</option>
+                    {[1, 2, 3, 4, 5].map(year => (
+                      <option key={year} value={year}>{year} year{year > 1 ? 's' : ''}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Loan Type — hidden when Split (each split has its own type) */}
+              {security.repaymentType !== 'Split' && (
+                <div className="mb-4">
+                  <label>Loan Type</label>
+                  <select
+                    value={security.loanType}
+                    onChange={(e) => updateSecurity(index, 'loanType', e.target.value)}
+                  >
+                    <option value="">Select...</option>
+                    <option value="Principal & Interest">Principal & Interest</option>
+                    <option value="Interest Only">Interest Only</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Interest Only Period — only when IO and not Split */}
+              {security.loanType === 'Interest Only' && security.repaymentType !== 'Split' && (
+                <div className="mb-4">
+                  <label>Interest Only Period (years)</label>
+                  <select
+                    value={security.interestOnlyPeriod}
+                    onChange={(e) => updateSecurity(index, 'interestOnlyPeriod', e.target.value)}
+                  >
+                    <option value="">Select...</option>
+                    {[1, 2, 3, 4, 5].map(year => (
+                      <option key={year} value={year}>{year} year{year > 1 ? 's' : ''}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Split Details — shown instead of Loan Type when Split is selected */}
               {security.repaymentType === 'Split' && (
                 <div className="mb-4" style={{ background: 'var(--bg-primary)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-primary)' }}>
                   <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Split Details</h4>
 
                   <div className="mb-4">
-                    <label>Split 1 - Loan Amount</label>
+                    <label>Split 1 — Loan Amount</label>
                     <input
                       type="text"
                       value={formatCurrency(security.split1Amount || '')}
@@ -408,7 +459,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                       placeholder="300,000"
                     />
                     <div className="mt-2">
-                      <label style={{ fontSize: '13px' }}>Split 1 - Loan Type</label>
+                      <label style={{ fontSize: '13px' }}>Split 1 — Loan Type</label>
                       <select
                         value={security.split1Type || ''}
                         onChange={(e) => updateSecurity(index, 'split1Type', e.target.value)}
@@ -422,7 +473,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                   </div>
 
                   <div className="mb-4">
-                    <label>Split 2 - Loan Amount</label>
+                    <label>Split 2 — Loan Amount</label>
                     <input
                       type="text"
                       value={formatCurrency(security.split2Amount || '')}
@@ -430,7 +481,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                       placeholder="300,000"
                     />
                     <div className="mt-2">
-                      <label style={{ fontSize: '13px' }}>Split 2 - Loan Type</label>
+                      <label style={{ fontSize: '13px' }}>Split 2 — Loan Type</label>
                       <select
                         value={security.split2Type || ''}
                         onChange={(e) => updateSecurity(index, 'split2Type', e.target.value)}
@@ -446,45 +497,16 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                   {security.split1Amount && security.split2Amount && (
                     <div className="hint-text" style={{ marginTop: '8px' }}>
                       {(() => {
-                        const split1 = parseFloat(parseCurrency(security.split1Amount));
-                        const split2 = parseFloat(parseCurrency(security.split2Amount));
-                        const total = split1 + split2;
-                        const loanAmount = parseFloat(parseCurrency(security.loanAmount));
-                        if (Math.abs(total - loanAmount) < 1) {
-                          return `✓ Total: ${formatCurrencyDisplay(total.toString())} (matches loan amount)`;
-                        } else {
-                          return `⚠️ Total: ${formatCurrencyDisplay(total.toString())} (loan amount is ${formatCurrencyDisplay(security.loanAmount)})`;
-                        }
+                        const s1 = parseFloat(parseCurrency(security.split1Amount)) || 0;
+                        const s2 = parseFloat(parseCurrency(security.split2Amount)) || 0;
+                        const total = s1 + s2;
+                        const loan = parseFloat(parseCurrency(security.loanAmount)) || 0;
+                        return Math.abs(total - loan) < 1
+                          ? `✓ Total: ${formatCurrencyDisplay(total.toString())} (matches loan amount)`
+                          : `⚠️ Total: ${formatCurrencyDisplay(total.toString())} (loan amount is ${formatCurrencyDisplay(security.loanAmount)})`;
                       })()}
                     </div>
                   )}
-                </div>
-              )}
-
-              <div className="mb-4">
-                <label>Loan Type</label>
-                <select
-                  value={security.loanType}
-                  onChange={(e) => updateSecurity(index, 'loanType', e.target.value)}
-                >
-                  <option value="">Select...</option>
-                  <option value="Principal & Interest">Principal & Interest</option>
-                  <option value="Interest Only">Interest Only</option>
-                </select>
-              </div>
-
-              {security.loanType === 'Interest Only' && (
-                <div className="mb-4">
-                  <label>Interest Only Period (years)</label>
-                  <select
-                    value={security.interestOnlyPeriod}
-                    onChange={(e) => updateSecurity(index, 'interestOnlyPeriod', e.target.value)}
-                  >
-                    <option value="">Select...</option>
-                    {[1, 2, 3, 4, 5].map(year => (
-                      <option key={year} value={year}>{year} year{year > 1 ? 's' : ''}</option>
-                    ))}
-                  </select>
                 </div>
               )}
 

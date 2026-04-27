@@ -4,23 +4,33 @@ import './styles.css';
 const Step2Employment = ({ formData, updateFormData }) => {
   const [employmentRecords, setEmploymentRecords] = useState([]);
 
-  // Initialize employment records for all applicants
+  // Sync employment records with applicants — preserves existing data, updates names live
   useEffect(() => {
     if (formData.applicants && formData.applicants.length > 0) {
-      const records = formData.applicants.map((applicant) => ({
-        applicantId: applicant.id,
-        applicantName: `${applicant.firstName} ${applicant.lastName}`.trim() || `${applicant.role} ${applicant.number}`,
-        currentEmployment: {
-          employmentType: '',
-          employer: '',
-          role: '',
-          startDate: '',
-          abn: ''
-        },
-        previousEmployments: [],
-        totalYears: 0,
-        meetsRequirement: false
-      }));
+      const records = formData.applicants.map((applicant) => {
+        const applicantName = `${applicant.firstName || ''} ${applicant.lastName || ''}`.trim()
+          || `${applicant.role} ${applicant.number}`;
+        const existing = (formData.employment || []).find(r => r.applicantId === applicant.id);
+        if (existing) {
+          return { ...existing, applicantName };
+        }
+        return {
+          applicantId: applicant.id,
+          applicantName,
+          currentEmployment: {
+            employmentType: '',
+            employer: '',
+            role: '',
+            startDate: '',
+            abn: '',
+            entityType: '',
+            receivingCentrelink: false
+          },
+          previousEmployments: [],
+          totalYears: 0,
+          meetsRequirement: false
+        };
+      });
       setEmploymentRecords(records);
     }
   }, [formData.applicants]);

@@ -11,27 +11,19 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'email or phone query param required' });
   }
 
-  // Support multiple possible env var naming conventions
-  const apiKey =
-    process.env.MERCURY_API_KEY ||
-    process.env.MERCURY_KEY ||
-    process.env.CONNECTIVE_API_KEY;
-
-  const apiToken =
-    process.env.MERCURY_API_TOKEN ||
-    process.env.MERCURY_TOKEN ||
-    process.env.CONNECTIVE_API_TOKEN;
+  const apiKey = process.env.VITE_MERCURY_API_KEY;
+  const apiToken = process.env.VITE_MERCURY_API_TOKEN;
+  const baseUrl = process.env.VITE_MERCURY_API_URL || 'https://apis.connective.com.au/mercury/v1';
 
   if (!apiKey || !apiToken) {
     return res.status(500).json({
-      error: 'Mercury credentials not found. Check Vercel env vars are named MERCURY_API_KEY and MERCURY_API_TOKEN.',
-      envKeysFound: Object.keys(process.env).filter(k => k.toLowerCase().includes('mercury') || k.toLowerCase().includes('connective'))
+      error: `Mercury credentials missing. Found keys: ${Object.keys(process.env).filter(k => k.includes('MERCURY')).join(', ') || 'none'}`
     });
   }
 
   const trySearch = async (fieldName, value) => {
     const searchParams = encodeURIComponent(JSON.stringify({ [fieldName]: value }));
-    const url = `https://apis.connective.com.au/mercury/v1/${apiToken}/contacts?search=true&searchParams=${searchParams}&count=5`;
+    const url = `${baseUrl}/${apiToken}/contacts?search=true&searchParams=${searchParams}&count=5`;
     const response = await fetch(url, {
       headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }
     });

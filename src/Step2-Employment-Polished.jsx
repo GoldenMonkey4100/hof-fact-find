@@ -180,8 +180,41 @@ const Step2Employment = ({ formData, updateFormData }) => {
               </select>
             </div>
 
-            {record.currentEmployment.employmentType && 
-             record.currentEmployment.employmentType !== 'Unemployed' && 
+            {/* Change 11: Entity Type for Self-Employed */}
+            {record.currentEmployment.employmentType === 'Self-Employed' && (
+              <div className="mb-4">
+                <label>Entity Type</label>
+                <select
+                  value={record.currentEmployment.entityType || ''}
+                  onChange={(e) => updateCurrentEmployment(index, 'entityType', e.target.value)}
+                  required
+                >
+                  <option value="">Select Entity Type...</option>
+                  <option value="Sole Trader">Sole Trader</option>
+                  <option value="Partnership">Partnership</option>
+                  <option value="Company">Company</option>
+                  <option value="Trust">Trust</option>
+                </select>
+              </div>
+            )}
+
+            {/* Change 12: Centrelink checkbox for Unemployed */}
+            {record.currentEmployment.employmentType === 'Unemployed' && (
+              <div className="mb-4" style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '6px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={record.currentEmployment.receivingCentrelink || false}
+                    onChange={(e) => updateCurrentEmployment(index, 'receivingCentrelink', e.target.checked)}
+                    style={{ marginRight: '8px' }}
+                  />
+                  <span>Receiving Government Benefits (Centrelink)</span>
+                </label>
+              </div>
+            )}
+
+            {record.currentEmployment.employmentType &&
+             record.currentEmployment.employmentType !== 'Unemployed' &&
              record.currentEmployment.employmentType !== 'Retired' && (
               <>
                 <div className="grid grid-cols-2 mb-4">

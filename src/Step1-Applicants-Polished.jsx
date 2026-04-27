@@ -4,7 +4,6 @@ import './styles.css';
 const Step1Applicants = ({ formData, updateFormData }) => {
   const [applicants, setApplicants] = useState([]);
 
-  // Initialize applicants based on numApplicants and applicantType
   React.useEffect(() => {
     const totalCount = formData.numApplicants + formData.numGuarantors;
     const newApplicants = [];
@@ -12,7 +11,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     for (let i = 0; i < totalCount; i++) {
       const isApplicant = i < formData.numApplicants;
       const applicantNumber = isApplicant ? i + 1 : i - formData.numApplicants + 1;
-      
+
       if (formData.applicantType === 'Natural Person' && isApplicant) {
         newApplicants.push({
           id: i + 1,
@@ -25,6 +24,9 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           phone: '',
           email: '',
           address: '',
+          yearsAtCurrentAddress: '',
+          monthsAtCurrentAddress: '',
+          addressHistory: [],
           gender: '',
           maritalStatus: '',
           residencyStatus: '',
@@ -32,11 +34,9 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           relationshipToApplicant1: i === 0 ? 'Primary' : '',
           numDependants: 0,
           dependants: [],
-          documents: {
-            driverLicence: null,
-            payslips: null,
-            other: null
-          }
+          uploadedDocuments: [],
+          assets: [],
+          liabilities: []
         });
       } else {
         newApplicants.push({
@@ -49,12 +49,13 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           dob: '',
           phone: '',
           email: '',
+          companyName: '',
+          companyABN: '',
+          companyACN: '',
           relationshipToCompany: '',
-          documents: {
-            driverLicence: null,
-            payslips: null,
-            other: null
-          }
+          uploadedDocuments: [],
+          assets: [],
+          liabilities: []
         });
       }
     }
@@ -65,12 +66,10 @@ const Step1Applicants = ({ formData, updateFormData }) => {
   const updateApplicant = (index, field, value) => {
     const updated = [...applicants];
     updated[index] = { ...updated[index], [field]: value };
-    
-    // Handle dependants number change
+
     if (field === 'numDependants') {
       const numDeps = parseInt(value) || 0;
       const currentDeps = updated[index].dependants || [];
-      
       if (numDeps > currentDeps.length) {
         const newDeps = [...currentDeps];
         for (let i = currentDeps.length; i < numDeps; i++) {
@@ -81,7 +80,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         updated[index].dependants = currentDeps.slice(0, numDeps);
       }
     }
-    
+
     setApplicants(updated);
     updateFormData('applicants', updated);
   };
@@ -89,13 +88,6 @@ const Step1Applicants = ({ formData, updateFormData }) => {
   const updateDependant = (applicantIndex, dependantIndex, field, value) => {
     const updated = [...applicants];
     updated[applicantIndex].dependants[dependantIndex][field] = value;
-    setApplicants(updated);
-    updateFormData('applicants', updated);
-  };
-
-  const handleFileUpload = (applicantIndex, docType, files) => {
-    const updated = [...applicants];
-    updated[applicantIndex].documents[docType] = files[0];
     setApplicants(updated);
     updateFormData('applicants', updated);
   };
@@ -110,22 +102,19 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     <div className="fade-in">
       <div className="mb-6">
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
-          Complete details for {formData.numApplicants} applicant{formData.numApplicants > 1 ? 's' : ''} 
+          Complete details for {formData.numApplicants} applicant{formData.numApplicants > 1 ? 's' : ''}
           {formData.numGuarantors > 0 && ` and ${formData.numGuarantors} guarantor${formData.numGuarantors > 1 ? 's' : ''}`}
         </p>
       </div>
 
       {applicants.map((applicant, index) => (
         <div key={applicant.id} className="card mb-6">
-          
-          {/* Card Header */}
+
+          {/* Card Header - Change 7: removed Company Guarantor blue bubble */}
           <div className="card-header">
             <div>
               <h3 className="card-title" style={{ margin: 0 }}>
                 {applicant.role} {applicant.number}
-                {applicant.type === 'Company Guarantor' && (
-                  <span className="badge badge-info" style={{ marginLeft: '8px' }}>Company Guarantor</span>
-                )}
               </h3>
               <p className="card-subtitle">
                 {applicant.type === 'Natural Person' ? 'Natural person details' : 'Guarantor details'}
@@ -136,12 +125,11 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {/* Natural Person Fields */}
           {applicant.type === 'Natural Person' && (
             <>
-              {/* Personal Details */}
               <div className="mb-6">
                 <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
                   Personal Details
                 </h4>
-                
+
                 <div className="grid grid-cols-2 mb-4">
                   <div>
                     <label>First Name</label>
@@ -205,17 +193,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   />
                 </div>
 
-                <div className="mb-4">
-                  <label>Residential Address</label>
-                  <input
-                    type="text"
-                    value={applicant.address}
-                    onChange={(e) => updateApplicant(index, 'address', e.target.value)}
-                    placeholder="123 Main Street, Sydney NSW 2000"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2">
+                <div className="grid grid-cols-2 mb-4">
                   <div>
                     <label>Marital Status</label>
                     <select
@@ -246,7 +224,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                 </div>
 
                 {applicant.residencyStatus === 'Temporary Visa' && (
-                  <div className="mt-4">
+                  <div className="mb-4">
                     <label>Visa Number</label>
                     <input
                       type="text"
@@ -256,9 +234,149 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                     />
                   </div>
                 )}
+
+                {/* Change 10: 3-Year Residential Address History */}
+                <div className="mb-4" style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px' }}>
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>
+                      3-Year Residential Address History
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentAddresses = applicant.addressHistory || [];
+                        updateApplicant(index, 'addressHistory', [
+                          ...currentAddresses,
+                          { id: Date.now(), address: '', yearsAtAddress: '', monthsAtAddress: '' }
+                        ]);
+                      }}
+                      className="btn-secondary"
+                      style={{ fontSize: '13px', padding: '6px 12px' }}
+                    >
+                      + Add Previous Address
+                    </button>
+                  </div>
+
+                  <div className="mb-3" style={{ paddingBottom: '12px', borderBottom: '1px solid var(--border-primary)' }}>
+                    <label style={{ fontSize: '13px', fontWeight: '500' }}>Current Address</label>
+                    <input
+                      type="text"
+                      value={applicant.address || ''}
+                      onChange={(e) => updateApplicant(index, 'address', e.target.value)}
+                      placeholder="Current residential address"
+                      style={{ fontSize: '13px' }}
+                    />
+                    <div className="grid grid-cols-2" style={{ marginTop: '8px' }}>
+                      <div>
+                        <label style={{ fontSize: '12px' }}>Years</label>
+                        <input
+                          type="number"
+                          value={applicant.yearsAtCurrentAddress || ''}
+                          onChange={(e) => updateApplicant(index, 'yearsAtCurrentAddress', e.target.value)}
+                          placeholder="0"
+                          min="0"
+                          style={{ fontSize: '13px' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '12px' }}>Months</label>
+                        <input
+                          type="number"
+                          value={applicant.monthsAtCurrentAddress || ''}
+                          onChange={(e) => updateApplicant(index, 'monthsAtCurrentAddress', e.target.value)}
+                          placeholder="0"
+                          min="0"
+                          max="11"
+                          style={{ fontSize: '13px' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {(applicant.addressHistory || []).map((addr, addrIndex) => (
+                    <div key={addr.id} className="mb-3" style={{ paddingTop: '12px' }}>
+                      <div className="flex justify-between items-center mb-2">
+                        <label style={{ fontSize: '13px', fontWeight: '500' }}>Previous Address {addrIndex + 1}</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = applicant.addressHistory.filter((_, i) => i !== addrIndex);
+                            updateApplicant(index, 'addressHistory', updated);
+                          }}
+                          className="btn-danger"
+                          style={{ fontSize: '12px', padding: '4px 8px' }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={addr.address}
+                        onChange={(e) => {
+                          const updated = [...applicant.addressHistory];
+                          updated[addrIndex] = { ...updated[addrIndex], address: e.target.value };
+                          updateApplicant(index, 'addressHistory', updated);
+                        }}
+                        placeholder="Previous residential address"
+                        style={{ fontSize: '13px' }}
+                      />
+                      <div className="grid grid-cols-2" style={{ marginTop: '8px' }}>
+                        <div>
+                          <label style={{ fontSize: '12px' }}>Years</label>
+                          <input
+                            type="number"
+                            value={addr.yearsAtAddress}
+                            onChange={(e) => {
+                              const updated = [...applicant.addressHistory];
+                              updated[addrIndex] = { ...updated[addrIndex], yearsAtAddress: e.target.value };
+                              updateApplicant(index, 'addressHistory', updated);
+                            }}
+                            placeholder="0"
+                            min="0"
+                            style={{ fontSize: '13px' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '12px' }}>Months</label>
+                          <input
+                            type="number"
+                            value={addr.monthsAtAddress}
+                            onChange={(e) => {
+                              const updated = [...applicant.addressHistory];
+                              updated[addrIndex] = { ...updated[addrIndex], monthsAtAddress: e.target.value };
+                              updateApplicant(index, 'addressHistory', updated);
+                            }}
+                            placeholder="0"
+                            min="0"
+                            max="11"
+                            style={{ fontSize: '13px' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="hint-text" style={{ marginTop: '12px', fontSize: '12px' }}>
+                    {(() => {
+                      const currentYears = parseInt(applicant.yearsAtCurrentAddress) || 0;
+                      const currentMonths = parseInt(applicant.monthsAtCurrentAddress) || 0;
+                      const historyYears = (applicant.addressHistory || []).reduce((sum, addr) =>
+                        sum + (parseInt(addr.yearsAtAddress) || 0), 0);
+                      const historyMonths = (applicant.addressHistory || []).reduce((sum, addr) =>
+                        sum + (parseInt(addr.monthsAtAddress) || 0), 0);
+                      const totalMonths = (currentYears * 12) + currentMonths + (historyYears * 12) + historyMonths;
+                      const totalYears = Math.floor(totalMonths / 12);
+                      const remainingMonths = totalMonths % 12;
+                      if (totalMonths < 36) {
+                        return `⚠️ Total: ${totalYears} years ${remainingMonths} months (need 3 years minimum)`;
+                      } else {
+                        return `✓ Total: ${totalYears} years ${remainingMonths} months`;
+                      }
+                    })()}
+                  </div>
+                </div>
               </div>
 
-              {/* Relationship (for Applicant 2+) */}
               {index > 0 && (
                 <div className="mb-6">
                   <label>Relationship to Applicant 1</label>
@@ -278,18 +396,12 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                 </div>
               )}
 
-              {/* Dependants */}
               {!shouldShareDependants(index) && (
                 <div className="mb-6">
-                  <div style={{ 
-                    background: 'var(--bg-secondary)', 
-                    padding: '20px', 
-                    borderRadius: 'var(--radius-lg)' 
-                  }}>
+                  <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: 'var(--radius-lg)' }}>
                     <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
                       Dependants
                     </h4>
-
                     <div className="mb-4">
                       <label>Number of Dependants</label>
                       <select
@@ -301,17 +413,10 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                         ))}
                       </select>
                     </div>
-
                     {applicant.dependants && applicant.dependants.map((dependant, depIndex) => (
-                      <div 
+                      <div
                         key={depIndex}
-                        style={{ 
-                          background: 'var(--bg-primary)', 
-                          padding: '12px', 
-                          borderRadius: 'var(--radius-md)',
-                          marginBottom: '8px',
-                          border: '1px solid var(--border-primary)'
-                        }}
+                        style={{ background: 'var(--bg-primary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '8px', border: '1px solid var(--border-primary)' }}
                       >
                         <div className="grid grid-cols-2">
                           <div>
@@ -341,12 +446,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
               {shouldShareDependants(index) && (
                 <div className="mb-6">
-                  <div style={{ 
-                    padding: '16px', 
-                    background: 'var(--color-info-light)', 
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--color-info)'
-                  }}>
+                  <div style={{ padding: '16px', background: 'var(--color-info-light)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-info)' }}>
                     <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-info-dark)' }}>
                       ℹ️ <strong>Shared Dependants:</strong> As the spouse of Applicant 1, dependants are automatically shared and managed in Applicant 1's section.
                     </p>
@@ -410,7 +510,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                 />
               </div>
 
-              <div>
+              <div className="mb-4">
                 <label>Relationship to Company</label>
                 <select
                   value={applicant.relationshipToCompany}
@@ -424,79 +524,110 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   <option value="Other">Other</option>
                 </select>
               </div>
+
+              {/* Change 8: Company Details section */}
+              <div className="mb-4" style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Company Details</h4>
+
+                <div className="mb-3">
+                  <label>Company Name</label>
+                  <input
+                    type="text"
+                    value={applicant.companyName || ''}
+                    onChange={(e) => updateApplicant(index, 'companyName', e.target.value)}
+                    placeholder="XYZ Pty Ltd"
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label>ABN</label>
+                  <input
+                    type="text"
+                    value={applicant.companyABN || ''}
+                    onChange={(e) => updateApplicant(index, 'companyABN', e.target.value)}
+                    placeholder="12 345 678 901"
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label>ACN</label>
+                  <input
+                    type="text"
+                    value={applicant.companyACN || ''}
+                    onChange={(e) => updateApplicant(index, 'companyACN', e.target.value)}
+                    placeholder="123 456 789"
+                  />
+                </div>
+
+                <div className="hint-text" style={{ marginTop: '8px', fontSize: '12px' }}>
+                  ℹ️ Additional company details can be refined later
+                </div>
+              </div>
             </>
           )}
 
-          {/* Document Upload */}
+          {/* Change 9: Single Document Upload Zone */}
           <div className="mt-6">
-            <div style={{ 
-              background: 'var(--bg-secondary)', 
-              padding: '20px', 
-              borderRadius: 'var(--radius-lg)' 
-            }}>
+            <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: 'var(--radius-lg)' }}>
               <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
                 Document Upload
               </h4>
-              
-              <div className="grid grid-cols-3">
-                <div>
-                  <label>Driver's Licence</label>
-                  <input
-                    type="file"
-                    onChange={(e) => handleFileUpload(index, 'driverLicence', e.target.files)}
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    style={{ fontSize: '13px' }}
-                  />
-                  {applicant.documents.driverLicence && (
-                    <div className="success-message">
-                      ✓ {applicant.documents.driverLicence.name}
-                    </div>
-                  )}
-                </div>
 
-                <div>
-                  <label>Payslips (Last 2)</label>
-                  <input
-                    type="file"
-                    onChange={(e) => handleFileUpload(index, 'payslips', e.target.files)}
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    style={{ fontSize: '13px' }}
-                  />
-                  {applicant.documents.payslips && (
-                    <div className="success-message">
-                      ✓ {applicant.documents.payslips.name}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label>Other Documents</label>
-                  <input
-                    type="file"
-                    onChange={(e) => handleFileUpload(index, 'other', e.target.files)}
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    style={{ fontSize: '13px' }}
-                  />
-                  {applicant.documents.other && (
-                    <div className="success-message">
-                      ✓ {applicant.documents.other.name}
-                    </div>
-                  )}
-                </div>
+              <div
+                className="document-upload-zone"
+                style={{
+                  border: '2px dashed var(--border-primary)',
+                  borderRadius: '8px',
+                  padding: '32px',
+                  textAlign: 'center',
+                  background: 'var(--bg-primary)',
+                  cursor: 'pointer',
+                  marginTop: '8px'
+                }}
+                onClick={() => document.getElementById(`fileInput-${index}`).click()}
+              >
+                <div style={{ fontSize: '48px', marginBottom: '8px' }}>📎</div>
+                <p style={{ margin: '0 0 8px 0', fontWeight: '500' }}>Drag and drop files here</p>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>or click to browse</p>
+                <input
+                  id={`fileInput-${index}`}
+                  type="file"
+                  multiple
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files);
+                    updateApplicant(index, 'uploadedDocuments', files);
+                  }}
+                  style={{ display: 'none' }}
+                />
               </div>
 
+              {applicant.uploadedDocuments && applicant.uploadedDocuments.length > 0 && (
+                <div className="mt-2">
+                  <p style={{ fontSize: '13px', fontWeight: '500', marginBottom: '4px' }}>
+                    {applicant.uploadedDocuments.length} file(s) selected:
+                  </p>
+                  <ul style={{ fontSize: '12px', margin: '0', paddingLeft: '20px' }}>
+                    {applicant.uploadedDocuments.map((file, i) => (
+                      <li key={i}>{file.name}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <p className="hint-text" style={{ marginTop: '12px' }}>
-                Accepted formats: PDF, JPG, PNG (max 5MB per file)
+                Accepted formats: PDF, JPG, PNG, DOC, DOCX (max 5MB per file)
               </p>
             </div>
           </div>
+
         </div>
       ))}
 
       {applicants.length === 0 && (
-        <div style={{ 
-          padding: '40px', 
-          textAlign: 'center', 
+        <div style={{
+          padding: '40px',
+          textAlign: 'center',
           background: 'var(--bg-secondary)',
           borderRadius: 'var(--radius-lg)',
           border: '2px dashed var(--border-primary)'

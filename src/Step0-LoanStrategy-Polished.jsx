@@ -1,21 +1,12 @@
 import React from 'react';
 import './styles.css';
+import { getBrokerEmail, formatCurrency, parseCurrency, calculateLVR, calculatePropertyValue, calculateLoanAmount, formatCurrencyDisplay } from './utils';
 
 const Step0LoanStrategy = ({ formData, updateFormData }) => {
-  
+
   const updateSecurity = (index, field, value) => {
     const securities = [...formData.securities];
     securities[index] = { ...securities[index], [field]: value };
-    
-    // Auto-calculate LVR
-    if (field === 'propertyValue' || field === 'loanAmount') {
-      const propValue = field === 'propertyValue' ? parseFloat(value) : parseFloat(securities[index].propertyValue);
-      const loanAmt = field === 'loanAmount' ? parseFloat(value) : parseFloat(securities[index].loanAmount);
-      if (propValue && loanAmt) {
-        securities[index].lvr = ((loanAmt / propValue) * 100).toFixed(2);
-      }
-    }
-    
     updateFormData('securities', securities);
   };
 
@@ -34,7 +25,10 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
       loanType: '',
       repaymentType: '',
       interestOnlyPeriod: '',
-      splits: [],
+      split1Amount: '',
+      split1Type: '',
+      split2Amount: '',
+      split2Type: '',
       ratePreference: '',
       hasOffset: false,
       hasRedraw: false
@@ -53,43 +47,65 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
     const securities = [...formData.securities];
     const field = isPrimary ? 'primaryTransactionTypes' : 'secondaryTransactionTypes';
     const current = securities[securityIndex][field];
-    
     if (current.includes(type)) {
       securities[securityIndex][field] = current.filter(t => t !== type);
     } else {
       securities[securityIndex][field] = [...current, type];
     }
-    
     updateFormData('securities', securities);
   };
 
-  const addLoanSplit = (securityIndex) => {
-    const securities = [...formData.securities];
-    const splits = securities[securityIndex].splits || [];
-    splits.push({
-      id: splits.length + 1,
-      portion: '',
-      repaymentType: ''
-    });
-    securities[securityIndex].splits = splits;
-    updateFormData('securities', securities);
+  // Change 1: Broker dropdown with auto-email
+  const handleBrokerChange = (e) => {
+    const brokerName = e.target.value;
+    updateFormData('brokerName', brokerName);
+    updateFormData('brokerEmail', getBrokerEmail(brokerName));
   };
 
-  const removeLoanSplit = (securityIndex, splitIndex) => {
-    const securities = [...formData.securities];
-    securities[securityIndex].splits = securities[securityIndex].splits.filter((_, i) => i !== splitIndex);
-    updateFormData('securities', securities);
+  // Change 2: Currency handlers with LVR auto-calc
+  const handlePropertyValueChange = (index, value) => {
+    const parsed = parseCurrency(value);
+    updateSecurity(index, 'propertyValue', parsed);
+    const security = formData.securities[index];
+    if (security.loanAmount) {
+      updateSecurity(index, 'lvr', calculateLVR(parsed, security.loanAmount));
+    }
   };
 
-  const updateLoanSplit = (securityIndex, splitIndex, field, value) => {
-    const securities = [...formData.securities];
-    securities[securityIndex].splits[splitIndex][field] = value;
-    updateFormData('securities', securities);
+  const handleLoanAmountChange = (index, value) => {
+    const parsed = parseCurrency(value);
+    updateSecurity(index, 'loanAmount', parsed);
+    const security = formData.securities[index];
+    if (security.propertyValue) {
+      updateSecurity(index, 'lvr', calculateLVR(security.propertyValue, parsed));
+    }
+  };
+
+  // Change 3: LVR 3-way editing
+  const handleLVRChange = (index, value) => {
+    const lvrValue = value.replace(/[^0-9.]/g, '');
+    updateSecurity(index, 'lvr', lvrValue);
+    const security = formData.securities[index];
+    if (security.propertyValue && lvrValue) {
+      updateSecurity(index, 'loanAmount', calculateLoanAmount(security.propertyValue, lvrValue));
+    } else if (security.loanAmount && lvrValue) {
+      updateSecurity(index, 'propertyValue', calculatePropertyValue(security.loanAmount, lvrValue));
+    }
+  };
+
+  // Change 5: Lender multi-select toggle
+  const toggleLender = (lender) => {
+    const currentLenders = formData.lenderPreference || [];
+    if (currentLenders.includes(lender)) {
+      updateFormData('lenderPreference', currentLenders.filter(l => l !== lender));
+    } else {
+      updateFormData('lenderPreference', [...currentLenders, lender]);
+    }
   };
 
   return (
     <div className="fade-in">
-      
+
       {/* Applicant Type */}
       <div className="mb-8">
         <label>Applicant Type</label>
@@ -99,7 +115,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               key={type}
               onClick={() => updateFormData('applicantType', type)}
               className={formData.applicantType === type ? 'btn-primary' : 'btn-secondary'}
-              style={{ 
+              style={{
                 border: formData.applicantType === type ? '2px solid var(--color-primary)' : '1px solid var(--border-primary)',
                 background: formData.applicantType === type ? 'var(--color-primary)' : 'white',
                 color: formData.applicantType === type ? 'white' : 'var(--text-primary)'
@@ -114,29 +130,22 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
       {/* Broker Details Card */}
       <div className="card mb-8">
         <h3 className="card-title">Broker Details</h3>
-        
+
         <div className="grid grid-cols-2 mb-4">
+          {/* Change 1: Broker dropdown - email auto-fills in background */}
           <div>
             <label>Broker Name</label>
-            <input
-              type="text"
+            <select
               value={formData.brokerName}
-              onChange={(e) => updateFormData('brokerName', e.target.value)}
-              placeholder="Enter your name"
-            />
+              onChange={handleBrokerChange}
+              required
+            >
+              <option value="">Select Broker...</option>
+              <option value="Laith Hana">Laith Hana</option>
+              <option value="Mehdi Amirilayeghi">Mehdi Amirilayeghi</option>
+              <option value="Yousif Jirjis">Yousif Jirjis</option>
+            </select>
           </div>
-          <div>
-            <label>Broker Email</label>
-            <input
-              type="email"
-              value={formData.brokerEmail}
-              onChange={(e) => updateFormData('brokerEmail', e.target.value)}
-              placeholder="email@example.com"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2">
           <div>
             <label>Client Type</label>
             <select
@@ -149,24 +158,24 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               <option value="Family & Friends">Family & Friends</option>
             </select>
           </div>
-          
-          {formData.clientType === 'New' && (
-            <div>
-              <label>Lead Source</label>
-              <select
-                value={formData.leadSource}
-                onChange={(e) => updateFormData('leadSource', e.target.value)}
-              >
-                <option value="">Select...</option>
-                <option value="Referral">Referral</option>
-                <option value="Website">Website</option>
-                <option value="Social Media">Social Media</option>
-                <option value="Walk-in">Walk-in</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-          )}
         </div>
+
+        {formData.clientType === 'New' && (
+          <div>
+            <label>Lead Source</label>
+            <select
+              value={formData.leadSource}
+              onChange={(e) => updateFormData('leadSource', e.target.value)}
+            >
+              <option value="">Select...</option>
+              <option value="Referral">Referral</option>
+              <option value="Website">Website</option>
+              <option value="Social Media">Social Media</option>
+              <option value="Walk-in">Walk-in</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Number of Applicants & Guarantors */}
@@ -214,10 +223,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                 )}
               </div>
               {formData.securities.length > 1 && (
-                <button 
-                  onClick={() => removeSecurity(index)}
-                  className="btn-danger"
-                >
+                <button onClick={() => removeSecurity(index)} className="btn-danger">
                   Remove
                 </button>
               )}
@@ -234,37 +240,50 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               />
             </div>
 
+            {/* Change 2: Currency-formatted Property Value & Loan Amount */}
+            {/* Change 3: LVR is now editable with 3-way calculation */}
             <div className="grid grid-cols-3 mb-4">
               <div>
-                <label>Property Value ($)</label>
+                <label>Property Value</label>
                 <input
-                  type="number"
-                  value={security.propertyValue}
-                  onChange={(e) => updateSecurity(index, 'propertyValue', e.target.value)}
-                  placeholder="750000"
+                  type="text"
+                  value={formatCurrency(security.propertyValue)}
+                  onChange={(e) => handlePropertyValueChange(index, e.target.value)}
+                  placeholder="750,000"
                 />
+                {security.propertyValue && (
+                  <div className="hint-text" style={{ fontSize: '12px', marginTop: '4px', color: 'var(--text-secondary)' }}>
+                    {formatCurrencyDisplay(security.propertyValue)}
+                  </div>
+                )}
               </div>
               <div>
-                <label>Loan Amount ($)</label>
+                <label>Loan Amount</label>
                 <input
-                  type="number"
-                  value={security.loanAmount}
-                  onChange={(e) => updateSecurity(index, 'loanAmount', e.target.value)}
-                  placeholder="600000"
+                  type="text"
+                  value={formatCurrency(security.loanAmount)}
+                  onChange={(e) => handleLoanAmountChange(index, e.target.value)}
+                  placeholder="600,000"
                 />
+                {security.loanAmount && (
+                  <div className="hint-text" style={{ fontSize: '12px', marginTop: '4px', color: 'var(--text-secondary)' }}>
+                    {formatCurrencyDisplay(security.loanAmount)}
+                  </div>
+                )}
               </div>
               <div>
                 <label>LVR (%)</label>
                 <input
                   type="text"
                   value={security.lvr}
-                  readOnly
-                  placeholder="Auto-calculated"
-                  style={{ background: 'var(--bg-secondary)', cursor: 'not-allowed' }}
+                  onChange={(e) => handleLVRChange(index, e.target.value)}
+                  placeholder="80.00"
                 />
                 {security.lvr && (
-                  <div className="hint-text">
-                    {parseFloat(security.lvr) > 80 ? '⚠️ High LVR - May require LMI' : '✓ Standard LVR'}
+                  <div className="hint-text" style={{ fontSize: '12px', marginTop: '4px' }}>
+                    {parseFloat(security.lvr) > 80
+                      ? '⚠️ High LVR - May require LMI'
+                      : '✓ Standard LVR'}
                   </div>
                 )}
               </div>
@@ -344,12 +363,13 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               </div>
             </div>
 
-            {/* Loan Structure Card */}
+            {/* Loan Structure */}
             <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: 'var(--radius-lg)', marginBottom: '16px' }}>
               <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
                 Loan Structure
               </h4>
-              
+
+              {/* Change 4: Repayment Type now appears before Loan Type */}
               <div className="grid grid-cols-2 mb-4">
                 <div>
                   <label>Loan Term (years)</label>
@@ -361,28 +381,95 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                   />
                 </div>
                 <div>
-                  <label>Loan Type</label>
+                  <label>Repayment Type</label>
                   <select
-                    value={security.loanType}
-                    onChange={(e) => updateSecurity(index, 'loanType', e.target.value)}
+                    value={security.repaymentType}
+                    onChange={(e) => updateSecurity(index, 'repaymentType', e.target.value)}
                   >
                     <option value="">Select...</option>
-                    <option value="Principal & Interest">Principal & Interest</option>
-                    <option value="Interest Only">Interest Only</option>
+                    <option value="Fixed">Fixed</option>
+                    <option value="Variable">Variable</option>
+                    <option value="Split">Split</option>
                   </select>
                 </div>
               </div>
 
+              {/* Change 6: Split in dollar values */}
+              {security.repaymentType === 'Split' && (
+                <div className="mb-4" style={{ background: 'var(--bg-primary)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-primary)' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Split Details</h4>
+
+                  <div className="mb-4">
+                    <label>Split 1 - Loan Amount</label>
+                    <input
+                      type="text"
+                      value={formatCurrency(security.split1Amount || '')}
+                      onChange={(e) => updateSecurity(index, 'split1Amount', parseCurrency(e.target.value))}
+                      placeholder="300,000"
+                    />
+                    <div className="mt-2">
+                      <label style={{ fontSize: '13px' }}>Split 1 - Loan Type</label>
+                      <select
+                        value={security.split1Type || ''}
+                        onChange={(e) => updateSecurity(index, 'split1Type', e.target.value)}
+                        style={{ fontSize: '13px' }}
+                      >
+                        <option value="">Select Type...</option>
+                        <option value="Principal & Interest">Principal & Interest</option>
+                        <option value="Interest Only">Interest Only</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label>Split 2 - Loan Amount</label>
+                    <input
+                      type="text"
+                      value={formatCurrency(security.split2Amount || '')}
+                      onChange={(e) => updateSecurity(index, 'split2Amount', parseCurrency(e.target.value))}
+                      placeholder="300,000"
+                    />
+                    <div className="mt-2">
+                      <label style={{ fontSize: '13px' }}>Split 2 - Loan Type</label>
+                      <select
+                        value={security.split2Type || ''}
+                        onChange={(e) => updateSecurity(index, 'split2Type', e.target.value)}
+                        style={{ fontSize: '13px' }}
+                      >
+                        <option value="">Select Type...</option>
+                        <option value="Principal & Interest">Principal & Interest</option>
+                        <option value="Interest Only">Interest Only</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {security.split1Amount && security.split2Amount && (
+                    <div className="hint-text" style={{ marginTop: '8px' }}>
+                      {(() => {
+                        const split1 = parseFloat(parseCurrency(security.split1Amount));
+                        const split2 = parseFloat(parseCurrency(security.split2Amount));
+                        const total = split1 + split2;
+                        const loanAmount = parseFloat(parseCurrency(security.loanAmount));
+                        if (Math.abs(total - loanAmount) < 1) {
+                          return `✓ Total: ${formatCurrencyDisplay(total.toString())} (matches loan amount)`;
+                        } else {
+                          return `⚠️ Total: ${formatCurrencyDisplay(total.toString())} (loan amount is ${formatCurrencyDisplay(security.loanAmount)})`;
+                        }
+                      })()}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="mb-4">
-                <label>Repayment Type</label>
+                <label>Loan Type</label>
                 <select
-                  value={security.repaymentType}
-                  onChange={(e) => updateSecurity(index, 'repaymentType', e.target.value)}
+                  value={security.loanType}
+                  onChange={(e) => updateSecurity(index, 'loanType', e.target.value)}
                 >
                   <option value="">Select...</option>
-                  <option value="Fixed">Fixed</option>
-                  <option value="Variable">Variable</option>
-                  <option value="Split">Split</option>
+                  <option value="Principal & Interest">Principal & Interest</option>
+                  <option value="Interest Only">Interest Only</option>
                 </select>
               </div>
 
@@ -398,65 +485,6 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                       <option key={year} value={year}>{year} year{year > 1 ? 's' : ''}</option>
                     ))}
                   </select>
-                </div>
-              )}
-
-              {/* Split Loan Details */}
-              {security.repaymentType === 'Split' && (
-                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-primary)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <label style={{ margin: 0, fontWeight: '500' }}>Split Portions</label>
-                    <button 
-                      onClick={() => addLoanSplit(index)}
-                      className="btn-secondary"
-                      style={{ fontSize: '13px', padding: '6px 12px' }}
-                    >
-                      + Add Split
-                    </button>
-                  </div>
-                  
-                  {security.splits && security.splits.map((split, splitIndex) => (
-                    <div key={split.id} style={{ 
-                      background: 'var(--bg-primary)', 
-                      padding: '12px', 
-                      borderRadius: 'var(--radius-md)',
-                      marginBottom: '8px',
-                      border: '1px solid var(--border-primary)'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: '500' }}>Split {splitIndex + 1}</span>
-                        <button 
-                          onClick={() => removeLoanSplit(index, splitIndex)}
-                          className="btn-danger"
-                          style={{ fontSize: '12px', padding: '4px 8px' }}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2">
-                        <div>
-                          <label>Portion (%)</label>
-                          <input
-                            type="number"
-                            value={split.portion}
-                            onChange={(e) => updateLoanSplit(index, splitIndex, 'portion', e.target.value)}
-                            placeholder="50"
-                          />
-                        </div>
-                        <div>
-                          <label>Type</label>
-                          <select
-                            value={split.repaymentType}
-                            onChange={(e) => updateLoanSplit(index, splitIndex, 'repaymentType', e.target.value)}
-                          >
-                            <option value="">Select...</option>
-                            <option value="Fixed">Fixed</option>
-                            <option value="Variable">Variable</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               )}
 
@@ -482,7 +510,6 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                   />
                   <span>Offset Account</span>
                 </label>
-
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
                   <input
                     type="checkbox"
@@ -497,24 +524,27 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
         ))}
       </div>
 
-      {/* Lender Preference */}
+      {/* Change 5: Lender Preference multi-select checkboxes */}
       <div className="mb-8">
-        <label>Lender Preference</label>
-        <select
-          value={formData.lenderPreference}
-          onChange={(e) => updateFormData('lenderPreference', e.target.value)}
-        >
-          <option value="">No preference</option>
-          <option value="ANZ">ANZ</option>
-          <option value="CBA">Commonwealth Bank</option>
-          <option value="NAB">NAB</option>
-          <option value="Westpac">Westpac</option>
-          <option value="Macquarie">Macquarie</option>
-          <option value="Bankwest">Bankwest</option>
-          <option value="Suncorp">Suncorp</option>
-          <option value="ING">ING</option>
-          <option value="Other">Other</option>
-        </select>
+        <label style={{ fontWeight: '500' }}>Lender Preference (select all that apply)</label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '12px' }}>
+          {['ANZ', 'CBA', 'Westpac', 'NAB', 'Macquarie', 'Bankwest', 'ING', 'Suncorp', 'BOQ', 'Bendigo', 'Others'].map(lender => (
+            <label key={lender} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={(formData.lenderPreference || []).includes(lender)}
+                onChange={() => toggleLender(lender)}
+                style={{ marginRight: '8px' }}
+              />
+              <span>{lender}</span>
+            </label>
+          ))}
+        </div>
+        {formData.lenderPreference && formData.lenderPreference.length > 0 && (
+          <div className="hint-text" style={{ marginTop: '8px' }}>
+            Selected: {formData.lenderPreference.join(', ')}
+          </div>
+        )}
       </div>
 
       {/* Broker Strategy Notes */}

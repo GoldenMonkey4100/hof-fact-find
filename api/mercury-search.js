@@ -11,38 +11,71 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'email or phone query param required' });
   }
 
-  const apiKey = process.env.MERCURY_API_KEY;
-  const apiToken = process.env.MERCURY_API_TOKEN;
+  // Support multiple possible env var naming conventions
+  const apiKey =
+    process.env.MERCURY_API_KEY ||
+    process.env.MERCURY_KEY ||
+    process.env.CONNECTIVE_API_KEY;
+
+  const apiToken =
+    process.env.MERCURY_API_TOKEN ||
+    process.env.MERCURY_TOKEN ||
+    process.env.CONNECTIVE_API_TOKEN;
 
   if (!apiKey || !apiToken) {
-    return res.status(500).json({ error: 'Mercury API credentials not configured' });
+    return res.status(500).json({
+      error: 'Mercury credentials not found. Check Vercel env vars are named MERCURY_API_KEY and MERCURY_API_TOKEN.',
+      envKeysFound: Object.keys(process.env).filter(k => k.toLowerCase().includes('mercury') || k.toLowerCase().includes('connective'))
+    });
   }
 
-  // Try email first (more unique), fall back to mobile
   const trySearch = async (fieldName, value) => {
     const searchParams = encodeURIComponent(JSON.stringify({ [fieldName]: value }));
     const url = `https://apis.connective.com.au/mercury/v1/${apiToken}/contacts?search=true&searchParams=${searchParams}&count=5`;
     const response = await fetch(url, {
       headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' }
     });
+    const text = await response.text();
     if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Mercury ${response.status}: ${text}`);
+      throw new Error(`Mercury ${response.status} on field "${fieldName}": ${text}`);
     }
-    return response.json();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`Non-JSON response: ${text.slice(0, 200)}`);
+    }
   };
 
   try {
     let data = null;
+    let lastError = null;
 
+    // Mercury contact methods may be stored under different field names — try all variants
     if (email) {
-      data = await trySearch('email', email);
+      for (const fieldName of ['email', 'email1', 'emailAddress', 'Email1']) {
+        try {
+          data = await trySearch(fieldName, email);
+          if (data.results && data.results.length > 0) break;
+        } catch (err) {
+          lastError = err;
+        }
+      }
     }
 
-    // If email search returned nothing but we have a phone, try phone
+    // Fall back to phone/mobile variants
     if ((!data || !data.results || data.results.length === 0) && phone) {
-      data = await trySearch('mobile', phone);
+      const cleanPhone = phone.replace(/\s/g, '');
+      for (const fieldName of ['mobile', 'mobilePhone', 'phone', 'Mobile']) {
+        try {
+          data = await trySearch(fieldName, cleanPhone);
+          if (data.results && data.results.length > 0) break;
+        } catch (err) {
+          lastError = err;
+        }
+      }
     }
+
+    if (!data && lastError) throw lastError;
 
     return res.status(200).json(data || { totalCount: 0, count: 0, offset: 0, results: [] });
   } catch (err) {

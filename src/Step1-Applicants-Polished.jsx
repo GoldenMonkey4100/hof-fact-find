@@ -18,7 +18,9 @@ const Step1Applicants = ({ formData, updateFormData }) => {
       const res = await fetch(`/api/mercury-search?${params}`);
       const data = await res.json();
 
-      if (data.results && data.results.length > 0) {
+      if (data.error) {
+        setMercuryMatches(prev => ({ ...prev, [applicantIndex]: { status: 'error', message: data.error } }));
+      } else if (data.results && data.results.length > 0) {
         setMercuryMatches(prev => ({
           ...prev,
           [applicantIndex]: { status: 'found', contact: data.results[0], totalCount: data.totalCount }
@@ -26,8 +28,8 @@ const Step1Applicants = ({ formData, updateFormData }) => {
       } else {
         setMercuryMatches(prev => ({ ...prev, [applicantIndex]: { status: 'not_found' } }));
       }
-    } catch {
-      setMercuryMatches(prev => ({ ...prev, [applicantIndex]: { status: 'error' } }));
+    } catch (err) {
+      setMercuryMatches(prev => ({ ...prev, [applicantIndex]: { status: 'error', message: err.message } }));
     }
   };
 
@@ -57,6 +59,22 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             style={{ color: 'var(--color-primary)', fontWeight: '600', textDecoration: 'none', whiteSpace: 'nowrap' }}>
             View in Mercury →
           </a>
+        </div>
+      );
+    }
+
+    if (match.status === 'not_found') {
+      return (
+        <div style={{ padding: '10px 14px', background: '#fefce8', border: '1px solid #fde047', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: '#854d0e' }}>
+          No existing client found in Mercury for these details.
+        </div>
+      );
+    }
+
+    if (match.status === 'error') {
+      return (
+        <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: '#991b1b' }}>
+          Mercury lookup error: {match.message || 'Unknown error — check Vercel function logs.'}
         </div>
       );
     }

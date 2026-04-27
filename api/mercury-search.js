@@ -31,8 +31,10 @@ export default async function handler(req, res) {
   const env = (process.env.VITE_MERCURY_ENV || '').toLowerCase();
   const sandboxUrl = 'https://uatapis.connective.com.au/mercury/v1';
   const productionUrl = 'https://apis.connective.com.au/mercury/v1';
-  const baseUrl = process.env.VITE_MERCURY_API_URL ||
-    (env === 'sandbox' || env === 'uat' ? sandboxUrl : productionUrl);
+  // VITE_MERCURY_ENV=production always wins — prevents sandbox URL override
+  const baseUrl = (env === 'production' || env === 'prod')
+    ? productionUrl
+    : process.env.VITE_MERCURY_API_URL || productionUrl;
 
   if (!apiKey || !apiToken) {
     return res.status(500).json({

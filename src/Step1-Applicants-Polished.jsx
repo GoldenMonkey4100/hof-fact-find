@@ -3,6 +3,66 @@ import './styles.css';
 
 const Step1Applicants = ({ formData, updateFormData }) => {
   const [applicants, setApplicants] = useState([]);
+  const [mercuryMatches, setMercuryMatches] = useState({});
+
+  const lookupMercury = async (applicantIndex, email, phone) => {
+    const hasValue = (email && email.includes('@')) || (phone && phone.replace(/\D/g, '').length >= 10);
+    if (!hasValue) return;
+
+    setMercuryMatches(prev => ({ ...prev, [applicantIndex]: { status: 'loading' } }));
+    try {
+      const params = new URLSearchParams();
+      if (email && email.includes('@')) params.set('email', email);
+      if (phone && phone.replace(/\D/g, '').length >= 10) params.set('phone', phone.replace(/\s/g, ''));
+
+      const res = await fetch(`/api/mercury-search?${params}`);
+      const data = await res.json();
+
+      if (data.results && data.results.length > 0) {
+        setMercuryMatches(prev => ({
+          ...prev,
+          [applicantIndex]: { status: 'found', contact: data.results[0], totalCount: data.totalCount }
+        }));
+      } else {
+        setMercuryMatches(prev => ({ ...prev, [applicantIndex]: { status: 'not_found' } }));
+      }
+    } catch {
+      setMercuryMatches(prev => ({ ...prev, [applicantIndex]: { status: 'error' } }));
+    }
+  };
+
+  const renderMercuryBanner = (applicantIndex) => {
+    const match = mercuryMatches[applicantIndex];
+    if (!match) return null;
+
+    if (match.status === 'loading') {
+      return (
+        <div style={{ padding: '10px 14px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: '#0369a1' }}>
+          Searching Mercury database...
+        </div>
+      );
+    }
+
+    if (match.status === 'found') {
+      const { contact, totalCount } = match;
+      const name = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'Unknown';
+      const mercuryUrl = `https://crm.connective.com.au/#/people/${contact.uniqueId}`;
+      return (
+        <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <span style={{ color: '#166534' }}>
+            ✓ Existing client found in Mercury: <strong>{name}</strong>
+            {totalCount > 1 && <span style={{ fontWeight: 400 }}> (+{totalCount - 1} more)</span>}
+          </span>
+          <a href={mercuryUrl} target="_blank" rel="noopener noreferrer"
+            style={{ color: 'var(--color-primary)', fontWeight: '600', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            View in Mercury →
+          </a>
+        </div>
+      );
+    }
+
+    return null;
+  };
 
   React.useEffect(() => {
     const totalCount = formData.numApplicants + formData.numGuarantors;
@@ -510,6 +570,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {/* ── Director Guarantor Fields ── */}
           {applicant.type === 'Director Guarantor' && (
             <>
+              {renderMercuryBanner(index)}
               <div className="mb-6">
                 <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
                   Director / Guarantor Details
@@ -551,6 +612,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                       type="tel"
                       value={applicant.phone || ''}
                       onChange={(e) => updateApplicant(index, 'phone', e.target.value)}
+                      onBlur={(e) => lookupMercury(index, applicant.email, e.target.value)}
                       placeholder="0400 000 000"
                     />
                   </div>
@@ -576,6 +638,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                     type="email"
                     value={applicant.email || ''}
                     onChange={(e) => updateApplicant(index, 'email', e.target.value)}
+                    onBlur={(e) => lookupMercury(index, e.target.value, applicant.phone)}
                     placeholder="john.smith@company.com.au"
                   />
                 </div>
@@ -591,6 +654,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {/* ── Natural Person Fields ── */}
           {applicant.type === 'Natural Person' && (
             <>
+              {renderMercuryBanner(index)}
               <div className="mb-6">
                 <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
                   Personal Details
@@ -632,6 +696,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                       type="tel"
                       value={applicant.phone}
                       onChange={(e) => updateApplicant(index, 'phone', e.target.value)}
+                      onBlur={(e) => lookupMercury(index, applicant.email, e.target.value)}
                       placeholder="0400 000 000"
                     />
                   </div>
@@ -655,6 +720,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                     type="email"
                     value={applicant.email}
                     onChange={(e) => updateApplicant(index, 'email', e.target.value)}
+                    onBlur={(e) => lookupMercury(index, e.target.value, applicant.phone)}
                     placeholder="john.smith@example.com"
                   />
                 </div>

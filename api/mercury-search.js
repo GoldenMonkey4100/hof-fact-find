@@ -13,7 +13,11 @@ export default async function handler(req, res) {
 
   const apiKey = process.env.VITE_MERCURY_API_KEY;
   const apiToken = process.env.VITE_MERCURY_API_TOKEN;
-  const baseUrl = process.env.VITE_MERCURY_API_URL || 'https://apis.connective.com.au/mercury/v1';
+  const env = (process.env.VITE_MERCURY_ENV || '').toLowerCase();
+  const sandboxUrl = 'https://uatapis.connective.com.au/mercury/v1';
+  const productionUrl = 'https://apis.connective.com.au/mercury/v1';
+  const baseUrl = process.env.VITE_MERCURY_API_URL ||
+    (env === 'sandbox' || env === 'uat' ? sandboxUrl : productionUrl);
 
   if (!apiKey || !apiToken) {
     return res.status(500).json({

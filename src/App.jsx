@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import './styles.css';
 
-// Import step components (these would be actual imports in production)
-// import Step0LoanStrategy from './Step0-LoanStrategy';
-// import Step1Applicants from './Step1-Applicants';
-// import Step2Employment from './Step2-Employment';
-// import Step3AssetsLiabilities from './Step3-AssetsLiabilities';
-// import Step4Review from './Step4-Review';
+// Import step components
+import Step0LoanStrategy from './Step0-LoanStrategy-Polished';
+import Step1Applicants from './Step1-Applicants-Polished';
+import Step2Employment from './Step2-Employment-Polished';
+import Step3AssetsLiabilities from './Step3-AssetsLiabilities-Polished';
+import Step4Review from './Step4-Review-Polished';
 
 const FactFindApp = () => {
   const [currentStep, setCurrentStep] = useState(0);

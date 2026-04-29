@@ -38,7 +38,7 @@ export default async function handler(req, res) {
 
   const trySearch = async (fieldName, value) => {
     const searchParams = encodeURIComponent(JSON.stringify({ [fieldName]: value }));
-    const url = `${baseUrl}/${apiToken}/contacts?search=true&searchParams=${searchParams}&count=5`;
+    const url = `${baseUrl}/${apiToken}/contacts?search=true&searchParams=${searchParams}&count=10`;
     const { status, body } = await httpsGet(url, { 'x-api-key': apiKey });
     if (status !== 200) {
       throw new Error(`Mercury ${status} (field: "${fieldName}"): ${body.slice(0, 300)}`);

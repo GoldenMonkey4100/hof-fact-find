@@ -23,7 +23,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
       } else if (data.results && data.results.length > 0) {
         setMercuryMatches(prev => ({
           ...prev,
-          [applicantIndex]: { status: 'found', contact: data.results[0], totalCount: data.totalCount }
+          [applicantIndex]: { status: 'found', contacts: data.results, totalCount: data.totalCount }
         }));
       } else {
         setMercuryMatches(prev => ({ ...prev, [applicantIndex]: { status: 'not_found' } }));
@@ -46,19 +46,40 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     }
 
     if (match.status === 'found') {
-      const { contact, totalCount } = match;
-      const name = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'Unknown';
-      const mercuryUrl = `https://crm.connective.com.au/#/people/${contact.uniqueId}`;
+      const { contacts, totalCount } = match;
       return (
-        <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <span style={{ color: '#166534' }}>
-            ✓ Existing client found in Mercury: <strong>{name}</strong>
-            {totalCount > 1 && <span style={{ fontWeight: 400 }}> (+{totalCount - 1} more)</span>}
-          </span>
-          <a href={mercuryUrl} target="_blank" rel="noopener noreferrer"
-            style={{ color: 'var(--color-primary)', fontWeight: '600', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-            View in Mercury →
-          </a>
+        <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', overflow: 'hidden' }}>
+          <div style={{ padding: '10px 14px', borderBottom: contacts.length > 1 ? '1px solid #bbf7d0' : 'none', color: '#166534', fontWeight: '600' }}>
+            ✓ {totalCount} existing {totalCount === 1 ? 'client' : 'clients'} found in Mercury
+            {totalCount > contacts.length && <span style={{ fontWeight: '400' }}> (showing {contacts.length})</span>}
+          </div>
+          {contacts.map((contact, i) => {
+            const isCompany = !contact.firstName && !contact.lastName && contact.company;
+            const name = isCompany
+              ? contact.company
+              : [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.company || 'Unknown';
+            const type = isCompany ? 'Company' : 'Person';
+            const mercuryUrl = `https://crm.connective.com.au/#/people/${contact.uniqueId}`;
+            return (
+              <div key={contact.uniqueId || i} style={{
+                padding: '10px 14px',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px',
+                borderBottom: i < contacts.length - 1 ? '1px solid #bbf7d0' : 'none',
+                background: i % 2 === 0 ? 'transparent' : 'rgba(134,239,172,0.1)'
+              }}>
+                <div>
+                  <span style={{ color: '#166534', fontWeight: '500' }}>{name}</span>
+                  <span style={{ marginLeft: '8px', fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: isCompany ? '#dbeafe' : '#f3f4f6', color: isCompany ? '#1d4ed8' : '#374151' }}>
+                    {type}
+                  </span>
+                </div>
+                <a href={mercuryUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ color: 'var(--color-primary)', fontWeight: '600', textDecoration: 'none', whiteSpace: 'nowrap', fontSize: '13px' }}>
+                  View in Mercury →
+                </a>
+              </div>
+            );
+          })}
         </div>
       );
     }

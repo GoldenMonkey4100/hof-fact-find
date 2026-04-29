@@ -43,11 +43,30 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     setDlExtracting(prev => ({ ...prev, [index]: true }));
     setDlExtracted(prev => ({ ...prev, [index]: null }));
 
+    // Validate & normalise MIME type — Claude only accepts these four types
+    const MIME_MAP = {
+      'image/jpeg': 'image/jpeg',
+      'image/jpg':  'image/jpeg',  // browsers sometimes return image/jpg
+      'image/png':  'image/png',
+      'image/gif':  'image/gif',
+      'image/webp': 'image/webp',
+    };
+    const rawType   = (file.type || '').toLowerCase();
+    const mediaType = MIME_MAP[rawType];
+
+    if (!mediaType) {
+      setDlExtracting(prev => ({ ...prev, [index]: false }));
+      setDlExtracted(prev => ({
+        ...prev,
+        [index]: { error: 'Please upload an image file (JPG, PNG, or WEBP). PDFs are not supported for auto-fill.' }
+      }));
+      return;
+    }
+
     const reader = new FileReader();
     reader.onloadend = async () => {
       try {
         const base64 = reader.result.split(',')[1];
-        const mediaType = file.type || 'image/jpeg';
 
         const res = await fetch('/api/extract-license', {
           method: 'POST',
@@ -237,7 +256,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         <label style={{ cursor: 'pointer', flexShrink: 0 }}>
           <input
             type="file"
-            accept="image/*,.pdf"
+            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
             style={{ display: 'none' }}
             onChange={(e) => handleDLUpload(index, e.target.files[0])}
           />

@@ -590,3 +590,41 @@ label {
 .justify-between { justify-content: space-between; }
 .gap-2 { gap: var(--space-2); }
 .gap-4 { gap: var(--space-4); }
+
+/* ── Google Places Autocomplete dropdown ───────────────────────────────── */
+.pac-container {
+  z-index: 99999 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
+  border: 1px solid var(--border-primary) !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  margin-top: 2px !important;
+  overflow: hidden !important;
+}
+
+.pac-item {
+  padding: 8px 12px !important;
+  cursor: pointer !important;
+  line-height: 1.4 !important;
+  color: var(--text-primary) !important;
+}
+
+.pac-item:hover,
+.pac-item-selected {
+  background: var(--color-primary-light) !important;
+}
+
+.pac-item-query {
+  font-size: 14px !important;
+  color: var(--text-primary) !important;
+}
+
+.pac-matched {
+  font-weight: 600 !important;
+}
+
+/* Spinner animation for DL upload button */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

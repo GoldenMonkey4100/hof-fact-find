@@ -2,12 +2,29 @@ import { useEffect, useRef } from 'react';
 
 /**
  * Australian address autocomplete backed by Google Places.
- * Requires the Google Maps JS SDK with the "places" library loaded in index.html.
- * Falls back to a plain text input if the SDK isn't available.
+ *
+ * Uses an UNCONTROLLED input with imperative DOM updates to avoid the
+ * React controlled-input conflict where React re-renders overwrite the
+ * value that Google Places is trying to set, corrupting the dropdown.
+ *
+ * - User typing  → fires onChange on every keystroke (parent can track if needed)
+ * - Place selected → fires onChange with formatted_address
+ * - External value update (e.g. AI pre-fill) → imperatively sets DOM value
+ *   when the field is not focused
  */
 const AddressAutocomplete = ({ value, onChange, placeholder, style, className }) => {
-  const inputRef = useRef(null);
+  const inputRef   = useRef(null);
+  const isFocused  = useRef(false);
 
+  // Sync external value changes into the DOM (e.g. AI pre-fill from DL scan)
+  // but only when the user isn't actively typing so we don't interrupt them.
+  useEffect(() => {
+    if (inputRef.current && !isFocused.current) {
+      inputRef.current.value = value || '';
+    }
+  }, [value]);
+
+  // Initialise Google Places Autocomplete once on mount.
   useEffect(() => {
     if (!window.google?.maps?.places || !inputRef.current) return;
 
@@ -29,7 +46,9 @@ const AddressAutocomplete = ({ value, onChange, placeholder, style, className })
     <input
       ref={inputRef}
       type="text"
-      value={value}
+      defaultValue={value}
+      onFocus={() => { isFocused.current = true; }}
+      onBlur={() => { isFocused.current = false; }}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder || 'Start typing an address…'}
       style={style}

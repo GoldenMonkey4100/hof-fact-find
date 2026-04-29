@@ -3,7 +3,7 @@ import './styles.css';
 import { formatCurrency, parseCurrency, formatCurrencyDisplay } from './utils';
 
 const MANDATORY_ASSETS = [
-  { type: 'Savings Account', description: 'Savings / Funds to Complete' },
+  { type: 'Savings Account', description: 'Savings' },
   { type: 'Superannuation', description: 'Superannuation' },
   { type: 'Vehicle', description: 'Vehicle' },
   { type: 'Home Contents', description: 'Home Contents' },
@@ -324,6 +324,30 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
                   </div>
                 )}
 
+                {/* Bank/Account fields for Savings Account */}
+                {asset.type === 'Savings Account' && (
+                  <div className="grid grid-cols-2 mb-3" style={{ marginTop: '12px' }}>
+                    <div>
+                      <label>Bank / Institution</label>
+                      <input
+                        type="text"
+                        value={asset.bank || ''}
+                        onChange={(e) => updateAsset(applicantIndex, assetIndex, 'bank', e.target.value)}
+                        placeholder="e.g. Commonwealth Bank"
+                      />
+                    </div>
+                    <div>
+                      <label>Account Name / Type</label>
+                      <input
+                        type="text"
+                        value={asset.accountName || ''}
+                        onChange={(e) => updateAsset(applicantIndex, assetIndex, 'accountName', e.target.value)}
+                        placeholder="e.g. Everyday Savings"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Vehicle — make & model fields */}
                 {asset.type === 'Vehicle' && (
                   <div className="grid grid-cols-2 mb-3" style={{ marginTop: '12px' }}>
@@ -350,13 +374,7 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
               </div>
             ))}
 
-            {applicant.assets && applicant.assets.length > 0 && (
-              <div style={{ textAlign: 'right', fontSize: '14px', fontWeight: '600', marginTop: '12px' }}>
-                Total Assets: {formatCurrencyDisplay(
-                  (applicant.assets.reduce((sum, a) => sum + (parseFloat(parseCurrency(a.value)) || 0), 0)).toString()
-                )}
-              </div>
-            )}
+            {/* spacer between assets list and liabilities */}
           </div>
 
           {/* Liabilities */}
@@ -444,30 +462,32 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
               </div>
             ))}
 
-            {applicant.liabilities && applicant.liabilities.length > 0 && (
-              <div style={{ textAlign: 'right', fontSize: '14px', fontWeight: '600', marginTop: '12px' }}>
-                <div>Total Liabilities: {formatCurrencyDisplay(
-                  (applicant.liabilities.reduce((sum, l) => sum + (parseFloat(parseCurrency(l.amount)) || 0), 0)).toString()
-                )}</div>
-                <div style={{ marginTop: '4px' }}>Total Monthly Repayments: {formatCurrencyDisplay(
-                  (applicant.liabilities.reduce((sum, l) => sum + (parseFloat(parseCurrency(l.repayment)) || 0), 0)).toString()
-                )}</div>
-              </div>
-            )}
           </div>
 
-          {/* Net Position */}
-          {((applicant.assets && applicant.assets.length > 0) || (applicant.liabilities && applicant.liabilities.length > 0)) && (
-            <div style={{ padding: '16px', background: 'var(--color-success-light)', borderRadius: '8px', borderLeft: '4px solid var(--color-success)' }}>
-              <div style={{ fontSize: '14px', fontWeight: '600' }}>
-                Net Position: {(() => {
-                  const ta = (applicant.assets || []).reduce((s, a) => s + (parseFloat(parseCurrency(a.value)) || 0), 0);
-                  const tl = (applicant.liabilities || []).reduce((s, l) => s + (parseFloat(parseCurrency(l.amount)) || 0), 0);
-                  return formatCurrencyDisplay((ta - tl).toString());
-                })()}
+          {/* Per-applicant summary */}
+          {(() => {
+            const ta = (applicant.assets || []).reduce((s, a) => s + (parseFloat(parseCurrency(a.value)) || 0), 0);
+            const tl = (applicant.liabilities || []).reduce((s, l) => s + (parseFloat(parseCurrency(l.amount)) || 0), 0);
+            const net = ta - tl;
+            const monthlyRepay = (applicant.liabilities || []).reduce((s, l) => s + (parseFloat(parseCurrency(l.repayment)) || 0), 0);
+            return (
+              <div className="grid grid-cols-3" style={{ marginTop: '8px', gap: '12px' }}>
+                <div style={{ padding: '14px 16px', background: 'var(--color-success-light)', borderRadius: '8px', border: '1px solid var(--color-success)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--color-success-dark)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Total Assets</div>
+                  <div style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-success-dark)' }}>{formatCurrencyDisplay(ta.toString())}</div>
+                </div>
+                <div style={{ padding: '14px 16px', background: '#fef2f2', borderRadius: '8px', border: '1px solid #fca5a5', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Total Liabilities</div>
+                  <div style={{ fontSize: '18px', fontWeight: '600', color: '#991b1b' }}>{formatCurrencyDisplay(tl.toString())}</div>
+                  {monthlyRepay > 0 && <div style={{ fontSize: '11px', color: '#991b1b', marginTop: '2px' }}>{formatCurrencyDisplay(monthlyRepay.toString())}/mo repayments</div>}
+                </div>
+                <div style={{ padding: '14px 16px', background: net >= 0 ? 'var(--color-success-light)' : '#fef2f2', borderRadius: '8px', border: `1px solid ${net >= 0 ? 'var(--color-success)' : '#fca5a5'}`, textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: net >= 0 ? 'var(--color-success-dark)' : '#991b1b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Net Position</div>
+                  <div style={{ fontSize: '18px', fontWeight: '600', color: net >= 0 ? 'var(--color-success-dark)' : '#991b1b' }}>{formatCurrencyDisplay(net.toString())}</div>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       ))}
 

@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import './styles.css';
+import AddressAutocomplete from './AddressAutocomplete';
 
 const Step1Applicants = ({ formData, updateFormData }) => {
   const [applicants, setApplicants] = useState([]);
   const [mercuryMatches, setMercuryMatches] = useState({});
+  const [dlExtracting, setDlExtracting] = useState({});
+  const [dlExtracted, setDlExtracted] = useState({});
 
+  // ── Mercury lookup ────────────────────────────────────────────────────────
   const lookupMercury = async (applicantIndex, email, phone) => {
     const hasValue = (email && email.includes('@')) || (phone && phone.replace(/\D/g, '').length >= 10);
     if (!hasValue) return;
@@ -33,6 +37,60 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     }
   };
 
+  // ── Driver Licence AI extraction ──────────────────────────────────────────
+  const handleDLUpload = (index, file) => {
+    if (!file) return;
+    setDlExtracting(prev => ({ ...prev, [index]: true }));
+    setDlExtracted(prev => ({ ...prev, [index]: null }));
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        const base64 = reader.result.split(',')[1];
+        const mediaType = file.type || 'image/jpeg';
+
+        const res = await fetch('/api/extract-license', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: base64, mediaType })
+        });
+
+        const data = await res.json();
+        setDlExtracting(prev => ({ ...prev, [index]: false }));
+
+        if (data.error) {
+          setDlExtracted(prev => ({ ...prev, [index]: { error: data.error } }));
+          return;
+        }
+
+        // Pre-fill form fields from extracted data
+        const updates = {};
+        if (data.firstName)     updates.firstName     = data.firstName;
+        if (data.lastName)      updates.lastName      = data.lastName;
+        if (data.middleName)    updates.middleName    = data.middleName;
+        if (data.dob)           updates.dob           = data.dob;
+        if (data.address)       updates.address       = data.address;
+        if (data.gender)        updates.gender        = data.gender;
+        if (data.licenceNumber) updates.licenceNumber = data.licenceNumber;
+
+        // Apply all updates atomically
+        setApplicants(prev => {
+          const updated = [...prev];
+          updated[index] = { ...updated[index], ...updates };
+          updateFormData('applicants', updated);
+          return updated;
+        });
+
+        setDlExtracted(prev => ({ ...prev, [index]: { success: true, fields: Object.keys(updates) } }));
+      } catch (err) {
+        setDlExtracting(prev => ({ ...prev, [index]: false }));
+        setDlExtracted(prev => ({ ...prev, [index]: { error: err.message } }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // ── Mercury banner ────────────────────────────────────────────────────────
   const renderMercuryBanner = (applicantIndex) => {
     const match = mercuryMatches[applicantIndex];
     if (!match) return null;
@@ -40,7 +98,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     if (match.status === 'loading') {
       return (
         <div style={{ padding: '10px 14px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: '#0369a1' }}>
-          Searching Mercury database...
+          Searching Mercury database…
         </div>
       );
     }
@@ -103,6 +161,123 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     return null;
   };
 
+  // ── Compact document upload ───────────────────────────────────────────────
+  const renderDocumentUpload = (applicant, index) => (
+    <div style={{ marginBottom: '16px' }}>
+      <div style={{
+        border: '1px dashed var(--border-primary)',
+        borderRadius: '8px',
+        padding: '10px 14px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        background: 'var(--bg-secondary)'
+      }}>
+        <span style={{ fontSize: '16px' }}>📎</span>
+        <div style={{ flex: 1 }}>
+          <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-secondary)' }}>
+            Supporting Documents
+          </span>
+          {applicant.uploadedDocuments?.length > 0 && (
+            <span style={{ fontSize: '12px', color: 'var(--color-primary)', marginLeft: '8px' }}>
+              ({applicant.uploadedDocuments.length} file{applicant.uploadedDocuments.length !== 1 ? 's' : ''} selected)
+            </span>
+          )}
+        </div>
+        <label style={{ cursor: 'pointer', flexShrink: 0 }}>
+          <input
+            type="file"
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+            onChange={(e) => {
+              const files = Array.from(e.target.files);
+              updateApplicant(index, 'uploadedDocuments', [...(applicant.uploadedDocuments || []), ...files]);
+            }}
+            style={{ display: 'none' }}
+          />
+          <span style={{
+            display: 'inline-block',
+            padding: '5px 14px',
+            background: 'white',
+            border: '1px solid var(--border-primary)',
+            borderRadius: '6px',
+            fontSize: '13px',
+            color: 'var(--text-primary)',
+            cursor: 'pointer'
+          }}>
+            Browse
+          </span>
+        </label>
+      </div>
+    </div>
+  );
+
+  // ── Driver Licence upload with AI extraction ──────────────────────────────
+  const renderDLUpload = (applicant, index) => (
+    <div style={{ marginBottom: '20px' }}>
+      <div style={{
+        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+        border: '1px solid #bae6fd',
+        borderRadius: '8px',
+        padding: '12px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        flexWrap: 'wrap'
+      }}>
+        <span style={{ fontSize: '22px', flexShrink: 0 }}>🪪</span>
+        <div style={{ flex: 1, minWidth: '180px' }}>
+          <div style={{ fontSize: '13px', fontWeight: '600', color: '#0369a1', marginBottom: '2px' }}>
+            Driver Licence — Auto-fill
+          </div>
+          <div style={{ fontSize: '12px', color: '#0284c7' }}>
+            Upload a photo or scan to automatically fill in personal details
+          </div>
+        </div>
+        <label style={{ cursor: 'pointer', flexShrink: 0 }}>
+          <input
+            type="file"
+            accept="image/*,.pdf"
+            style={{ display: 'none' }}
+            onChange={(e) => handleDLUpload(index, e.target.files[0])}
+          />
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '7px 16px',
+            background: dlExtracting[index] ? '#93c5fd' : '#0369a1',
+            color: 'white',
+            borderRadius: '6px',
+            fontSize: '13px',
+            fontWeight: '500',
+            cursor: dlExtracting[index] ? 'default' : 'pointer',
+            transition: 'background 0.2s'
+          }}>
+            {dlExtracting[index] ? (
+              <>
+                <span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                Reading…
+              </>
+            ) : 'Upload DL'}
+          </span>
+        </label>
+      </div>
+
+      {dlExtracted[index]?.success && (
+        <div style={{ marginTop: '6px', padding: '8px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', fontSize: '12px', color: '#166534' }}>
+          ✓ {dlExtracted[index].fields.length} field{dlExtracted[index].fields.length !== 1 ? 's' : ''} pre-filled from driver licence
+        </div>
+      )}
+      {dlExtracted[index]?.error && (
+        <div style={{ marginTop: '6px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', color: '#991b1b' }}>
+          ⚠️ Could not extract data: {dlExtracted[index].error}
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Applicant seeding ─────────────────────────────────────────────────────
   React.useEffect(() => {
     const totalCount = formData.numApplicants + formData.numGuarantors;
     const newApplicants = [];
@@ -140,10 +315,12 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             role,
             number: applicantNumber,
             firstName: '',
+            middleName: '',
             lastName: '',
             dob: '',
             phone: '',
             email: '',
+            licenceNumber: '',
             address: '',
             yearsAtCurrentAddress: '',
             monthsAtCurrentAddress: '',
@@ -157,17 +334,18 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           });
         }
       } else {
-        // Natural Person (and any other type defaults to natural person)
         newApplicants.push(existing && existing.type === 'Natural Person' ? existing : {
           id: i + 1,
           type: 'Natural Person',
           role,
           number: applicantNumber,
           firstName: '',
+          middleName: '',
           lastName: '',
           dob: '',
           phone: '',
           email: '',
+          licenceNumber: '',
           address: '',
           yearsAtCurrentAddress: '',
           monthsAtCurrentAddress: '',
@@ -188,35 +366,43 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
     setApplicants(newApplicants);
     updateFormData('applicants', newApplicants);
-  }, [formData.numApplicants, formData.numGuarantors, formData.applicantType]);
+  }, [formData.numApplicants, formData.numGuarantors, formData.applicantType]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── State helpers ─────────────────────────────────────────────────────────
   const updateApplicant = (index, field, value) => {
-    const updated = [...applicants];
-    updated[index] = { ...updated[index], [field]: value };
+    setApplicants(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
 
-    if (field === 'numDependants') {
-      const numDeps = parseInt(value) || 0;
-      const currentDeps = updated[index].dependants || [];
-      if (numDeps > currentDeps.length) {
-        const newDeps = [...currentDeps];
-        for (let i = currentDeps.length; i < numDeps; i++) {
-          newDeps.push({ name: '', age: '' });
+      if (field === 'numDependants') {
+        const numDeps = parseInt(value) || 0;
+        const currentDeps = updated[index].dependants || [];
+        if (numDeps > currentDeps.length) {
+          const newDeps = [...currentDeps];
+          for (let i = currentDeps.length; i < numDeps; i++) newDeps.push({ name: '', age: '' });
+          updated[index].dependants = newDeps;
+        } else {
+          updated[index].dependants = currentDeps.slice(0, numDeps);
         }
-        updated[index].dependants = newDeps;
-      } else {
-        updated[index].dependants = currentDeps.slice(0, numDeps);
       }
-    }
 
-    setApplicants(updated);
-    updateFormData('applicants', updated);
+      updateFormData('applicants', updated);
+      return updated;
+    });
   };
 
   const updateDependant = (applicantIndex, dependantIndex, field, value) => {
-    const updated = [...applicants];
-    updated[applicantIndex].dependants[dependantIndex][field] = value;
-    setApplicants(updated);
-    updateFormData('applicants', updated);
+    setApplicants(prev => {
+      const updated = [...prev];
+      updated[applicantIndex] = { ...updated[applicantIndex] };
+      updated[applicantIndex].dependants = [...updated[applicantIndex].dependants];
+      updated[applicantIndex].dependants[dependantIndex] = {
+        ...updated[applicantIndex].dependants[dependantIndex],
+        [field]: value
+      };
+      updateFormData('applicants', updated);
+      return updated;
+    });
   };
 
   const shouldShareDependants = (index) => {
@@ -230,6 +416,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     return 'Natural person details';
   };
 
+  // ── Address history (with autocomplete) ──────────────────────────────────
   const renderAddressHistory = (applicant, index) => (
     <div className="mb-4" style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px' }}>
       <div className="flex justify-between items-center mb-3">
@@ -252,13 +439,13 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         </button>
       </div>
 
+      {/* Current address */}
       <div className="mb-3" style={{ paddingBottom: '12px', borderBottom: '1px solid var(--border-primary)' }}>
         <label style={{ fontSize: '13px', fontWeight: '500' }}>Current Address</label>
-        <input
-          type="text"
+        <AddressAutocomplete
           value={applicant.address || ''}
-          onChange={(e) => updateApplicant(index, 'address', e.target.value)}
-          placeholder="Current residential address"
+          onChange={(val) => updateApplicant(index, 'address', val)}
+          placeholder="Start typing current address…"
           style={{ fontSize: '13px' }}
         />
         <div className="grid grid-cols-2" style={{ marginTop: '8px' }}>
@@ -288,6 +475,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         </div>
       </div>
 
+      {/* Previous addresses */}
       {(applicant.addressHistory || []).map((addr, addrIndex) => (
         <div key={addr.id} className="mb-3" style={{ paddingTop: '12px' }}>
           <div className="flex justify-between items-center mb-2">
@@ -304,15 +492,14 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               Remove
             </button>
           </div>
-          <input
-            type="text"
+          <AddressAutocomplete
             value={addr.address}
-            onChange={(e) => {
+            onChange={(val) => {
               const updated = [...applicant.addressHistory];
-              updated[addrIndex] = { ...updated[addrIndex], address: e.target.value };
+              updated[addrIndex] = { ...updated[addrIndex], address: val };
               updateApplicant(index, 'addressHistory', updated);
             }}
-            placeholder="Previous residential address"
+            placeholder="Start typing previous address…"
             style={{ fontSize: '13px' }}
           />
           <div className="grid grid-cols-2" style={{ marginTop: '8px' }}>
@@ -351,6 +538,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         </div>
       ))}
 
+      {/* Totals hint */}
       <div className="hint-text" style={{ marginTop: '12px', fontSize: '12px' }}>
         {(() => {
           const currentYears = parseInt(applicant.yearsAtCurrentAddress) || 0;
@@ -371,6 +559,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     </div>
   );
 
+  // ── Dependants ─────────────────────────────────────────────────────────────
   const renderDependants = (applicant, index) => (
     <div className="mb-6">
       <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: 'var(--radius-lg)' }}>
@@ -419,59 +608,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     </div>
   );
 
-  const renderDocumentUpload = (applicant, index) => (
-    <div className="mt-6">
-      <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: 'var(--radius-lg)' }}>
-        <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
-          Document Upload
-        </h4>
-        <div
-          className="document-upload-zone"
-          style={{
-            border: '2px dashed var(--border-primary)',
-            borderRadius: '8px',
-            padding: '32px',
-            textAlign: 'center',
-            background: 'var(--bg-primary)',
-            cursor: 'pointer',
-            marginTop: '8px'
-          }}
-          onClick={() => document.getElementById(`fileInput-${index}`).click()}
-        >
-          <div style={{ fontSize: '48px', marginBottom: '8px' }}>📎</div>
-          <p style={{ margin: '0 0 8px 0', fontWeight: '500' }}>Drag and drop files here</p>
-          <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>or click to browse</p>
-          <input
-            id={`fileInput-${index}`}
-            type="file"
-            multiple
-            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-            onChange={(e) => {
-              const files = Array.from(e.target.files);
-              updateApplicant(index, 'uploadedDocuments', files);
-            }}
-            style={{ display: 'none' }}
-          />
-        </div>
-        {applicant.uploadedDocuments && applicant.uploadedDocuments.length > 0 && (
-          <div className="mt-2">
-            <p style={{ fontSize: '13px', fontWeight: '500', marginBottom: '4px' }}>
-              {applicant.uploadedDocuments.length} file(s) selected:
-            </p>
-            <ul style={{ fontSize: '12px', margin: '0', paddingLeft: '20px' }}>
-              {applicant.uploadedDocuments.map((file, i) => (
-                <li key={i}>{file.name}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <p className="hint-text" style={{ marginTop: '12px' }}>
-          Accepted formats: PDF, JPG, PNG, DOC, DOCX (max 5MB per file)
-        </p>
-      </div>
-    </div>
-  );
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="fade-in">
       <div className="mb-6">
@@ -508,6 +645,9 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {/* ── Company Borrower Fields ── */}
           {applicant.type === 'Company Borrower' && (
             <>
+              {/* Compact doc upload at top */}
+              {renderDocumentUpload(applicant, index)}
+
               <div className="mb-6">
                 <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
                   Company Details
@@ -559,13 +699,8 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                       onChange={(e) => updateApplicant(index, 'entityType', e.target.value)}
                     >
                       <option value="">Select...</option>
-                      <option value="Pty Ltd">Pty Ltd</option>
-                      <option value="Unit Trust">Unit Trust</option>
-                      <option value="Discretionary Trust">Discretionary Trust</option>
-                      <option value="SMSF">SMSF</option>
-                      <option value="Partnership">Partnership</option>
-                      <option value="Sole Trader">Sole Trader</option>
-                      <option value="Other">Other</option>
+                      <option value="Company">Company</option>
+                      <option value="Trust">Trust</option>
                     </select>
                   </div>
                 </div>
@@ -601,8 +736,6 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   </div>
                 </div>
               </div>
-
-              {renderDocumentUpload(applicant, index)}
             </>
           )}
 
@@ -610,12 +743,15 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {applicant.type === 'Director Guarantor' && (
             <>
               {renderMercuryBanner(index)}
+              {renderDocumentUpload(applicant, index)}
+              {renderDLUpload(applicant, index)}
+
               <div className="mb-6">
                 <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
                   Director / Guarantor Details
                 </h4>
 
-                <div className="grid grid-cols-2 mb-4">
+                <div className="grid grid-cols-3 mb-4">
                   <div>
                     <label>First Name</label>
                     <input
@@ -623,6 +759,15 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                       value={applicant.firstName || ''}
                       onChange={(e) => updateApplicant(index, 'firstName', e.target.value)}
                       placeholder="John"
+                    />
+                  </div>
+                  <div>
+                    <label>Middle Name</label>
+                    <input
+                      type="text"
+                      value={applicant.middleName || ''}
+                      onChange={(e) => updateApplicant(index, 'middleName', e.target.value)}
+                      placeholder="Optional"
                     />
                   </div>
                   <div>
@@ -656,6 +801,28 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                     />
                   </div>
                   <div>
+                    <label>Licence Number</label>
+                    <input
+                      type="text"
+                      value={applicant.licenceNumber || ''}
+                      onChange={(e) => updateApplicant(index, 'licenceNumber', e.target.value)}
+                      placeholder="e.g. 12345678"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 mb-4">
+                  <div>
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={applicant.email || ''}
+                      onChange={(e) => updateApplicant(index, 'email', e.target.value)}
+                      onBlur={(e) => lookupMercury(index, e.target.value, applicant.phone)}
+                      placeholder="john.smith@company.com.au"
+                    />
+                  </div>
+                  <div>
                     <label>Relationship to Company</label>
                     <select
                       value={applicant.relationshipToCompany || ''}
@@ -671,22 +838,10 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   </div>
                 </div>
 
-                <div className="mb-4">
-                  <label>Email</label>
-                  <input
-                    type="email"
-                    value={applicant.email || ''}
-                    onChange={(e) => updateApplicant(index, 'email', e.target.value)}
-                    onBlur={(e) => lookupMercury(index, e.target.value, applicant.phone)}
-                    placeholder="john.smith@company.com.au"
-                  />
-                </div>
-
                 {renderAddressHistory(applicant, index)}
               </div>
 
               {renderDependants(applicant, index)}
-              {renderDocumentUpload(applicant, index)}
             </>
           )}
 
@@ -694,12 +849,15 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {applicant.type === 'Natural Person' && (
             <>
               {renderMercuryBanner(index)}
+              {renderDocumentUpload(applicant, index)}
+              {renderDLUpload(applicant, index)}
+
               <div className="mb-6">
                 <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
                   Personal Details
                 </h4>
 
-                <div className="grid grid-cols-2 mb-4">
+                <div className="grid grid-cols-3 mb-4">
                   <div>
                     <label>First Name</label>
                     <input
@@ -707,6 +865,15 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                       value={applicant.firstName}
                       onChange={(e) => updateApplicant(index, 'firstName', e.target.value)}
                       placeholder="John"
+                    />
+                  </div>
+                  <div>
+                    <label>Middle Name</label>
+                    <input
+                      type="text"
+                      value={applicant.middleName || ''}
+                      onChange={(e) => updateApplicant(index, 'middleName', e.target.value)}
+                      placeholder="Optional"
                     />
                   </div>
                   <div>
@@ -753,15 +920,26 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   </div>
                 </div>
 
-                <div className="mb-4">
-                  <label>Email</label>
-                  <input
-                    type="email"
-                    value={applicant.email}
-                    onChange={(e) => updateApplicant(index, 'email', e.target.value)}
-                    onBlur={(e) => lookupMercury(index, e.target.value, applicant.phone)}
-                    placeholder="john.smith@example.com"
-                  />
+                <div className="grid grid-cols-2 mb-4">
+                  <div>
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={applicant.email}
+                      onChange={(e) => updateApplicant(index, 'email', e.target.value)}
+                      onBlur={(e) => lookupMercury(index, e.target.value, applicant.phone)}
+                      placeholder="john.smith@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label>Licence Number</label>
+                    <input
+                      type="text"
+                      value={applicant.licenceNumber || ''}
+                      onChange={(e) => updateApplicant(index, 'licenceNumber', e.target.value)}
+                      placeholder="e.g. 12345678"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 mb-4">
@@ -839,8 +1017,6 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   </div>
                 </div>
               )}
-
-              {renderDocumentUpload(applicant, index)}
             </>
           )}
 

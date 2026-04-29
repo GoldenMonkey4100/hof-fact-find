@@ -2,13 +2,42 @@ import React, { useState } from 'react';
 import './styles.css';
 import AddressAutocomplete from './AddressAutocomplete';
 
-const Step1Applicants = ({ formData, updateFormData }) => {
-  const [applicants, setApplicants] = useState([]);
-  const [mercuryMatches, setMercuryMatches] = useState({});
-  const [dlExtracting, setDlExtracting] = useState({});
-  const [dlExtracted, setDlExtracted] = useState({});
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-  // ── Mercury lookup ────────────────────────────────────────────────────────
+const fileToBase64 = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onloadend = () => resolve(reader.result.split(',')[1]);
+  reader.onerror = reject;
+  reader.readAsDataURL(file);
+});
+
+const normalizeMediaType = (file) => {
+  const MIME_MAP = {
+    'image/jpeg':    'image/jpeg',
+    'image/jpg':     'image/jpeg',  // browsers sometimes return image/jpg
+    'image/png':     'image/png',
+    'image/gif':     'image/gif',
+    'image/webp':    'image/webp',
+    'application/pdf': 'application/pdf',
+  };
+  return MIME_MAP[(file.type || '').toLowerCase()] || 'image/jpeg';
+};
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+const Step1Applicants = ({ formData, updateFormData }) => {
+  const [applicants,    setApplicants]    = useState([]);
+  const [mercuryMatches, setMercuryMatches] = useState({});
+
+  // DL upload state: { [index]: { front: File|null, back: File|null } }
+  const [dlFiles,      setDlFilesState]  = useState({});
+  const [dlExtracting, setDlExtracting]  = useState({});
+  const [dlExtracted,  setDlExtracted]   = useState({});
+
+  // Increments when AI pre-fills the address → forces AddressAutocomplete remount
+  const [addrResetKey, setAddrResetKey]  = useState({});
+
+  // ── Mercury lookup ──────────────────────────────────────────────────────────
   const lookupMercury = async (applicantIndex, email, phone) => {
     const hasValue = (email && email.includes('@')) || (phone && phone.replace(/\D/g, '').length >= 10);
     if (!hasValue) return;
@@ -19,16 +48,13 @@ const Step1Applicants = ({ formData, updateFormData }) => {
       if (email && email.includes('@')) params.set('email', email);
       if (phone && phone.replace(/\D/g, '').length >= 10) params.set('phone', phone.replace(/\s/g, ''));
 
-      const res = await fetch(`/api/mercury-search?${params}`);
+      const res  = await fetch(`/api/mercury-search?${params}`);
       const data = await res.json();
 
       if (data.error) {
         setMercuryMatches(prev => ({ ...prev, [applicantIndex]: { status: 'error', message: data.error } }));
       } else if (data.results && data.results.length > 0) {
-        setMercuryMatches(prev => ({
-          ...prev,
-          [applicantIndex]: { status: 'found', contacts: data.results, totalCount: data.totalCount }
-        }));
+        setMercuryMatches(prev => ({ ...prev, [applicantIndex]: { status: 'found', contacts: data.results, totalCount: data.totalCount } }));
       } else {
         setMercuryMatches(prev => ({ ...prev, [applicantIndex]: { status: 'not_found' } }));
       }
@@ -37,79 +63,71 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     }
   };
 
-  // ── Driver Licence AI extraction ──────────────────────────────────────────
-  const handleDLUpload = (index, file) => {
-    if (!file) return;
+  // ── DL upload helpers ───────────────────────────────────────────────────────
+  const setDLFile = (index, side, file) => {
+    setDlFilesState(prev => ({
+      ...prev,
+      [index]: { ...(prev[index] || { front: null, back: null }), [side]: file || null }
+    }));
+  };
+
+  const handleDLExtract = async (index) => {
+    const files = dlFiles[index] || {};
+    const { front, back } = files;
+    if (!front) return;
+
     setDlExtracting(prev => ({ ...prev, [index]: true }));
     setDlExtracted(prev => ({ ...prev, [index]: null }));
 
-    // Validate & normalise MIME type — Claude only accepts these four types
-    const MIME_MAP = {
-      'image/jpeg': 'image/jpeg',
-      'image/jpg':  'image/jpeg',  // browsers sometimes return image/jpg
-      'image/png':  'image/png',
-      'image/gif':  'image/gif',
-      'image/webp': 'image/webp',
-    };
-    const rawType   = (file.type || '').toLowerCase();
-    const mediaType = MIME_MAP[rawType];
+    try {
+      const images = [{ base64: await fileToBase64(front), mediaType: normalizeMediaType(front) }];
+      if (back) images.push({ base64: await fileToBase64(back), mediaType: normalizeMediaType(back) });
 
-    if (!mediaType) {
+      const res  = await fetch('/api/extract-license', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images })
+      });
+      const data = await res.json();
+
       setDlExtracting(prev => ({ ...prev, [index]: false }));
-      setDlExtracted(prev => ({
-        ...prev,
-        [index]: { error: 'Please upload an image file (JPG, PNG, or WEBP). PDFs are not supported for auto-fill.' }
-      }));
-      return;
-    }
 
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      try {
-        const base64 = reader.result.split(',')[1];
-
-        const res = await fetch('/api/extract-license', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: base64, mediaType })
-        });
-
-        const data = await res.json();
-        setDlExtracting(prev => ({ ...prev, [index]: false }));
-
-        if (data.error) {
-          setDlExtracted(prev => ({ ...prev, [index]: { error: data.error } }));
-          return;
-        }
-
-        // Pre-fill form fields from extracted data
-        const updates = {};
-        if (data.firstName)     updates.firstName     = data.firstName;
-        if (data.lastName)      updates.lastName      = data.lastName;
-        if (data.middleName)    updates.middleName    = data.middleName;
-        if (data.dob)           updates.dob           = data.dob;
-        if (data.address)       updates.address       = data.address;
-        if (data.gender)        updates.gender        = data.gender;
-        if (data.licenceNumber) updates.licenceNumber = data.licenceNumber;
-
-        // Apply all updates atomically
-        setApplicants(prev => {
-          const updated = [...prev];
-          updated[index] = { ...updated[index], ...updates };
-          updateFormData('applicants', updated);
-          return updated;
-        });
-
-        setDlExtracted(prev => ({ ...prev, [index]: { success: true, fields: Object.keys(updates) } }));
-      } catch (err) {
-        setDlExtracting(prev => ({ ...prev, [index]: false }));
-        setDlExtracted(prev => ({ ...prev, [index]: { error: err.message } }));
+      if (data.error) {
+        setDlExtracted(prev => ({ ...prev, [index]: { error: data.error } }));
+        return;
       }
-    };
-    reader.readAsDataURL(file);
+
+      // Pre-fill form fields
+      const updates = {};
+      if (data.firstName)     updates.firstName     = data.firstName;
+      if (data.lastName)      updates.lastName      = data.lastName;
+      if (data.middleName)    updates.middleName    = data.middleName;
+      if (data.dob)           updates.dob           = data.dob;
+      if (data.address)       updates.address       = data.address;
+      if (data.gender)        updates.gender        = data.gender;
+      if (data.licenceNumber) updates.licenceNumber = data.licenceNumber;
+
+      setApplicants(prev => {
+        const updated = [...prev];
+        updated[index] = { ...updated[index], ...updates };
+        updateFormData('applicants', updated);
+        return updated;
+      });
+
+      // If address was pre-filled, increment reset key so AddressAutocomplete
+      // remounts with a fresh Google Places instance (prevents stale autocomplete)
+      if (data.address) {
+        setAddrResetKey(prev => ({ ...prev, [index]: (prev[index] || 0) + 1 }));
+      }
+
+      setDlExtracted(prev => ({ ...prev, [index]: { success: true, fields: Object.keys(updates) } }));
+    } catch (err) {
+      setDlExtracting(prev => ({ ...prev, [index]: false }));
+      setDlExtracted(prev => ({ ...prev, [index]: { error: err.message } }));
+    }
   };
 
-  // ── Mercury banner ────────────────────────────────────────────────────────
+  // ── Mercury banner ──────────────────────────────────────────────────────────
   const renderMercuryBanner = (applicantIndex) => {
     const match = mercuryMatches[applicantIndex];
     if (!match) return null;
@@ -180,7 +198,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     return null;
   };
 
-  // ── Compact document upload ───────────────────────────────────────────────
+  // ── Compact supporting document upload ──────────────────────────────────────
   const renderDocumentUpload = (applicant, index) => (
     <div style={{ marginBottom: '16px' }}>
       <div style={{
@@ -231,154 +249,158 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     </div>
   );
 
-  // ── Driver Licence upload with AI extraction ──────────────────────────────
-  const renderDLUpload = (applicant, index) => (
-    <div style={{ marginBottom: '20px' }}>
-      <div style={{
-        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-        border: '1px solid #bae6fd',
-        borderRadius: '8px',
-        padding: '12px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        flexWrap: 'wrap'
-      }}>
-        <span style={{ fontSize: '22px', flexShrink: 0 }}>🪪</span>
-        <div style={{ flex: 1, minWidth: '180px' }}>
-          <div style={{ fontSize: '13px', fontWeight: '600', color: '#0369a1', marginBottom: '2px' }}>
-            Driver Licence — Auto-fill
-          </div>
-          <div style={{ fontSize: '12px', color: '#0284c7' }}>
-            Upload a photo or scan to automatically fill in personal details
+  // ── Driver Licence upload (front + back) with AI extraction ─────────────────
+  const renderDLUpload = (applicant, index) => {
+    const files    = dlFiles[index] || {};
+    const hasFront = !!files.front;
+    const hasBack  = !!files.back;
+    const isReady  = hasFront && !dlExtracting[index];
+
+    const FileZone = ({ side, label, hint, file }) => (
+      <label style={{ cursor: 'pointer', display: 'block' }}>
+        <input
+          type="file"
+          accept="image/*,.pdf,application/pdf"
+          style={{ display: 'none' }}
+          onChange={(e) => setDLFile(index, side, e.target.files[0])}
+        />
+        <div style={{
+          padding: '8px 10px',
+          background: file ? '#dcfce7' : 'white',
+          border: `1px solid ${file ? '#86efac' : '#cbd5e1'}`,
+          borderRadius: '6px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          fontSize: '12px',
+          cursor: 'pointer'
+        }}>
+          <span style={{ fontSize: '14px', flexShrink: 0 }}>{file ? '✓' : '📷'}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: '600', color: file ? '#166534' : '#334155' }}>
+              {label}
+              {hint && <span style={{ fontWeight: '400', color: '#64748b', marginLeft: '4px' }}>{hint}</span>}
+            </div>
+            <div style={{ color: file ? '#166534' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {file ? file.name : 'Click to upload'}
+            </div>
           </div>
         </div>
-        <label style={{ cursor: 'pointer', flexShrink: 0 }}>
-          <input
-            type="file"
-            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
-            style={{ display: 'none' }}
-            onChange={(e) => handleDLUpload(index, e.target.files[0])}
-          />
-          <span style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '7px 16px',
-            background: dlExtracting[index] ? '#93c5fd' : '#0369a1',
-            color: 'white',
-            borderRadius: '6px',
-            fontSize: '13px',
-            fontWeight: '500',
-            cursor: dlExtracting[index] ? 'default' : 'pointer',
-            transition: 'background 0.2s'
-          }}>
+      </label>
+    );
+
+    return (
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{
+          background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+          border: '1px solid #bae6fd',
+          borderRadius: '8px',
+          padding: '14px 16px'
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <span style={{ fontSize: '20px' }}>🪪</span>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#0369a1' }}>Driver Licence — Auto-fill</div>
+              <div style={{ fontSize: '12px', color: '#0284c7' }}>
+                Upload front &amp; back — AI reads both sides and picks the most recent address
+              </div>
+            </div>
+          </div>
+
+          {/* Front / Back file zones */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+            <FileZone side="front" label="Front *"               file={files.front} />
+            <FileZone side="back"  label="Back"  hint="(recommended)" file={files.back} />
+          </div>
+
+          {/* Extract button */}
+          <button
+            type="button"
+            disabled={!isReady}
+            onClick={() => handleDLExtract(index)}
+            style={{
+              width: '100%',
+              padding: '8px',
+              background: isReady ? '#0369a1' : '#93c5fd',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: isReady ? 'pointer' : 'not-allowed',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
             {dlExtracting[index] ? (
               <>
                 <span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                Reading…
+                Reading licence…
               </>
-            ) : 'Upload DL'}
-          </span>
-        </label>
+            ) : !hasFront
+              ? 'Upload front of licence first'
+              : `Extract & Auto-fill${hasBack ? ' (Front + Back)' : ' (Front only)'}`}
+          </button>
+        </div>
+
+        {dlExtracted[index]?.success && (
+          <div style={{ marginTop: '6px', padding: '8px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', fontSize: '12px', color: '#166534' }}>
+            ✓ {dlExtracted[index].fields.length} field{dlExtracted[index].fields.length !== 1 ? 's' : ''} pre-filled from driver licence
+          </div>
+        )}
+        {dlExtracted[index]?.error && (
+          <div style={{ marginTop: '6px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', color: '#991b1b' }}>
+            ⚠️ Could not extract data: {dlExtracted[index].error}
+          </div>
+        )}
       </div>
+    );
+  };
 
-      {dlExtracted[index]?.success && (
-        <div style={{ marginTop: '6px', padding: '8px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', fontSize: '12px', color: '#166534' }}>
-          ✓ {dlExtracted[index].fields.length} field{dlExtracted[index].fields.length !== 1 ? 's' : ''} pre-filled from driver licence
-        </div>
-      )}
-      {dlExtracted[index]?.error && (
-        <div style={{ marginTop: '6px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', color: '#991b1b' }}>
-          ⚠️ Could not extract data: {dlExtracted[index].error}
-        </div>
-      )}
-    </div>
-  );
-
-  // ── Applicant seeding ─────────────────────────────────────────────────────
+  // ── Applicant seeding ───────────────────────────────────────────────────────
   React.useEffect(() => {
     const totalCount = formData.numApplicants + formData.numGuarantors;
     const newApplicants = [];
 
     for (let i = 0; i < totalCount; i++) {
-      const isApplicant = i < formData.numApplicants;
+      const isApplicant    = i < formData.numApplicants;
       const applicantNumber = isApplicant ? i + 1 : i - formData.numApplicants + 1;
-      const role = isApplicant ? 'Applicant' : 'Guarantor';
-
-      const existing = (formData.applicants || []).find(a => a.id === i + 1);
+      const role           = isApplicant ? 'Applicant' : 'Guarantor';
+      const existing       = (formData.applicants || []).find(a => a.id === i + 1);
 
       if (formData.applicantType === 'Company') {
         if (isApplicant) {
           newApplicants.push(existing && existing.type === 'Company Borrower' ? existing : {
-            id: i + 1,
-            type: 'Company Borrower',
-            role,
-            number: applicantNumber,
-            companyName: '',
-            tradingName: '',
-            companyABN: '',
-            companyACN: '',
-            entityType: '',
-            registeredAddress: '',
-            phone: '',
-            email: '',
-            uploadedDocuments: [],
-            assets: [],
-            liabilities: []
+            id: i + 1, type: 'Company Borrower', role, number: applicantNumber,
+            companyName: '', tradingName: '', companyABN: '', companyACN: '',
+            entityType: '', registeredAddress: '', phone: '', email: '',
+            uploadedDocuments: [], assets: [], liabilities: []
           });
         } else {
           newApplicants.push(existing && existing.type === 'Director Guarantor' ? existing : {
-            id: i + 1,
-            type: 'Director Guarantor',
-            role,
-            number: applicantNumber,
-            firstName: '',
-            middleName: '',
-            lastName: '',
-            dob: '',
-            phone: '',
-            email: '',
-            licenceNumber: '',
-            address: '',
-            yearsAtCurrentAddress: '',
-            monthsAtCurrentAddress: '',
-            addressHistory: [],
-            relationshipToCompany: '',
-            numDependants: 0,
-            dependants: [],
-            uploadedDocuments: [],
-            assets: [],
-            liabilities: []
+            id: i + 1, type: 'Director Guarantor', role, number: applicantNumber,
+            firstName: '', middleName: '', lastName: '', dob: '',
+            phone: '', email: '', licenceNumber: '',
+            address: '', yearsAtCurrentAddress: '', monthsAtCurrentAddress: '',
+            addressHistory: [], relationshipToCompany: '',
+            numDependants: 0, dependants: [],
+            uploadedDocuments: [], assets: [], liabilities: []
           });
         }
       } else {
         newApplicants.push(existing && existing.type === 'Natural Person' ? existing : {
-          id: i + 1,
-          type: 'Natural Person',
-          role,
-          number: applicantNumber,
-          firstName: '',
-          middleName: '',
-          lastName: '',
-          dob: '',
-          phone: '',
-          email: '',
-          licenceNumber: '',
-          address: '',
-          yearsAtCurrentAddress: '',
-          monthsAtCurrentAddress: '',
-          addressHistory: [],
-          gender: '',
-          maritalStatus: '',
-          residencyStatus: '',
-          visaNumber: '',
+          id: i + 1, type: 'Natural Person', role, number: applicantNumber,
+          firstName: '', middleName: '', lastName: '', dob: '',
+          phone: '', email: '', licenceNumber: '',
+          address: '', yearsAtCurrentAddress: '', monthsAtCurrentAddress: '',
+          addressHistory: [], gender: '', maritalStatus: '',
+          residencyStatus: '', visaNumber: '',
           relationshipToApplicant1: i === 0 ? 'Primary' : '',
-          numDependants: 0,
-          dependants: [],
-          uploadedDocuments: [],
-          assets: [],
-          liabilities: []
+          numDependants: 0, dependants: [],
+          uploadedDocuments: [], assets: [], liabilities: []
         });
       }
     }
@@ -387,14 +409,14 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     updateFormData('applicants', newApplicants);
   }, [formData.numApplicants, formData.numGuarantors, formData.applicantType]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── State helpers ─────────────────────────────────────────────────────────
+  // ── State helpers ───────────────────────────────────────────────────────────
   const updateApplicant = (index, field, value) => {
     setApplicants(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
 
       if (field === 'numDependants') {
-        const numDeps = parseInt(value) || 0;
+        const numDeps    = parseInt(value) || 0;
         const currentDeps = updated[index].dependants || [];
         if (numDeps > currentDeps.length) {
           const newDeps = [...currentDeps];
@@ -430,24 +452,24 @@ const Step1Applicants = ({ formData, updateFormData }) => {
   };
 
   const getCardSubtitle = (type) => {
-    if (type === 'Company Borrower') return 'Company / entity details';
+    if (type === 'Company Borrower')   return 'Company / entity details';
     if (type === 'Director Guarantor') return 'Director / personal guarantor details';
     return 'Natural person details';
   };
 
-  // ── Address history (with autocomplete) ──────────────────────────────────
+  // ── Address history (with Google Places autocomplete) ──────────────────────
+  // Key includes addrResetKey[index] so the current-address field remounts after
+  // AI pre-fill, giving a fresh Google Places instance that works correctly.
   const renderAddressHistory = (applicant, index) => (
     <div className="mb-4" style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px' }}>
       <div className="flex justify-between items-center mb-3">
-        <h4 style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>
-          3-Year Residential Address History
-        </h4>
+        <h4 style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>3-Year Residential Address History</h4>
         <button
           type="button"
           onClick={() => {
-            const currentAddresses = applicant.addressHistory || [];
+            const current = applicant.addressHistory || [];
             updateApplicant(index, 'addressHistory', [
-              ...currentAddresses,
+              ...current,
               { id: Date.now(), address: '', yearsAtAddress: '', monthsAtAddress: '' }
             ]);
           }}
@@ -458,10 +480,11 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         </button>
       </div>
 
-      {/* Current address */}
+      {/* Current address — key changes when AI pre-fills to force remount */}
       <div className="mb-3" style={{ paddingBottom: '12px', borderBottom: '1px solid var(--border-primary)' }}>
         <label style={{ fontSize: '13px', fontWeight: '500' }}>Current Address</label>
         <AddressAutocomplete
+          key={`current-addr-${index}-${addrResetKey[index] || 0}`}
           value={applicant.address || ''}
           onChange={(val) => updateApplicant(index, 'address', val)}
           placeholder="Start typing current address…"
@@ -470,26 +493,13 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         <div className="grid grid-cols-2" style={{ marginTop: '8px' }}>
           <div>
             <label style={{ fontSize: '12px' }}>Years</label>
-            <input
-              type="number"
-              value={applicant.yearsAtCurrentAddress || ''}
-              onChange={(e) => updateApplicant(index, 'yearsAtCurrentAddress', e.target.value)}
-              placeholder="0"
-              min="0"
-              style={{ fontSize: '13px' }}
-            />
+            <input type="number" value={applicant.yearsAtCurrentAddress || ''} placeholder="0" min="0" style={{ fontSize: '13px' }}
+              onChange={(e) => updateApplicant(index, 'yearsAtCurrentAddress', e.target.value)} />
           </div>
           <div>
             <label style={{ fontSize: '12px' }}>Months</label>
-            <input
-              type="number"
-              value={applicant.monthsAtCurrentAddress || ''}
-              onChange={(e) => updateApplicant(index, 'monthsAtCurrentAddress', e.target.value)}
-              placeholder="0"
-              min="0"
-              max="11"
-              style={{ fontSize: '13px' }}
-            />
+            <input type="number" value={applicant.monthsAtCurrentAddress || ''} placeholder="0" min="0" max="11" style={{ fontSize: '13px' }}
+              onChange={(e) => updateApplicant(index, 'monthsAtCurrentAddress', e.target.value)} />
           </div>
         </div>
       </div>
@@ -499,15 +509,8 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         <div key={addr.id} className="mb-3" style={{ paddingTop: '12px' }}>
           <div className="flex justify-between items-center mb-2">
             <label style={{ fontSize: '13px', fontWeight: '500' }}>Previous Address {addrIndex + 1}</label>
-            <button
-              type="button"
-              onClick={() => {
-                const updated = applicant.addressHistory.filter((_, i) => i !== addrIndex);
-                updateApplicant(index, 'addressHistory', updated);
-              }}
-              className="btn-danger"
-              style={{ fontSize: '12px', padding: '4px 8px' }}
-            >
+            <button type="button" className="btn-danger" style={{ fontSize: '12px', padding: '4px 8px' }}
+              onClick={() => updateApplicant(index, 'addressHistory', applicant.addressHistory.filter((_, i) => i !== addrIndex))}>
               Remove
             </button>
           </div>
@@ -524,101 +527,66 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           <div className="grid grid-cols-2" style={{ marginTop: '8px' }}>
             <div>
               <label style={{ fontSize: '12px' }}>Years</label>
-              <input
-                type="number"
-                value={addr.yearsAtAddress}
+              <input type="number" value={addr.yearsAtAddress} placeholder="0" min="0" style={{ fontSize: '13px' }}
                 onChange={(e) => {
                   const updated = [...applicant.addressHistory];
                   updated[addrIndex] = { ...updated[addrIndex], yearsAtAddress: e.target.value };
                   updateApplicant(index, 'addressHistory', updated);
-                }}
-                placeholder="0"
-                min="0"
-                style={{ fontSize: '13px' }}
-              />
+                }} />
             </div>
             <div>
               <label style={{ fontSize: '12px' }}>Months</label>
-              <input
-                type="number"
-                value={addr.monthsAtAddress}
+              <input type="number" value={addr.monthsAtAddress} placeholder="0" min="0" max="11" style={{ fontSize: '13px' }}
                 onChange={(e) => {
                   const updated = [...applicant.addressHistory];
                   updated[addrIndex] = { ...updated[addrIndex], monthsAtAddress: e.target.value };
                   updateApplicant(index, 'addressHistory', updated);
-                }}
-                placeholder="0"
-                min="0"
-                max="11"
-                style={{ fontSize: '13px' }}
-              />
+                }} />
             </div>
           </div>
         </div>
       ))}
 
-      {/* Totals hint */}
+      {/* Running total */}
       <div className="hint-text" style={{ marginTop: '12px', fontSize: '12px' }}>
         {(() => {
-          const currentYears = parseInt(applicant.yearsAtCurrentAddress) || 0;
-          const currentMonths = parseInt(applicant.monthsAtCurrentAddress) || 0;
-          const historyYears = (applicant.addressHistory || []).reduce((sum, addr) =>
-            sum + (parseInt(addr.yearsAtAddress) || 0), 0);
-          const historyMonths = (applicant.addressHistory || []).reduce((sum, addr) =>
-            sum + (parseInt(addr.monthsAtAddress) || 0), 0);
-          const totalMonths = (currentYears * 12) + currentMonths + (historyYears * 12) + historyMonths;
-          const totalYears = Math.floor(totalMonths / 12);
-          const remainingMonths = totalMonths % 12;
-          if (totalMonths < 36) {
-            return `⚠️ Total: ${totalYears} years ${remainingMonths} months (need 3 years minimum)`;
-          }
-          return `✓ Total: ${totalYears} years ${remainingMonths} months`;
+          const cy = parseInt(applicant.yearsAtCurrentAddress) || 0;
+          const cm = parseInt(applicant.monthsAtCurrentAddress) || 0;
+          const hy = (applicant.addressHistory || []).reduce((s, a) => s + (parseInt(a.yearsAtAddress) || 0), 0);
+          const hm = (applicant.addressHistory || []).reduce((s, a) => s + (parseInt(a.monthsAtAddress) || 0), 0);
+          const total = cy * 12 + cm + hy * 12 + hm;
+          const ty = Math.floor(total / 12), tm = total % 12;
+          return total < 36
+            ? `⚠️ Total: ${ty} years ${tm} months (need 3 years minimum)`
+            : `✓ Total: ${ty} years ${tm} months`;
         })()}
       </div>
     </div>
   );
 
-  // ── Dependants ─────────────────────────────────────────────────────────────
+  // ── Dependants ──────────────────────────────────────────────────────────────
   const renderDependants = (applicant, index) => (
     <div className="mb-6">
       <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: 'var(--radius-lg)' }}>
-        <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
-          Dependants
-        </h4>
+        <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Dependants</h4>
         <div className="mb-4">
           <label>Number of Dependants</label>
-          <select
-            value={applicant.numDependants}
-            onChange={(e) => updateApplicant(index, 'numDependants', e.target.value)}
-          >
-            {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(num => (
-              <option key={num} value={num}>{num}</option>
-            ))}
+          <select value={applicant.numDependants} onChange={(e) => updateApplicant(index, 'numDependants', e.target.value)}>
+            {[0,1,2,3,4,5,6,7,8].map(n => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
-        {applicant.dependants && applicant.dependants.map((dependant, depIndex) => (
-          <div
-            key={depIndex}
-            style={{ background: 'var(--bg-primary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '8px', border: '1px solid var(--border-primary)' }}
-          >
+        {(applicant.dependants || []).map((dep, depIndex) => (
+          <div key={depIndex} style={{ background: 'var(--bg-primary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '8px', border: '1px solid var(--border-primary)' }}>
             <div className="grid grid-cols-2">
               <div>
                 <label>Name</label>
-                <input
-                  type="text"
-                  value={dependant.name}
-                  onChange={(e) => updateDependant(index, depIndex, 'name', e.target.value)}
-                  placeholder="Dependant name"
-                />
+                <input type="text" value={dep.name} placeholder="Dependant name"
+                  onChange={(e) => updateDependant(index, depIndex, 'name', e.target.value)} />
               </div>
               <div>
                 <label>Age</label>
-                <input
-                  type="number"
-                  value={dependant.age}
-                  onChange={(e) => updateDependant(index, depIndex, 'age', e.target.value)}
-                  placeholder="Age"
-                />
+                <input type="number" value={dep.age} placeholder="Age"
+                  onChange={(e) => updateDependant(index, depIndex, 'age', e.target.value)} />
               </div>
             </div>
           </div>
@@ -627,7 +595,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     </div>
   );
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="fade-in">
       <div className="mb-6">
@@ -646,12 +614,9 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               <h3 className="card-title" style={{ margin: 0 }}>
                 {applicant.role} {applicant.number}
                 {applicant.type === 'Company Borrower' && applicant.companyName && (
-                  <span style={{ fontWeight: '400', color: 'var(--text-secondary)', marginLeft: '8px' }}>
-                    — {applicant.companyName}
-                  </span>
+                  <span style={{ fontWeight: '400', color: 'var(--text-secondary)', marginLeft: '8px' }}>— {applicant.companyName}</span>
                 )}
-                {(applicant.type === 'Natural Person' || applicant.type === 'Director Guarantor') &&
-                  (applicant.firstName || applicant.lastName) && (
+                {(applicant.type === 'Natural Person' || applicant.type === 'Director Guarantor') && (applicant.firstName || applicant.lastName) && (
                   <span style={{ fontWeight: '400', color: 'var(--text-secondary)', marginLeft: '8px' }}>
                     — {[applicant.firstName, applicant.lastName].filter(Boolean).join(' ')}
                   </span>
@@ -661,104 +626,64 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             </div>
           </div>
 
-          {/* ── Company Borrower Fields ── */}
+          {/* ── Company Borrower ── */}
           {applicant.type === 'Company Borrower' && (
             <>
-              {/* Compact doc upload at top */}
               {renderDocumentUpload(applicant, index)}
-
               <div className="mb-6">
-                <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
-                  Company Details
-                </h4>
-
+                <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Company Details</h4>
                 <div className="mb-4">
                   <label>Company Name *</label>
-                  <input
-                    type="text"
-                    value={applicant.companyName || ''}
-                    onChange={(e) => updateApplicant(index, 'companyName', e.target.value)}
-                    placeholder="XYZ Pty Ltd"
-                  />
+                  <input type="text" value={applicant.companyName || ''} placeholder="XYZ Pty Ltd"
+                    onChange={(e) => updateApplicant(index, 'companyName', e.target.value)} />
                 </div>
-
                 <div className="mb-4">
                   <label>Trading Name <span style={{ fontWeight: '400', color: 'var(--text-tertiary)' }}>(if different)</span></label>
-                  <input
-                    type="text"
-                    value={applicant.tradingName || ''}
-                    onChange={(e) => updateApplicant(index, 'tradingName', e.target.value)}
-                    placeholder="Trading name (optional)"
-                  />
+                  <input type="text" value={applicant.tradingName || ''} placeholder="Trading name (optional)"
+                    onChange={(e) => updateApplicant(index, 'tradingName', e.target.value)} />
                 </div>
-
                 <div className="grid grid-cols-3 mb-4">
                   <div>
                     <label>ABN</label>
-                    <input
-                      type="text"
-                      value={applicant.companyABN || ''}
-                      onChange={(e) => updateApplicant(index, 'companyABN', e.target.value)}
-                      placeholder="12 345 678 901"
-                    />
+                    <input type="text" value={applicant.companyABN || ''} placeholder="12 345 678 901"
+                      onChange={(e) => updateApplicant(index, 'companyABN', e.target.value)} />
                   </div>
                   <div>
                     <label>ACN</label>
-                    <input
-                      type="text"
-                      value={applicant.companyACN || ''}
-                      onChange={(e) => updateApplicant(index, 'companyACN', e.target.value)}
-                      placeholder="123 456 789"
-                    />
+                    <input type="text" value={applicant.companyACN || ''} placeholder="123 456 789"
+                      onChange={(e) => updateApplicant(index, 'companyACN', e.target.value)} />
                   </div>
                   <div>
                     <label>Entity Type</label>
-                    <select
-                      value={applicant.entityType || ''}
-                      onChange={(e) => updateApplicant(index, 'entityType', e.target.value)}
-                    >
+                    <select value={applicant.entityType || ''} onChange={(e) => updateApplicant(index, 'entityType', e.target.value)}>
                       <option value="">Select...</option>
                       <option value="Company">Company</option>
                       <option value="Trust">Trust</option>
                     </select>
                   </div>
                 </div>
-
                 <div className="mb-4">
                   <label>Registered Address</label>
-                  <input
-                    type="text"
-                    value={applicant.registeredAddress || ''}
-                    onChange={(e) => updateApplicant(index, 'registeredAddress', e.target.value)}
-                    placeholder="Registered business address"
-                  />
+                  <input type="text" value={applicant.registeredAddress || ''} placeholder="Registered business address"
+                    onChange={(e) => updateApplicant(index, 'registeredAddress', e.target.value)} />
                 </div>
-
                 <div className="grid grid-cols-2 mb-4">
                   <div>
                     <label>Phone</label>
-                    <input
-                      type="tel"
-                      value={applicant.phone || ''}
-                      onChange={(e) => updateApplicant(index, 'phone', e.target.value)}
-                      placeholder="02 9000 0000"
-                    />
+                    <input type="tel" value={applicant.phone || ''} placeholder="02 9000 0000"
+                      onChange={(e) => updateApplicant(index, 'phone', e.target.value)} />
                   </div>
                   <div>
                     <label>Email</label>
-                    <input
-                      type="email"
-                      value={applicant.email || ''}
-                      onChange={(e) => updateApplicant(index, 'email', e.target.value)}
-                      placeholder="info@company.com.au"
-                    />
+                    <input type="email" value={applicant.email || ''} placeholder="info@company.com.au"
+                      onChange={(e) => updateApplicant(index, 'email', e.target.value)} />
                   </div>
                 </div>
               </div>
             </>
           )}
 
-          {/* ── Director Guarantor Fields ── */}
+          {/* ── Director Guarantor ── */}
           {applicant.type === 'Director Guarantor' && (
             <>
               {renderMercuryBanner(index)}
@@ -766,87 +691,55 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               {renderDLUpload(applicant, index)}
 
               <div className="mb-6">
-                <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
-                  Director / Guarantor Details
-                </h4>
+                <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Director / Guarantor Details</h4>
 
                 <div className="grid grid-cols-3 mb-4">
                   <div>
                     <label>First Name</label>
-                    <input
-                      type="text"
-                      value={applicant.firstName || ''}
-                      onChange={(e) => updateApplicant(index, 'firstName', e.target.value)}
-                      placeholder="John"
-                    />
+                    <input type="text" value={applicant.firstName || ''} placeholder="John"
+                      onChange={(e) => updateApplicant(index, 'firstName', e.target.value)} />
                   </div>
                   <div>
                     <label>Middle Name</label>
-                    <input
-                      type="text"
-                      value={applicant.middleName || ''}
-                      onChange={(e) => updateApplicant(index, 'middleName', e.target.value)}
-                      placeholder="Optional"
-                    />
+                    <input type="text" value={applicant.middleName || ''} placeholder="Optional"
+                      onChange={(e) => updateApplicant(index, 'middleName', e.target.value)} />
                   </div>
                   <div>
                     <label>Last Name</label>
-                    <input
-                      type="text"
-                      value={applicant.lastName || ''}
-                      onChange={(e) => updateApplicant(index, 'lastName', e.target.value)}
-                      placeholder="Smith"
-                    />
+                    <input type="text" value={applicant.lastName || ''} placeholder="Smith"
+                      onChange={(e) => updateApplicant(index, 'lastName', e.target.value)} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 mb-4">
                   <div>
                     <label>Date of Birth</label>
-                    <input
-                      type="date"
-                      value={applicant.dob || ''}
-                      onChange={(e) => updateApplicant(index, 'dob', e.target.value)}
-                    />
+                    <input type="date" value={applicant.dob || ''}
+                      onChange={(e) => updateApplicant(index, 'dob', e.target.value)} />
                   </div>
                   <div>
                     <label>Phone</label>
-                    <input
-                      type="tel"
-                      value={applicant.phone || ''}
+                    <input type="tel" value={applicant.phone || ''} placeholder="0400 000 000"
                       onChange={(e) => updateApplicant(index, 'phone', e.target.value)}
-                      onBlur={(e) => lookupMercury(index, applicant.email, e.target.value)}
-                      placeholder="0400 000 000"
-                    />
+                      onBlur={(e) => lookupMercury(index, applicant.email, e.target.value)} />
                   </div>
                   <div>
                     <label>Licence Number</label>
-                    <input
-                      type="text"
-                      value={applicant.licenceNumber || ''}
-                      onChange={(e) => updateApplicant(index, 'licenceNumber', e.target.value)}
-                      placeholder="e.g. 12345678"
-                    />
+                    <input type="text" value={applicant.licenceNumber || ''} placeholder="e.g. 12345678"
+                      onChange={(e) => updateApplicant(index, 'licenceNumber', e.target.value)} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 mb-4">
                   <div>
                     <label>Email</label>
-                    <input
-                      type="email"
-                      value={applicant.email || ''}
+                    <input type="email" value={applicant.email || ''} placeholder="john.smith@company.com.au"
                       onChange={(e) => updateApplicant(index, 'email', e.target.value)}
-                      onBlur={(e) => lookupMercury(index, e.target.value, applicant.phone)}
-                      placeholder="john.smith@company.com.au"
-                    />
+                      onBlur={(e) => lookupMercury(index, e.target.value, applicant.phone)} />
                   </div>
                   <div>
                     <label>Relationship to Company</label>
-                    <select
-                      value={applicant.relationshipToCompany || ''}
-                      onChange={(e) => updateApplicant(index, 'relationshipToCompany', e.target.value)}
-                    >
+                    <select value={applicant.relationshipToCompany || ''} onChange={(e) => updateApplicant(index, 'relationshipToCompany', e.target.value)}>
                       <option value="">Select...</option>
                       <option value="Director">Director</option>
                       <option value="Shareholder">Shareholder</option>
@@ -864,7 +757,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             </>
           )}
 
-          {/* ── Natural Person Fields ── */}
+          {/* ── Natural Person ── */}
           {applicant.type === 'Natural Person' && (
             <>
               {renderMercuryBanner(index)}
@@ -872,65 +765,41 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               {renderDLUpload(applicant, index)}
 
               <div className="mb-6">
-                <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>
-                  Personal Details
-                </h4>
+                <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Personal Details</h4>
 
                 <div className="grid grid-cols-3 mb-4">
                   <div>
                     <label>First Name</label>
-                    <input
-                      type="text"
-                      value={applicant.firstName}
-                      onChange={(e) => updateApplicant(index, 'firstName', e.target.value)}
-                      placeholder="John"
-                    />
+                    <input type="text" value={applicant.firstName} placeholder="John"
+                      onChange={(e) => updateApplicant(index, 'firstName', e.target.value)} />
                   </div>
                   <div>
                     <label>Middle Name</label>
-                    <input
-                      type="text"
-                      value={applicant.middleName || ''}
-                      onChange={(e) => updateApplicant(index, 'middleName', e.target.value)}
-                      placeholder="Optional"
-                    />
+                    <input type="text" value={applicant.middleName || ''} placeholder="Optional"
+                      onChange={(e) => updateApplicant(index, 'middleName', e.target.value)} />
                   </div>
                   <div>
                     <label>Last Name</label>
-                    <input
-                      type="text"
-                      value={applicant.lastName}
-                      onChange={(e) => updateApplicant(index, 'lastName', e.target.value)}
-                      placeholder="Smith"
-                    />
+                    <input type="text" value={applicant.lastName} placeholder="Smith"
+                      onChange={(e) => updateApplicant(index, 'lastName', e.target.value)} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 mb-4">
                   <div>
                     <label>Date of Birth</label>
-                    <input
-                      type="date"
-                      value={applicant.dob}
-                      onChange={(e) => updateApplicant(index, 'dob', e.target.value)}
-                    />
+                    <input type="date" value={applicant.dob}
+                      onChange={(e) => updateApplicant(index, 'dob', e.target.value)} />
                   </div>
                   <div>
                     <label>Phone</label>
-                    <input
-                      type="tel"
-                      value={applicant.phone}
+                    <input type="tel" value={applicant.phone} placeholder="0400 000 000"
                       onChange={(e) => updateApplicant(index, 'phone', e.target.value)}
-                      onBlur={(e) => lookupMercury(index, applicant.email, e.target.value)}
-                      placeholder="0400 000 000"
-                    />
+                      onBlur={(e) => lookupMercury(index, applicant.email, e.target.value)} />
                   </div>
                   <div>
                     <label>Gender</label>
-                    <select
-                      value={applicant.gender}
-                      onChange={(e) => updateApplicant(index, 'gender', e.target.value)}
-                    >
+                    <select value={applicant.gender} onChange={(e) => updateApplicant(index, 'gender', e.target.value)}>
                       <option value="">Select...</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
@@ -942,32 +811,21 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                 <div className="grid grid-cols-2 mb-4">
                   <div>
                     <label>Email</label>
-                    <input
-                      type="email"
-                      value={applicant.email}
+                    <input type="email" value={applicant.email} placeholder="john.smith@example.com"
                       onChange={(e) => updateApplicant(index, 'email', e.target.value)}
-                      onBlur={(e) => lookupMercury(index, e.target.value, applicant.phone)}
-                      placeholder="john.smith@example.com"
-                    />
+                      onBlur={(e) => lookupMercury(index, e.target.value, applicant.phone)} />
                   </div>
                   <div>
                     <label>Licence Number</label>
-                    <input
-                      type="text"
-                      value={applicant.licenceNumber || ''}
-                      onChange={(e) => updateApplicant(index, 'licenceNumber', e.target.value)}
-                      placeholder="e.g. 12345678"
-                    />
+                    <input type="text" value={applicant.licenceNumber || ''} placeholder="e.g. 12345678"
+                      onChange={(e) => updateApplicant(index, 'licenceNumber', e.target.value)} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 mb-4">
                   <div>
                     <label>Marital Status</label>
-                    <select
-                      value={applicant.maritalStatus}
-                      onChange={(e) => updateApplicant(index, 'maritalStatus', e.target.value)}
-                    >
+                    <select value={applicant.maritalStatus} onChange={(e) => updateApplicant(index, 'maritalStatus', e.target.value)}>
                       <option value="">Select...</option>
                       <option value="Single">Single</option>
                       <option value="Married">Married</option>
@@ -978,10 +836,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   </div>
                   <div>
                     <label>Residency Status</label>
-                    <select
-                      value={applicant.residencyStatus}
-                      onChange={(e) => updateApplicant(index, 'residencyStatus', e.target.value)}
-                    >
+                    <select value={applicant.residencyStatus} onChange={(e) => updateApplicant(index, 'residencyStatus', e.target.value)}>
                       <option value="">Select...</option>
                       <option value="Australian Citizen">Australian Citizen</option>
                       <option value="Permanent Resident">Permanent Resident</option>
@@ -994,12 +849,8 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                 {applicant.residencyStatus === 'Temporary Visa' && (
                   <div className="mb-4">
                     <label>Visa Number</label>
-                    <input
-                      type="text"
-                      value={applicant.visaNumber}
-                      onChange={(e) => updateApplicant(index, 'visaNumber', e.target.value)}
-                      placeholder="Enter visa number"
-                    />
+                    <input type="text" value={applicant.visaNumber} placeholder="Enter visa number"
+                      onChange={(e) => updateApplicant(index, 'visaNumber', e.target.value)} />
                   </div>
                 )}
 
@@ -1009,10 +860,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               {index > 0 && (
                 <div className="mb-6">
                   <label>Relationship to Applicant 1</label>
-                  <select
-                    value={applicant.relationshipToApplicant1}
-                    onChange={(e) => updateApplicant(index, 'relationshipToApplicant1', e.target.value)}
-                  >
+                  <select value={applicant.relationshipToApplicant1} onChange={(e) => updateApplicant(index, 'relationshipToApplicant1', e.target.value)}>
                     <option value="">Select...</option>
                     <option value="Spouse">Spouse</option>
                     <option value="De Facto Partner">De Facto Partner</option>
@@ -1043,13 +891,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
       ))}
 
       {applicants.length === 0 && (
-        <div style={{
-          padding: '40px',
-          textAlign: 'center',
-          background: 'var(--bg-secondary)',
-          borderRadius: 'var(--radius-lg)',
-          border: '2px dashed var(--border-primary)'
-        }}>
+        <div style={{ padding: '40px', textAlign: 'center', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '2px dashed var(--border-primary)' }}>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
             No applicants configured. Please complete Step 0 (Loan Strategy) first.
           </p>

@@ -33,6 +33,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
   const [dlFiles,      setDlFilesState]  = useState({});
   const [dlExtracting, setDlExtracting]  = useState({});
   const [dlExtracted,  setDlExtracted]   = useState({});
+  const [dlDragging,   setDlDragging]    = useState({}); // { '[index]-front': bool }
 
   // Increments when AI pre-fills the address → forces AddressAutocomplete remount
   const [addrResetKey, setAddrResetKey]  = useState({});
@@ -142,6 +143,36 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
     if (match.status === 'found') {
       const { contacts, totalCount } = match;
+
+      // Comprehensive company detection — checks multiple CRM field conventions
+      const resolveContact = (contact) => {
+        // 1. Explicit type/category fields (various CRM conventions)
+        const typeStr = [
+          contact.type, contact.entityType, contact.contactType,
+          contact.recordType, contact.category, contact.contactCategory
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        if (typeStr.match(/compan|organis|organizat|business|corporate|entity/)) {
+          return { isCompany: true };
+        }
+        if (typeStr.match(/person|individual|contact|client/)) {
+          return { isCompany: false };
+        }
+
+        // 2. Has ABN → company
+        if (contact.abn) return { isCompany: true };
+
+        // 3. Has a company name distinctly different from the person name
+        const personName = [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim().toLowerCase();
+        const companyName = (contact.company || '').trim().toLowerCase();
+        if (companyName && companyName !== personName) return { isCompany: true };
+
+        // 4. No person name at all but has company name
+        if (!contact.firstName && !contact.lastName && contact.company) return { isCompany: true };
+
+        return { isCompany: false };
+      };
+
       return (
         <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', overflow: 'hidden' }}>
           <div style={{ padding: '10px 14px', borderBottom: contacts.length > 1 ? '1px solid #bbf7d0' : 'none', color: '#166534', fontWeight: '600' }}>
@@ -149,10 +180,13 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             {totalCount > contacts.length && <span style={{ fontWeight: '400' }}> (showing {contacts.length})</span>}
           </div>
           {contacts.map((contact, i) => {
-            const isCompany = !contact.firstName && !contact.lastName && contact.company;
+            const { isCompany } = resolveContact(contact);
+            const personName = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
             const name = isCompany
-              ? contact.company
-              : [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.company || 'Unknown';
+              ? (contact.company || personName || 'Unknown')
+              : (personName || contact.company || 'Unknown');
+            // For company records, show the contact person's name as a subtitle if available
+            const contactPerson = isCompany && personName && personName !== contact.company ? personName : null;
             const type = isCompany ? 'Company' : 'Person';
             const mercuryUrl = `https://crm.connective.com.au/#/people/${contact.uniqueId}`;
             return (
@@ -167,6 +201,11 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   <span style={{ marginLeft: '8px', fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: isCompany ? '#dbeafe' : '#f3f4f6', color: isCompany ? '#1d4ed8' : '#374151' }}>
                     {type}
                   </span>
+                  {contactPerson && (
+                    <span style={{ marginLeft: '6px', fontSize: '11px', color: '#6b7280' }}>
+                      c/- {contactPerson}
+                    </span>
+                  )}
                 </div>
                 <a href={mercuryUrl} target="_blank" rel="noopener noreferrer"
                   style={{ color: 'var(--color-primary)', fontWeight: '600', textDecoration: 'none', whiteSpace: 'nowrap', fontSize: '13px' }}>
@@ -249,45 +288,66 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     </div>
   );
 
-  // ── Driver Licence upload (front + back) with AI extraction ─────────────────
+  // ── Driver Licence upload (front + back) with drag-and-drop + AI extraction ──
   const renderDLUpload = (applicant, index) => {
     const files    = dlFiles[index] || {};
     const hasFront = !!files.front;
     const hasBack  = !!files.back;
     const isReady  = hasFront && !dlExtracting[index];
 
-    const FileZone = ({ side, label, hint, file }) => (
-      <label style={{ cursor: 'pointer', display: 'block' }}>
-        <input
-          type="file"
-          accept="image/*,.pdf,application/pdf"
-          style={{ display: 'none' }}
-          onChange={(e) => setDLFile(index, side, e.target.files[0])}
-        />
-        <div style={{
-          padding: '8px 10px',
-          background: file ? '#dcfce7' : 'white',
-          border: `1px solid ${file ? '#86efac' : '#cbd5e1'}`,
-          borderRadius: '6px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          fontSize: '12px',
-          cursor: 'pointer'
-        }}>
-          <span style={{ fontSize: '14px', flexShrink: 0 }}>{file ? '✓' : '📷'}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: '600', color: file ? '#166534' : '#334155' }}>
+    const FileZone = ({ side, label, hint, file }) => {
+      const dragKey   = `${index}-${side}`;
+      const isDragging = !!dlDragging[dragKey];
+
+      const onDragOver = (e) => { e.preventDefault(); setDlDragging(p => ({ ...p, [dragKey]: true })); };
+      const onDragLeave = () =>  { setDlDragging(p => ({ ...p, [dragKey]: false })); };
+      const onDrop = (e) => {
+        e.preventDefault();
+        setDlDragging(p => ({ ...p, [dragKey]: false }));
+        const dropped = e.dataTransfer.files[0];
+        if (dropped) setDLFile(index, side, dropped);
+      };
+
+      return (
+        <label
+          style={{ cursor: 'pointer', display: 'block' }}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+        >
+          <input
+            type="file"
+            accept="image/*,.pdf,application/pdf"
+            style={{ display: 'none' }}
+            onChange={(e) => setDLFile(index, side, e.target.files[0])}
+          />
+          <div style={{
+            padding: '12px 10px',
+            background: isDragging ? '#dbeafe' : file ? '#dcfce7' : 'white',
+            border: `${isDragging ? '2px dashed #3b82f6' : `1px solid ${file ? '#86efac' : '#cbd5e1'}`}`,
+            borderRadius: '6px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '4px',
+            fontSize: '12px',
+            cursor: 'pointer',
+            textAlign: 'center',
+            transition: 'all 0.15s'
+          }}>
+            <span style={{ fontSize: '20px' }}>{isDragging ? '📂' : file ? '✅' : '📷'}</span>
+            <div style={{ fontWeight: '600', color: isDragging ? '#1d4ed8' : file ? '#166534' : '#334155', fontSize: '11px' }}>
               {label}
               {hint && <span style={{ fontWeight: '400', color: '#64748b', marginLeft: '4px' }}>{hint}</span>}
             </div>
-            <div style={{ color: file ? '#166534' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {file ? file.name : 'Click to upload'}
+            <div style={{ color: isDragging ? '#3b82f6' : file ? '#166534' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%', fontSize: '11px' }}>
+              {isDragging ? 'Drop to upload' : file ? file.name : 'Drop or click'}
             </div>
           </div>
-        </div>
-      </label>
-    );
+        </label>
+      );
+    };
 
     return (
       <div style={{ marginBottom: '20px' }}>

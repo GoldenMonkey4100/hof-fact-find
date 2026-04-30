@@ -1,60 +1,146 @@
-import { useEffect, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 /**
- * Australian address autocomplete backed by Google Places.
+ * Australian address autocomplete using Google Places AutocompleteService
+ * (data-only API — no pac-container widget injected into the DOM).
  *
- * Uses an UNCONTROLLED input with imperative DOM updates to avoid the
- * React controlled-input conflict where React re-renders overwrite the
- * value that Google Places is trying to set, corrupting the dropdown.
- *
- * - User typing  → fires onChange on every keystroke (parent can track if needed)
- * - Place selected → fires onChange with formatted_address
- * - External value update (e.g. AI pre-fill) → imperatively sets DOM value
- *   when the field is not focused
+ * Renders a fully custom dropdown, avoiding all pac-container CSS conflicts
+ * and the React controlled-input race condition that caused the ! icon bug.
  */
 const AddressAutocomplete = ({ value, onChange, placeholder, style, className }) => {
-  const inputRef   = useRef(null);
-  const isFocused  = useRef(false);
+  const [inputVal,   setInputVal]   = useState(value || '');
+  const [suggestions, setSuggestions] = useState([]);
+  const [open,       setOpen]       = useState(false);
+  const [activeIdx,  setActiveIdx]  = useState(-1);
 
-  // Sync external value changes into the DOM (e.g. AI pre-fill from DL scan)
-  // but only when the user isn't actively typing so we don't interrupt them.
+  const containerRef = useRef(null);
+  const serviceRef   = useRef(null);
+  const debounceRef  = useRef(null);
+
+  // Keep inputVal in sync with external changes (AI pre-fill etc.)
+  useEffect(() => { setInputVal(value || ''); }, [value]);
+
+  // Init AutocompleteService — poll until Google Maps SDK loads
   useEffect(() => {
-    if (inputRef.current && !isFocused.current) {
-      inputRef.current.value = value || '';
+    const init = () => {
+      if (window.google?.maps?.places) {
+        serviceRef.current = new window.google.maps.places.AutocompleteService();
+        return true;
+      }
+      return false;
+    };
+    if (!init()) {
+      const id = setInterval(() => { if (init()) clearInterval(id); }, 300);
+      return () => clearInterval(id);
     }
-  }, [value]);
+  }, []);
 
-  // Initialise Google Places Autocomplete once on mount.
+  const fetchSuggestions = useCallback((input) => {
+    if (!serviceRef.current || !input || input.length < 3) {
+      setSuggestions([]);
+      setOpen(false);
+      return;
+    }
+    serviceRef.current.getPlacePredictions(
+      { input, types: ['address'], componentRestrictions: { country: 'au' } },
+      (predictions, status) => {
+        if (status === 'OK' && predictions?.length) {
+          setSuggestions(predictions);
+          setOpen(true);
+          setActiveIdx(-1);
+        } else {
+          setSuggestions([]);
+          setOpen(false);
+        }
+      }
+    );
+  }, []);
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    setInputVal(val);
+    onChange(val);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchSuggestions(val), 300);
+  };
+
+  const handleSelect = (s) => {
+    setInputVal(s.description);
+    setSuggestions([]);
+    setOpen(false);
+    onChange(s.description);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!open || !suggestions.length) return;
+    if      (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, suggestions.length - 1)); }
+    else if (e.key === 'ArrowUp')   { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, -1)); }
+    else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); handleSelect(suggestions[activeIdx]); }
+    else if (e.key === 'Escape')    { setOpen(false); }
+  };
+
+  // Close on outside click
   useEffect(() => {
-    if (!window.google?.maps?.places || !inputRef.current) return;
-
-    const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
-      types: ['address'],
-      componentRestrictions: { country: 'au' },
-      fields: ['formatted_address']
-    });
-
-    const listener = autocomplete.addListener('place_changed', () => {
-      const place = autocomplete.getPlace();
-      if (place?.formatted_address) onChange(place.formatted_address);
-    });
-
-    return () => window.google.maps.event.removeListener(listener);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   return (
-    <input
-      ref={inputRef}
-      type="text"
-      defaultValue={value}
-      onFocus={() => { isFocused.current = true; }}
-      onBlur={() => { isFocused.current = false; }}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder || 'Start typing an address…'}
-      style={style}
-      className={className}
-      autoComplete="off"
-    />
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      <input
+        type="text"
+        value={inputVal}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        onFocus={() => suggestions.length > 0 && setOpen(true)}
+        placeholder={placeholder || 'Start typing an address…'}
+        style={style}
+        className={className}
+        autoComplete="nope"
+      />
+
+      {open && suggestions.length > 0 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0,
+          zIndex: 99999, background: 'white',
+          border: '1px solid var(--border-primary)',
+          borderRadius: '8px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+          marginTop: '2px', overflow: 'hidden',
+          maxHeight: '220px', overflowY: 'auto'
+        }}>
+          {suggestions.map((s, i) => {
+            const main      = s.structured_formatting?.main_text || s.description;
+            const secondary = s.structured_formatting?.secondary_text || '';
+            return (
+              <div
+                key={s.place_id}
+                onMouseDown={(e) => { e.preventDefault(); handleSelect(s); }}
+                style={{
+                  padding: '9px 12px', cursor: 'pointer', fontSize: '13px',
+                  background: i === activeIdx ? 'var(--color-primary-light)' : 'white',
+                  borderBottom: i < suggestions.length - 1 ? '1px solid #f1f5f9' : 'none',
+                  display: 'flex', alignItems: 'center', gap: '8px'
+                }}
+              >
+                <span style={{ color: 'var(--text-tertiary)', fontSize: '13px', flexShrink: 0 }}>📍</span>
+                <div>
+                  <span style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{main}</span>
+                  {secondary && (
+                    <span style={{ color: 'var(--text-secondary)', marginLeft: '6px', fontSize: '12px' }}>
+                      {secondary}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 };
 

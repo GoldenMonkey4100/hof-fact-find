@@ -21,12 +21,16 @@ const AddressAutocomplete = ({ value, onChange, placeholder, style, className })
   useEffect(() => { setInputVal(value || ''); }, [value]);
 
   // Init AutocompleteService — poll until Google Maps SDK loads
+  // Check specifically for AutocompleteService, not just the places namespace,
+  // because loading=async can populate the namespace before all classes are ready.
   useEffect(() => {
     const init = () => {
-      if (window.google?.maps?.places) {
-        serviceRef.current = new window.google.maps.places.AutocompleteService();
-        return true;
-      }
+      try {
+        if (typeof window.google?.maps?.places?.AutocompleteService === 'function') {
+          serviceRef.current = new window.google.maps.places.AutocompleteService();
+          return true;
+        }
+      } catch (e) { /* retry */ }
       return false;
     };
     if (!init()) {
@@ -51,6 +55,7 @@ const AddressAutocomplete = ({ value, onChange, placeholder, style, className })
         } else {
           setSuggestions([]);
           setOpen(false);
+          if (status !== 'ZERO_RESULTS') console.warn('[AddressAutocomplete] Places status:', status);
         }
       }
     );

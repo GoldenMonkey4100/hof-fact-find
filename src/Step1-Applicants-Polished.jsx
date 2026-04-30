@@ -237,56 +237,77 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     return null;
   };
 
-  // ── Compact supporting document upload ──────────────────────────────────────
-  const renderDocumentUpload = (applicant, index) => (
-    <div style={{ marginBottom: '16px' }}>
-      <div style={{
-        border: '1px dashed var(--border-primary)',
-        borderRadius: '8px',
-        padding: '10px 14px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        background: 'var(--bg-secondary)'
-      }}>
-        <span style={{ fontSize: '16px' }}>📎</span>
-        <div style={{ flex: 1 }}>
-          <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-secondary)' }}>
-            Supporting Documents
-          </span>
-          {applicant.uploadedDocuments?.length > 0 && (
-            <span style={{ fontSize: '12px', color: 'var(--color-primary)', marginLeft: '8px' }}>
-              ({applicant.uploadedDocuments.length} file{applicant.uploadedDocuments.length !== 1 ? 's' : ''} selected)
-            </span>
+  // ── E-Signature request section ─────────────────────────────────────────────
+  const [eSignOpen, setESignOpen] = useState({}); // { [index]: bool }
+
+  const renderESignatureSection = (applicant, index) => {
+    const sig   = applicant.eSignature || {};
+    const open  = !!eSignOpen[index];
+    const isPending = sig.status === 'pending';
+    const isSigned  = sig.status === 'signed';
+
+    const defaultName  = [applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ')
+      || (applicant.type === 'Company Borrower' ? applicant.companyName : '');
+    const defaultEmail = applicant.email || '';
+    const defaultPhone = applicant.phone || '';
+
+    const handleSend = () => {
+      const name  = document.getElementById(`esig-name-${index}`)?.value || defaultName;
+      const email = document.getElementById(`esig-email-${index}`)?.value || defaultEmail;
+      const phone = document.getElementById(`esig-phone-${index}`)?.value || defaultPhone;
+      updateApplicant(index, 'eSignature', { status: 'pending', name, email, mobile: phone, requestedAt: new Date().toISOString() });
+      setESignOpen(p => ({ ...p, [index]: false }));
+    };
+
+    return (
+      <div style={{ marginTop: '8px', padding: '14px 16px', background: isSigned ? '#f0fdf4' : isPending ? '#f0f9ff' : '#fafafa', border: `1px solid ${isSigned ? '#86efac' : isPending ? '#bae6fd' : 'var(--border-primary)'}`, borderRadius: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '18px' }}>{isSigned ? '✅' : isPending ? '🕐' : '✍️'}</span>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Credit Guide — E-Signature Request</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                {isSigned ? `Signed by ${sig.name}` : isPending ? `Request sent to ${sig.email} · Awaiting signature` : 'Send credit guide for digital signing (required for Equifax & illion credit checks)'}
+              </div>
+            </div>
+          </div>
+          {!isSigned && (
+            <button type="button"
+              onClick={() => setESignOpen(p => ({ ...p, [index]: !p[index] }))}
+              style={{ padding: '5px 14px', background: isPending ? 'white' : 'var(--color-primary)', color: isPending ? 'var(--text-primary)' : 'white', border: isPending ? '1px solid var(--border-primary)' : 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', flexShrink: 0 }}>
+              {isPending ? 'Resend' : open ? 'Cancel' : 'Request Signature'}
+            </button>
           )}
         </div>
-        <label style={{ cursor: 'pointer', flexShrink: 0 }}>
-          <input
-            type="file"
-            multiple
-            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-            onChange={(e) => {
-              const files = Array.from(e.target.files);
-              updateApplicant(index, 'uploadedDocuments', [...(applicant.uploadedDocuments || []), ...files]);
-            }}
-            style={{ display: 'none' }}
-          />
-          <span style={{
-            display: 'inline-block',
-            padding: '5px 14px',
-            background: 'white',
-            border: '1px solid var(--border-primary)',
-            borderRadius: '6px',
-            fontSize: '13px',
-            color: 'var(--text-primary)',
-            cursor: 'pointer'
-          }}>
-            Browse
-          </span>
-        </label>
+
+        {open && (
+          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-primary)' }}>
+            <div className="grid grid-cols-3" style={{ marginBottom: '10px' }}>
+              <div>
+                <label style={{ fontSize: '12px' }}>Full Name *</label>
+                <input id={`esig-name-${index}`} type="text" defaultValue={defaultName} placeholder="Full legal name" style={{ fontSize: '13px' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px' }}>Email *</label>
+                <input id={`esig-email-${index}`} type="email" defaultValue={defaultEmail} placeholder="client@email.com" style={{ fontSize: '13px' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: '12px' }}>Mobile *</label>
+                <input id={`esig-phone-${index}`} type="tel" defaultValue={defaultPhone} placeholder="0400 000 000" style={{ fontSize: '13px' }} />
+              </div>
+            </div>
+            <div style={{ padding: '8px 10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '11px', color: '#1e40af', marginBottom: '10px' }}>
+              ℹ️ The client will receive a link to digitally sign the Credit Guide. This is required before Equifax &amp; illion credit checks can be submitted.
+            </div>
+            <button type="button" onClick={handleSend}
+              style={{ padding: '7px 20px', background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+              Send Signature Request →
+            </button>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // ── Driver Licence upload (front + back) with drag-and-drop + AI extraction ──
   const renderDLUpload = (applicant, index) => {
@@ -296,32 +317,24 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     const isReady  = hasFront && !dlExtracting[index];
 
     const FileZone = ({ side, label, hint, file }) => {
-      const dragKey   = `${index}-${side}`;
+      const dragKey    = `${index}-${side}`;
       const isDragging = !!dlDragging[dragKey];
-
-      const onDragOver = (e) => { e.preventDefault(); setDlDragging(p => ({ ...p, [dragKey]: true })); };
-      const onDragLeave = () =>  { setDlDragging(p => ({ ...p, [dragKey]: false })); };
-      const onDrop = (e) => {
-        e.preventDefault();
-        setDlDragging(p => ({ ...p, [dragKey]: false }));
-        const dropped = e.dataTransfer.files[0];
-        if (dropped) setDLFile(index, side, dropped);
-      };
+      const inputId    = `dl-input-${index}-${side}`;
 
       return (
-        <label
-          style={{ cursor: 'pointer', display: 'block' }}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          onDrop={onDrop}
-        >
-          <input
-            type="file"
-            accept="image/*,.pdf,application/pdf"
-            style={{ display: 'none' }}
-            onChange={(e) => setDLFile(index, side, e.target.files[0])}
-          />
-          <div style={{
+        <div
+          onClick={() => document.getElementById(inputId)?.click()}
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDlDragging(p => ({ ...p, [dragKey]: true })); }}
+          onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDlDragging(p => ({ ...p, [dragKey]: true })); }}
+          onDragLeave={(e) => { e.stopPropagation(); setDlDragging(p => ({ ...p, [dragKey]: false })); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDlDragging(p => ({ ...p, [dragKey]: false }));
+            const dropped = e.dataTransfer.files[0];
+            if (dropped) setDLFile(index, side, dropped);
+          }}
+          style={{
             padding: '12px 10px',
             background: isDragging ? '#dbeafe' : file ? '#dcfce7' : 'white',
             border: `${isDragging ? '2px dashed #3b82f6' : `1px solid ${file ? '#86efac' : '#cbd5e1'}`}`,
@@ -334,18 +347,26 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             fontSize: '12px',
             cursor: 'pointer',
             textAlign: 'center',
-            transition: 'all 0.15s'
-          }}>
-            <span style={{ fontSize: '20px' }}>{isDragging ? '📂' : file ? '✅' : '📷'}</span>
-            <div style={{ fontWeight: '600', color: isDragging ? '#1d4ed8' : file ? '#166534' : '#334155', fontSize: '11px' }}>
-              {label}
-              {hint && <span style={{ fontWeight: '400', color: '#64748b', marginLeft: '4px' }}>{hint}</span>}
-            </div>
-            <div style={{ color: isDragging ? '#3b82f6' : file ? '#166534' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%', fontSize: '11px' }}>
-              {isDragging ? 'Drop to upload' : file ? file.name : 'Drop or click'}
-            </div>
+            transition: 'all 0.15s',
+            userSelect: 'none'
+          }}
+        >
+          <input
+            id={inputId}
+            type="file"
+            accept="image/*,.pdf,application/pdf"
+            style={{ display: 'none' }}
+            onChange={(e) => setDLFile(index, side, e.target.files[0])}
+          />
+          <span style={{ fontSize: '20px' }}>{isDragging ? '📂' : file ? '✅' : '📷'}</span>
+          <div style={{ fontWeight: '600', color: isDragging ? '#1d4ed8' : file ? '#166534' : '#334155', fontSize: '11px' }}>
+            {label}
+            {hint && <span style={{ fontWeight: '400', color: '#64748b', marginLeft: '4px' }}>{hint}</span>}
           </div>
-        </label>
+          <div style={{ color: isDragging ? '#3b82f6' : file ? '#166534' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%', fontSize: '11px' }}>
+            {isDragging ? 'Drop to upload' : file ? file.name : 'Drop or click'}
+          </div>
+        </div>
       );
     };
 
@@ -437,7 +458,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             id: i + 1, type: 'Company Borrower', role, number: applicantNumber,
             companyName: '', tradingName: '', companyABN: '', companyACN: '',
             entityType: '', registeredAddress: '', phone: '', email: '',
-            uploadedDocuments: [], assets: [], liabilities: []
+            assets: [], liabilities: [], eSignature: null
           });
         } else {
           newApplicants.push(existing && existing.type === 'Director Guarantor' ? existing : {
@@ -447,7 +468,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             address: '', yearsAtCurrentAddress: '', monthsAtCurrentAddress: '',
             addressHistory: [], relationshipToCompany: '',
             numDependants: 0, dependants: [],
-            uploadedDocuments: [], assets: [], liabilities: []
+            assets: [], liabilities: [], eSignature: null
           });
         }
       } else {
@@ -460,7 +481,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           residencyStatus: '', visaNumber: '',
           relationshipToApplicant1: i === 0 ? 'Primary' : '',
           numDependants: 0, dependants: [],
-          uploadedDocuments: [], assets: [], liabilities: []
+          assets: [], liabilities: [], eSignature: null
         });
       }
     }
@@ -689,7 +710,6 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {/* ── Company Borrower ── */}
           {applicant.type === 'Company Borrower' && (
             <>
-              {renderDocumentUpload(applicant, index)}
               <div className="mb-6">
                 <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Company Details</h4>
                 <div className="mb-4">
@@ -740,6 +760,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   </div>
                 </div>
               </div>
+              {renderESignatureSection(applicant, index)}
             </>
           )}
 
@@ -747,7 +768,6 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {applicant.type === 'Director Guarantor' && (
             <>
               {renderMercuryBanner(index)}
-              {renderDocumentUpload(applicant, index)}
               {renderDLUpload(applicant, index)}
 
               <div className="mb-6">
@@ -814,6 +834,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               </div>
 
               {renderDependants(applicant, index)}
+              {renderESignatureSection(applicant, index)}
             </>
           )}
 
@@ -821,7 +842,6 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {applicant.type === 'Natural Person' && (
             <>
               {renderMercuryBanner(index)}
-              {renderDocumentUpload(applicant, index)}
               {renderDLUpload(applicant, index)}
 
               <div className="mb-6">
@@ -944,6 +964,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   </div>
                 </div>
               )}
+              {renderESignatureSection(applicant, index)}
             </>
           )}
 

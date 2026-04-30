@@ -200,7 +200,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
           </div>
         </div>
 
-        {formData.clientType && (
+        {formData.clientType === 'New' && (
           <div>
             <label>Lead Source</label>
             <select value={formData.leadSource} onChange={(e) => updateFormData('leadSource', e.target.value)}>

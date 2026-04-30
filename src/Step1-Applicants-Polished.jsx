@@ -238,70 +238,183 @@ const Step1Applicants = ({ formData, updateFormData }) => {
   };
 
   // ── E-Signature request section ─────────────────────────────────────────────
-  const [eSignOpen, setESignOpen] = useState({}); // { [index]: bool }
+  const [eSignOpen,    setESignOpen]    = useState({}); // { [index]: bool }
+  const [eSignSending, setESignSending] = useState({}); // { [index]: bool }
+  const [eSignChecking,setESignChecking]= useState({}); // { [index]: bool }
+  const [eSignError,   setESignError]   = useState({}); // { [index]: string }
+  // Local form state for the send form: { [index]: { name, email, mobile } }
+  const [eSignForm,    setESignForm]    = useState({});
+
+  const updateESignForm = (index, field, value) =>
+    setESignForm(p => ({ ...p, [index]: { ...(p[index] || {}), [field]: value } }));
+
+  const handleSendESign = async (applicant, index) => {
+    const form  = eSignForm[index] || {};
+    const name  = form.name  || [applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ') || applicant.companyName || '';
+    const email = form.email || applicant.email || '';
+    const mobile= form.mobile|| applicant.phone || '';
+
+    if (!name || !email) {
+      setESignError(p => ({ ...p, [index]: 'Full name and email are required.' }));
+      return;
+    }
+    if (!formData.brokerName) {
+      setESignError(p => ({ ...p, [index]: 'Please select a broker in Step 0 first.' }));
+      return;
+    }
+
+    setESignSending(p => ({ ...p, [index]: true }));
+    setESignError(p => ({ ...p, [index]: null }));
+
+    try {
+      const res  = await fetch('/api/adobe-sign-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signerName: name, signerEmail: email, brokerName: formData.brokerName, applicantRef: `${applicant.role} ${applicant.number}` }),
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        setESignError(p => ({ ...p, [index]: data.error }));
+        setESignSending(p => ({ ...p, [index]: false }));
+        return;
+      }
+
+      // Save agreement details to applicant record
+      updateApplicant(index, 'eSignature', {
+        status: 'pending',
+        name, email, mobile,
+        agreementId: data.agreementId,
+        signingUrl: data.signingUrl,
+        requestedAt: data.sentAt || new Date().toISOString(),
+        broker: formData.brokerName,
+      });
+      setESignOpen(p => ({ ...p, [index]: false }));
+      setESignSending(p => ({ ...p, [index]: false }));
+    } catch (err) {
+      setESignError(p => ({ ...p, [index]: err.message }));
+      setESignSending(p => ({ ...p, [index]: false }));
+    }
+  };
+
+  const handleCheckStatus = async (applicant, index) => {
+    const sig = applicant.eSignature || {};
+    if (!sig.agreementId) return;
+    setESignChecking(p => ({ ...p, [index]: true }));
+    try {
+      const res  = await fetch(`/api/adobe-sign-status?agreementId=${sig.agreementId}`);
+      const data = await res.json();
+      if (data.error) { setESignChecking(p => ({ ...p, [index]: false })); return; }
+
+      const newStatus = data.status === 'SIGNED' ? 'signed' : data.status === 'DECLINED' ? 'declined' : 'pending';
+      updateApplicant(index, 'eSignature', {
+        ...sig,
+        status: newStatus,
+        signedAt: data.signedAt || sig.signedAt,
+        adobeStatus: data.status,
+      });
+      setESignChecking(p => ({ ...p, [index]: false }));
+    } catch {
+      setESignChecking(p => ({ ...p, [index]: false }));
+    }
+  };
 
   const renderESignatureSection = (applicant, index) => {
-    const sig   = applicant.eSignature || {};
-    const open  = !!eSignOpen[index];
-    const isPending = sig.status === 'pending';
-    const isSigned  = sig.status === 'signed';
+    const sig        = applicant.eSignature || {};
+    const open       = !!eSignOpen[index];
+    const sending    = !!eSignSending[index];
+    const checking   = !!eSignChecking[index];
+    const error      = eSignError[index];
+    const isPending  = sig.status === 'pending';
+    const isSigned   = sig.status === 'signed';
+    const isDeclined = sig.status === 'declined';
+    const form       = eSignForm[index] || {};
 
-    const defaultName  = [applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ')
-      || (applicant.type === 'Company Borrower' ? applicant.companyName : '');
-    const defaultEmail = applicant.email || '';
-    const defaultPhone = applicant.phone || '';
+    const defaultName  = form.name  ?? ([applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ') || applicant.companyName || '');
+    const defaultEmail = form.email ?? (applicant.email || '');
+    const defaultMobile= form.mobile?? (applicant.phone || '');
 
-    const handleSend = () => {
-      const name  = document.getElementById(`esig-name-${index}`)?.value || defaultName;
-      const email = document.getElementById(`esig-email-${index}`)?.value || defaultEmail;
-      const phone = document.getElementById(`esig-phone-${index}`)?.value || defaultPhone;
-      updateApplicant(index, 'eSignature', { status: 'pending', name, email, mobile: phone, requestedAt: new Date().toISOString() });
-      setESignOpen(p => ({ ...p, [index]: false }));
-    };
+    const bgColor     = isSigned ? '#f0fdf4' : isDeclined ? '#fef2f2' : isPending ? '#f0f9ff' : '#fafafa';
+    const borderColor = isSigned ? '#86efac' : isDeclined ? '#fca5a5' : isPending ? '#bae6fd' : 'var(--border-primary)';
+    const icon        = isSigned ? '✅' : isDeclined ? '❌' : isPending ? '🕐' : '✍️';
+    const subtitle    = isSigned   ? `Signed by ${sig.name} — ${sig.signedAt ? new Date(sig.signedAt).toLocaleDateString('en-AU') : ''}`
+                      : isDeclined ? `Declined by ${sig.name}`
+                      : isPending  ? `Sent to ${sig.email} · Awaiting signature`
+                      : 'Send credit guide for digital signing — required for Equifax & illion credit checks';
 
     return (
-      <div style={{ marginTop: '8px', padding: '14px 16px', background: isSigned ? '#f0fdf4' : isPending ? '#f0f9ff' : '#fafafa', border: `1px solid ${isSigned ? '#86efac' : isPending ? '#bae6fd' : 'var(--border-primary)'}`, borderRadius: '8px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '18px' }}>{isSigned ? '✅' : isPending ? '🕐' : '✍️'}</span>
+      <div style={{ marginTop: '8px', padding: '14px 16px', background: bgColor, border: `1px solid ${borderColor}`, borderRadius: '8px' }}>
+
+        {/* Header row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+            <span style={{ fontSize: '18px', flexShrink: 0 }}>{icon}</span>
             <div>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Credit Guide — E-Signature Request</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                {isSigned ? `Signed by ${sig.name}` : isPending ? `Request sent to ${sig.email} · Awaiting signature` : 'Send credit guide for digital signing (required for Equifax & illion credit checks)'}
-              </div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Credit Guide — E-Signature</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{subtitle}</div>
             </div>
           </div>
-          {!isSigned && (
-            <button type="button"
-              onClick={() => setESignOpen(p => ({ ...p, [index]: !p[index] }))}
-              style={{ padding: '5px 14px', background: isPending ? 'white' : 'var(--color-primary)', color: isPending ? 'var(--text-primary)' : 'white', border: isPending ? '1px solid var(--border-primary)' : 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', flexShrink: 0 }}>
-              {isPending ? 'Resend' : open ? 'Cancel' : 'Request Signature'}
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            {isPending && sig.agreementId && (
+              <button type="button" onClick={() => handleCheckStatus(applicant, index)} disabled={checking}
+                style={{ padding: '5px 10px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '11px', cursor: checking ? 'not-allowed' : 'pointer', color: 'var(--text-secondary)' }}>
+                {checking ? 'Checking…' : '↻ Check Status'}
+              </button>
+            )}
+            {!isSigned && (
+              <button type="button" onClick={() => { setESignOpen(p => ({ ...p, [index]: !p[index] })); setESignError(p => ({ ...p, [index]: null })); }}
+                style={{ padding: '5px 12px', background: isPending ? 'white' : 'var(--color-primary)', color: isPending ? 'var(--text-primary)' : 'white', border: isPending ? '1px solid var(--border-primary)' : 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                {isPending ? 'Resend' : open ? 'Cancel' : 'Request Signature'}
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* Signed: show download buttons */}
+        {isSigned && sig.agreementId && (
+          <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+            <a href={`/api/adobe-sign-download?agreementId=${sig.agreementId}&type=signed`} target="_blank" rel="noopener noreferrer"
+              style={{ padding: '5px 12px', background: '#166534', color: 'white', borderRadius: '6px', fontSize: '12px', fontWeight: '600', textDecoration: 'none', display: 'inline-block' }}>
+              ⬇ Signed Credit Guide
+            </a>
+            <a href={`/api/adobe-sign-download?agreementId=${sig.agreementId}&type=audit`} target="_blank" rel="noopener noreferrer"
+              style={{ padding: '5px 12px', background: '#0369a1', color: 'white', borderRadius: '6px', fontSize: '12px', fontWeight: '600', textDecoration: 'none', display: 'inline-block' }}>
+              ⬇ Audit Trail
+            </a>
+          </div>
+        )}
+
+        {/* Send form */}
         {open && (
           <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-primary)' }}>
             <div className="grid grid-cols-3" style={{ marginBottom: '10px' }}>
               <div>
                 <label style={{ fontSize: '12px' }}>Full Name *</label>
-                <input id={`esig-name-${index}`} type="text" defaultValue={defaultName} placeholder="Full legal name" style={{ fontSize: '13px' }} />
+                <input type="text" value={defaultName} placeholder="Full legal name" style={{ fontSize: '13px' }}
+                  onChange={(e) => updateESignForm(index, 'name', e.target.value)} />
               </div>
               <div>
                 <label style={{ fontSize: '12px' }}>Email *</label>
-                <input id={`esig-email-${index}`} type="email" defaultValue={defaultEmail} placeholder="client@email.com" style={{ fontSize: '13px' }} />
+                <input type="email" value={defaultEmail} placeholder="client@email.com" style={{ fontSize: '13px' }}
+                  onChange={(e) => updateESignForm(index, 'email', e.target.value)} />
               </div>
               <div>
-                <label style={{ fontSize: '12px' }}>Mobile *</label>
-                <input id={`esig-phone-${index}`} type="tel" defaultValue={defaultPhone} placeholder="0400 000 000" style={{ fontSize: '13px' }} />
+                <label style={{ fontSize: '12px' }}>Mobile</label>
+                <input type="tel" value={defaultMobile} placeholder="0400 000 000" style={{ fontSize: '13px' }}
+                  onChange={(e) => updateESignForm(index, 'mobile', e.target.value)} />
               </div>
             </div>
             <div style={{ padding: '8px 10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '11px', color: '#1e40af', marginBottom: '10px' }}>
-              ℹ️ The client will receive a link to digitally sign the Credit Guide. This is required before Equifax &amp; illion credit checks can be submitted.
+              ℹ️ Sending as broker: <strong>{formData.brokerName || '(select broker in Step 0)'}</strong>. The client will receive an email from Adobe Sign with a link to read and sign the Credit Guide.
             </div>
-            <button type="button" onClick={handleSend}
-              style={{ padding: '7px 20px', background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-              Send Signature Request →
+            {error && (
+              <div style={{ padding: '8px 10px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', color: '#991b1b', marginBottom: '10px' }}>
+                ⚠️ {error}
+              </div>
+            )}
+            <button type="button" onClick={() => handleSendESign(applicant, index)} disabled={sending}
+              style={{ padding: '7px 20px', background: sending ? '#93c5fd' : 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: sending ? 'not-allowed' : 'pointer' }}>
+              {sending ? 'Sending…' : 'Send Signature Request →'}
             </button>
           </div>
         )}

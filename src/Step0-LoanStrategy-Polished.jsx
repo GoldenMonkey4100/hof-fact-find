@@ -18,6 +18,72 @@ const PRIMARY_TYPES = ['Purchase', 'Refinance'];
 const SECONDARY_TYPES = ['Bridging', 'Cashout', 'Construction', 'Off the Plan', 'Pre-approval', 'SMSF', 'Vacant Land'];
 const PURCHASE_COMPLETION = ['Own Savings', 'Gift from Family', 'Equity from Existing Property', 'First Home Owner Grant', 'Other'];
 
+// [from, base, rate] — duty = base + rate × (value − from)
+const SD_BRACKETS = {
+  NSW: [[0,0,0.0125],[17000,212.5,0.015],[36000,497.5,0.0175],[97000,1565,0.035],[364000,10929.5,0.045],[1094000,43789.5,0.055]],
+  VIC: [[0,0,0.014],[25000,350,0.024],[130000,2870,0.06],[960000,52670,0.055]],
+  QLD: [[0,0,0],[5000,0,0.015],[75000,1050,0.035],[540000,17325,0.045],[1000000,38025,0.0575]],
+  WA:  [[0,0,0.019],[120000,2280,0.0285],[150000,3135,0.038],[360000,11115,0.045],[725000,27540,0.051]],
+  SA:  [[0,0,0.01],[12000,120,0.02],[30000,480,0.03],[50000,1080,0.035],[100000,2830,0.04],[200000,6830,0.0425],[250000,8955,0.0475],[300000,11330,0.05],[500000,21330,0.055]],
+  TAS: [[0,20,0],[3000,50,0.015],[25000,380,0.0225],[75000,1505,0.035],[200000,5880,0.04],[375000,12880,0.0425],[725000,27755,0.045]],
+  ACT: [[0,0,0.0156],[200000,3120,0.022],[300000,5320,0.034],[500000,12120,0.043],[750000,22870,0.054],[1000000,36370,0.055]],
+  NT:  [[0,0,0.02],[100000,2000,0.03],[200000,5000,0.04],[525000,18000,0.0495]],
+};
+
+const FHB_CONCESSIONS = {
+  NSW: { exemptUpTo: 800000,  concessionUpTo: 1000000, note: 'Full exemption ≤ $800k; concessional $800k–$1M' },
+  VIC: { exemptUpTo: 600000,  concessionUpTo: 750000,  note: 'Full exemption ≤ $600k; concessional $600k–$750k' },
+  QLD: { exemptUpTo: 500000,  concessionUpTo: 550000,  note: 'Concessional rate ≤ $500k; partial concession to $550k' },
+  WA:  { exemptUpTo: 430000,  concessionUpTo: 530000,  note: 'Full exemption ≤ $430k; concessional $430k–$530k' },
+  SA:  { exemptUpTo: 0,       concessionUpTo: 0,       note: 'No FHB stamp duty concession in SA' },
+  TAS: { exemptUpTo: 0,       concessionUpTo: 0,       note: '50% duty reduction on new homes up to $400k' },
+  ACT: { exemptUpTo: 585000,  concessionUpTo: 585000,  note: 'Duty concession for eligible FHBs (income-tested)' },
+  NT:  { exemptUpTo: 500000,  concessionUpTo: 500000,  note: 'FHB discount of $18,601 for properties ≤ $500k' },
+};
+
+const FHOG_DATA = {
+  NSW: { amount: 10000, maxValue: 600000, newHomeOnly: true,  note: '$10,000 for new homes ≤ $600k' },
+  VIC: { amount: 10000, maxValue: 750000, newHomeOnly: true,  note: '$10,000 metro / $20,000 regional — new homes ≤ $750k' },
+  QLD: { amount: 30000, maxValue: 750000, newHomeOnly: true,  note: '$30,000 for new homes ≤ $750k' },
+  WA:  { amount: 10000, maxValue: 750000, newHomeOnly: true,  note: '$10,000 for new homes ≤ $750k' },
+  SA:  { amount: 15000, maxValue: 650000, newHomeOnly: true,  note: '$15,000 for new homes ≤ $650k' },
+  TAS: { amount: 10000, maxValue: 0,      newHomeOnly: true,  note: '$10,000 for new homes (no value cap)' },
+  ACT: { amount: 0,     maxValue: 0,      newHomeOnly: false, note: 'No FHOG in ACT — replaced by duty concession' },
+  NT:  { amount: 10000, maxValue: 0,      newHomeOnly: false, note: '$10,000 for all first home buyers' },
+};
+
+const calcBracketDuty = (value, brackets) => {
+  for (let i = brackets.length - 1; i >= 0; i--) {
+    const [from, base, rate] = brackets[i];
+    if (value > from) return Math.round(base + rate * (value - from));
+  }
+  return 0;
+};
+
+const calcStampDuty = (propertyValue, state, isFirstHomeBuyer) => {
+  const val = parseFloat(propertyValue) || 0;
+  if (!val || !state || !SD_BRACKETS[state]) return null;
+  let duty = calcBracketDuty(val, SD_BRACKETS[state]);
+  if (isFirstHomeBuyer) {
+    const conc = FHB_CONCESSIONS[state];
+    if (conc && val <= conc.exemptUpTo) {
+      duty = 0;
+    } else if (conc && conc.concessionUpTo > conc.exemptUpTo && val <= conc.concessionUpTo) {
+      duty = Math.round(duty * (val - conc.exemptUpTo) / (conc.concessionUpTo - conc.exemptUpTo));
+    }
+  }
+  return duty;
+};
+
+const calcFHOG = (state, propertyValue, isNewHome) => {
+  const fhog = FHOG_DATA[state];
+  if (!fhog || fhog.amount === 0) return 0;
+  if (fhog.newHomeOnly && !isNewHome) return 0;
+  const val = parseFloat(propertyValue) || 0;
+  if (fhog.maxValue > 0 && val > fhog.maxValue) return 0;
+  return fhog.amount;
+};
+
 const ToggleButton = ({ label, active, onClick, color = 'success' }) => {
   const colors = {
     success: { border: 'var(--color-success)', bg: 'var(--color-success-light)', text: 'var(--color-success-dark)' },
@@ -43,6 +109,86 @@ const ToggleButton = ({ label, active, onClick, color = 'success' }) => {
   );
 };
 
+const FundsToCompleteCard = ({ security, allSecurities }) => {
+  const propVal = parseFloat(security.propertyValue) || 0;
+  const loanAmt = parseFloat(security.loanAmount) || 0;
+  if (!propVal || !loanAmt || propVal <= loanAmt) return null;
+
+  const deposit    = propVal - loanAmt;
+  const stampDuty  = calcStampDuty(propVal, security.state, !!security.isFirstHomeBuyer) || 0;
+  const legal      = 2000;
+  const inspection = 600;
+  const totalNeeded = deposit + stampDuty + legal + inspection;
+
+  const amounts = security.purchaseCompletionAmounts || {};
+  const methods = security.purchaseCompletionMethods  || [];
+  let confirmed = 0;
+  methods.forEach(m => {
+    if (m === 'Own Savings' || m === 'Gift from Family')
+      confirmed += parseFloat((amounts[m] || '').replace(/,/g, '')) || 0;
+    if (m === 'Equity from Existing Property') {
+      const ep = (security.equityPropertyIndex !== '' && security.equityPropertyIndex !== undefined)
+        ? allSecurities[parseInt(security.equityPropertyIndex)] : null;
+      if (ep) confirmed += Math.max(0, (parseFloat(ep.propertyValue)||0)*0.8 - (parseFloat(ep.loanAmount)||0));
+    }
+    if (m === 'First Home Owner Grant')
+      confirmed += calcFHOG(security.state, propVal, !!security.isNewHome);
+  });
+
+  const surplus  = confirmed - totalNeeded;
+  const hasFunds = methods.length > 0;
+  const fmt = n => `$${Math.round(n).toLocaleString()}`;
+
+  const Row = ({ label, value, bold, green, muted, indent }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0',
+      borderBottom: '1px solid #d1fae5', fontSize: '13px',
+      fontWeight: bold ? '700' : '400',
+      color: green ? '#16a34a' : muted ? '#9ca3af' : 'var(--text-primary)',
+      paddingLeft: indent ? '12px' : '0' }}>
+      <span>{label}</span><span>{value}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: '12px', padding: '14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
+      <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: '700', color: '#166534' }}>Funds to Complete</p>
+      <Row label={`Deposit (${((deposit/propVal)*100).toFixed(1)}%)`} value={fmt(deposit)} />
+      {stampDuty > 0 && <Row label={`Stamp Duty${security.isFirstHomeBuyer ? ' (FHB rate)' : ''}${security.state ? ` — ${security.state}` : ''}`} value={fmt(stampDuty)} />}
+      {stampDuty === 0 && security.state && <Row label={`Stamp Duty — ${security.state}`} value="Exempt ✓" green />}
+      {!security.state && <Row label="Stamp Duty" value="Select state above" muted />}
+      <Row label="Legal Fees (est.)" value={fmt(legal)} muted />
+      <Row label="Building Inspection (est.)" value={fmt(inspection)} muted />
+      <Row label="Total Funds Needed" value={fmt(totalNeeded)} bold />
+      {hasFunds && (
+        <>
+          <div style={{ margin: '8px 0 2px', fontSize: '11px', fontWeight: '600', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Confirmed Funds</div>
+          {methods.map(m => {
+            let amt = 0;
+            if (m === 'Own Savings' || m === 'Gift from Family')
+              amt = parseFloat((amounts[m] || '').replace(/,/g, '')) || 0;
+            if (m === 'Equity from Existing Property') {
+              const ep = (security.equityPropertyIndex !== '' && security.equityPropertyIndex !== undefined)
+                ? allSecurities[parseInt(security.equityPropertyIndex)] : null;
+              if (ep) amt = Math.max(0, (parseFloat(ep.propertyValue)||0)*0.8 - (parseFloat(ep.loanAmount)||0));
+            }
+            if (m === 'First Home Owner Grant')
+              amt = calcFHOG(security.state, propVal, !!security.isNewHome);
+            return amt > 0 ? <Row key={m} label={m} value={fmt(amt)} green indent /> : null;
+          })}
+          <Row
+            label={surplus >= 0 ? '✓ Surplus' : '⚠ Shortfall'}
+            value={fmt(Math.abs(surplus))}
+            bold green={surplus >= 0}
+          />
+        </>
+      )}
+      <div style={{ marginTop: '6px', fontSize: '11px', color: '#6b7280' }}>
+        * Estimates only. Stamp duty and FHOG figures should be confirmed with a solicitor.
+      </div>
+    </div>
+  );
+};
+
 const Step0LoanStrategy = ({ formData, updateFormData }) => {
 
   const updateSecurity = (index, field, value) => {
@@ -61,6 +207,9 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
       split1Amount: '', split1Type: '', split1RateType: '', split1FixedYears: '', split1IOYears: '',
       split2Amount: '', split2Type: '', split2RateType: '', split2FixedYears: '', split2IOYears: '',
       currentLoanBalance: '', cashoutAmount: '', purchaseCompletionMethods: [],
+      state: '', isFirstHomeBuyer: false, isNewHome: false,
+      purchaseCompletionAmounts: {}, purchaseCompletionOther: '',
+      equityPropertyIndex: '', giftRelationship: '',
       hasOffset: false, hasRedraw: false
     }];
     updateFormData('securities', securities);
@@ -85,9 +234,21 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
   const togglePurchaseCompletion = (securityIndex, method) => {
     const securities = [...formData.securities];
     const current = securities[securityIndex].purchaseCompletionMethods || [];
-    securities[securityIndex].purchaseCompletionMethods = current.includes(method)
-      ? current.filter(m => m !== method)
-      : [...current, method];
+    const removing = current.includes(method);
+    securities[securityIndex] = {
+      ...securities[securityIndex],
+      purchaseCompletionMethods: removing ? current.filter(m => m !== method) : [...current, method],
+    };
+    if (removing) {
+      if (method === 'Own Savings' || method === 'Gift from Family') {
+        const a = { ...(securities[securityIndex].purchaseCompletionAmounts || {}) };
+        delete a[method];
+        securities[securityIndex].purchaseCompletionAmounts = a;
+        if (method === 'Gift from Family') securities[securityIndex].giftRelationship = '';
+      }
+      if (method === 'Equity from Existing Property') securities[securityIndex].equityPropertyIndex = '';
+      if (method === 'Other') securities[securityIndex].purchaseCompletionOther = '';
+    }
     updateFormData('securities', securities);
   };
 
@@ -341,11 +502,65 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               </div>
             </div>
 
-            {/* Purchase completion method */}
+            {/* Purchase section — state, stamp duty, completion methods */}
             {security.primaryTransactionTypes.includes('Purchase') && (
               <div className="mb-4" style={{ padding: '14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#166534' }}>How does the client intend to complete the purchase?</label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+
+                {/* State + FHB */}
+                <div className="grid grid-cols-2 mb-3">
+                  <div>
+                    <label style={{ fontSize: '13px', color: '#166534' }}>State / Territory</label>
+                    <select value={security.state || ''}
+                      onChange={(e) => updateSecurity(index, 'state', e.target.value)}
+                      style={{ fontSize: '13px' }}>
+                      <option value="">Select state…</option>
+                      {['NSW','VIC','QLD','WA','SA','TAS','ACT','NT'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ paddingTop: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontSize: '13px' }}>
+                      <input type="checkbox" checked={!!security.isFirstHomeBuyer}
+                        onChange={(e) => updateSecurity(index, 'isFirstHomeBuyer', e.target.checked)} />
+                      First Home Buyer
+                    </label>
+                    {security.isFirstHomeBuyer && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontSize: '13px' }}>
+                        <input type="checkbox" checked={!!security.isNewHome}
+                          onChange={(e) => updateSecurity(index, 'isNewHome', e.target.checked)} />
+                        New / off-the-plan home
+                      </label>
+                    )}
+                  </div>
+                </div>
+
+                {/* Stamp duty result */}
+                {security.state && security.propertyValue && (() => {
+                  const duty = calcStampDuty(parseFloat(security.propertyValue), security.state, !!security.isFirstHomeBuyer);
+                  if (duty === null) return null;
+                  return (
+                    <div style={{ background: 'white', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '10px 12px', marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '13px', color: '#166534' }}>
+                          Estimated Stamp Duty — {security.state}{security.isFirstHomeBuyer ? ' (FHB rate)' : ''}
+                        </span>
+                        <span style={{ fontSize: '15px', fontWeight: '700', color: duty === 0 ? '#16a34a' : '#166534' }}>
+                          {duty === 0 ? 'Exempt ✓' : `$${duty.toLocaleString()}`}
+                        </span>
+                      </div>
+                      {security.isFirstHomeBuyer && FHB_CONCESSIONS[security.state]?.note && (
+                        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+                          {FHB_CONCESSIONS[security.state].note}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* How does the client intend to complete the purchase */}
+                <label style={{ fontSize: '13px', fontWeight: '600', color: '#166534' }}>
+                  How does the client intend to complete the purchase?
+                </label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px', marginBottom: '12px' }}>
                   {PURCHASE_COMPLETION.map(method => (
                     <ToggleButton key={method} label={method} color="success"
                       active={(security.purchaseCompletionMethods || []).includes(method)}
@@ -353,6 +568,122 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                     />
                   ))}
                 </div>
+
+                {/* Per-method sub-fields */}
+                {(security.purchaseCompletionMethods || []).map(method => (
+                  <div key={method} style={{ marginBottom: '10px', padding: '10px 12px', background: 'white', borderRadius: '6px', border: '1px solid #d1fae5' }}>
+
+                    {/* Own Savings / Gift from Family → amount + gift relationship */}
+                    {(method === 'Own Savings' || method === 'Gift from Family') && (
+                      <div>
+                        <label style={{ fontSize: '13px' }}>{method} — Amount</label>
+                        <input type="text"
+                          value={formatCurrency(security.purchaseCompletionAmounts?.[method] || '')}
+                          onChange={(e) => {
+                            const val = parseCurrency(e.target.value);
+                            updateSecurity(index, 'purchaseCompletionAmounts', {
+                              ...(security.purchaseCompletionAmounts || {}), [method]: val,
+                            });
+                          }}
+                          placeholder="e.g. 80,000" style={{ fontSize: '13px' }} />
+                        {method === 'Gift from Family' && (
+                          <div style={{ marginTop: '8px' }}>
+                            <label style={{ fontSize: '13px' }}>Gift Relationship</label>
+                            <select value={security.giftRelationship || ''} style={{ fontSize: '13px' }}
+                              onChange={(e) => updateSecurity(index, 'giftRelationship', e.target.value)}>
+                              <option value="">Select…</option>
+                              {['Parent(s)', 'Grandparent(s)', 'Sibling', 'Other family member'].map(r => (
+                                <option key={r} value={r}>{r}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Equity from Existing Property → link + equity calc */}
+                    {method === 'Equity from Existing Property' && (() => {
+                      const eqIdx = security.equityPropertyIndex;
+                      const equityProp = (eqIdx !== '' && eqIdx !== undefined) ? formData.securities[parseInt(eqIdx)] : null;
+                      const availEquity = equityProp
+                        ? Math.max(0, (parseFloat(equityProp.propertyValue)||0) * 0.8 - (parseFloat(equityProp.loanAmount)||0))
+                        : null;
+                      return (
+                        <div>
+                          <label style={{ fontSize: '13px' }}>Link to Existing Property</label>
+                          <select value={eqIdx ?? ''} style={{ fontSize: '13px' }}
+                            onChange={(e) => updateSecurity(index, 'equityPropertyIndex', e.target.value === '' ? '' : parseInt(e.target.value))}>
+                            <option value="">Select property…</option>
+                            {formData.securities.map((s, i) => i !== index ? (
+                              <option key={i} value={i}>Security {i + 1}{s.address ? ` — ${s.address}` : ''}</option>
+                            ) : null)}
+                          </select>
+                          {equityProp && (
+                            <div style={{ marginTop: '8px', padding: '8px 10px', background: '#f0fdf4', borderRadius: '4px', fontSize: '12px' }}>
+                              <div>Property Value: <strong>{formatCurrencyDisplay(equityProp.propertyValue)}</strong></div>
+                              <div>Existing Loan: <strong>{formatCurrencyDisplay(equityProp.loanAmount)}</strong></div>
+                              <div style={{ marginTop: '4px', color: availEquity > 0 ? '#166534' : '#dc2626', fontWeight: '600' }}>
+                                Available Equity (80% LVR): <strong>${(availEquity || 0).toLocaleString()}</strong>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* First Home Owner Grant → eligibility + amount */}
+                    {method === 'First Home Owner Grant' && (() => {
+                      const st = security.state;
+                      const fhogData = st ? FHOG_DATA[st] : null;
+                      const fhogAmt = (fhogData && security.isFirstHomeBuyer)
+                        ? calcFHOG(st, security.propertyValue, !!security.isNewHome)
+                        : null;
+                      return (
+                        <div>
+                          <label style={{ fontSize: '13px' }}>First Home Owner Grant Eligibility</label>
+                          {!st ? (
+                            <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
+                              Select a state above to check FHOG eligibility
+                            </div>
+                          ) : !security.isFirstHomeBuyer ? (
+                            <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
+                              Tick "First Home Buyer" above to check eligibility
+                            </div>
+                          ) : fhogData?.amount === 0 ? (
+                            <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>{fhogData.note}</div>
+                          ) : (
+                            <div style={{ padding: '8px 10px', background: '#f0fdf4', borderRadius: '4px', fontSize: '12px', marginTop: '4px' }}>
+                              <div style={{ fontWeight: '600', color: fhogAmt > 0 ? '#16a34a' : '#9ca3af' }}>
+                                {fhogAmt > 0
+                                  ? `Grant: $${fhogAmt.toLocaleString()} ✓`
+                                  : fhogAmt === 0 && security.isNewHome
+                                    ? `Not eligible — property value exceeds ${st} cap`
+                                    : `Potential grant: $${fhogData?.amount?.toLocaleString()} — tick "New home" above to confirm`
+                                }
+                              </div>
+                              <div style={{ color: '#4b5563', marginTop: '2px' }}>{fhogData?.note}</div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Other → textarea */}
+                    {method === 'Other' && (
+                      <div>
+                        <label style={{ fontSize: '13px' }}>Please describe</label>
+                        <textarea
+                          value={security.purchaseCompletionOther || ''}
+                          onChange={(e) => updateSecurity(index, 'purchaseCompletionOther', e.target.value)}
+                          placeholder="Describe how the client will complete the purchase…"
+                          rows="2" style={{ fontSize: '13px' }} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* Funds to Complete summary */}
+                <FundsToCompleteCard security={security} allSecurities={formData.securities} />
               </div>
             )}
 

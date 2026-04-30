@@ -46,6 +46,9 @@ const FactFindApp = () => {
       currentLoanBalance: '',
       cashoutAmount: '',
       purchaseCompletionMethods: [],
+      state: '', isFirstHomeBuyer: false, isNewHome: false,
+      purchaseCompletionAmounts: {}, purchaseCompletionOther: '',
+      equityPropertyIndex: '', giftRelationship: '',
       hasOffset: false,
       hasRedraw: false
     }],

@@ -267,10 +267,10 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     setESignError(p => ({ ...p, [index]: null }));
 
     try {
-      const res  = await fetch('/api/adobe-sign-send', {
+      const res  = await fetch('/api/docuseal-send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signerName: name, signerEmail: email, brokerName: formData.brokerName, applicantRef: `${applicant.role} ${applicant.number}` }),
+        body: JSON.stringify({ signerName: name, signerEmail: email, signerPhone: mobile, brokerName: formData.brokerName, applicantRef: `${applicant.role} ${applicant.number}` }),
       });
       const data = await res.json();
 
@@ -280,11 +280,11 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         return;
       }
 
-      // Save agreement details to applicant record
+      // Save submission details to applicant record
       updateApplicant(index, 'eSignature', {
         status: 'pending',
         name, email, mobile,
-        agreementId: data.agreementId,
+        submissionId: data.submissionId,
         signingUrl: data.signingUrl,
         requestedAt: data.sentAt || new Date().toISOString(),
         broker: formData.brokerName,
@@ -299,19 +299,20 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
   const handleCheckStatus = async (applicant, index) => {
     const sig = applicant.eSignature || {};
-    if (!sig.agreementId) return;
+    if (!sig.submissionId) return;
     setESignChecking(p => ({ ...p, [index]: true }));
     try {
-      const res  = await fetch(`/api/adobe-sign-status?agreementId=${sig.agreementId}`);
+      const res  = await fetch(`/api/docuseal-status?submissionId=${sig.submissionId}`);
       const data = await res.json();
       if (data.error) { setESignChecking(p => ({ ...p, [index]: false })); return; }
 
-      const newStatus = data.status === 'SIGNED' ? 'signed' : data.status === 'DECLINED' ? 'declined' : 'pending';
+      // DocuSeal statuses: pending | completed | declined | expired
+      const newStatus = data.status === 'completed' ? 'signed' : data.status === 'declined' ? 'declined' : 'pending';
       updateApplicant(index, 'eSignature', {
         ...sig,
         status: newStatus,
         signedAt: data.signedAt || sig.signedAt,
-        adobeStatus: data.status,
+        docusealStatus: data.status,
       });
       setESignChecking(p => ({ ...p, [index]: false }));
     } catch {
@@ -355,7 +356,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-            {isPending && sig.agreementId && (
+            {isPending && sig.submissionId && (
               <button type="button" onClick={() => handleCheckStatus(applicant, index)} disabled={checking}
                 style={{ padding: '5px 10px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '11px', cursor: checking ? 'not-allowed' : 'pointer', color: 'var(--text-secondary)' }}>
                 {checking ? 'Checking…' : '↻ Check Status'}
@@ -371,13 +372,13 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         </div>
 
         {/* Signed: show download buttons */}
-        {isSigned && sig.agreementId && (
+        {isSigned && sig.submissionId && (
           <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
-            <a href={`/api/adobe-sign-download?agreementId=${sig.agreementId}&type=signed`} target="_blank" rel="noopener noreferrer"
+            <a href={`/api/docuseal-download?submissionId=${sig.submissionId}&type=signed`} target="_blank" rel="noopener noreferrer"
               style={{ padding: '5px 12px', background: '#166534', color: 'white', borderRadius: '6px', fontSize: '12px', fontWeight: '600', textDecoration: 'none', display: 'inline-block' }}>
               ⬇ Signed Credit Guide
             </a>
-            <a href={`/api/adobe-sign-download?agreementId=${sig.agreementId}&type=audit`} target="_blank" rel="noopener noreferrer"
+            <a href={`/api/docuseal-download?submissionId=${sig.submissionId}&type=audit`} target="_blank" rel="noopener noreferrer"
               style={{ padding: '5px 12px', background: '#0369a1', color: 'white', borderRadius: '6px', fontSize: '12px', fontWeight: '600', textDecoration: 'none', display: 'inline-block' }}>
               ⬇ Audit Trail
             </a>
@@ -405,7 +406,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               </div>
             </div>
             <div style={{ padding: '8px 10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '11px', color: '#1e40af', marginBottom: '10px' }}>
-              ℹ️ Sending as broker: <strong>{formData.brokerName || '(select broker in Step 0)'}</strong>. The client will receive an email from Adobe Sign with a link to read and sign the Credit Guide.
+              ℹ️ Sending as broker: <strong>{formData.brokerName || '(select broker in Step 0)'}</strong>. The client will receive an email from DocuSeal with a link to read and sign the Credit Guide.
             </div>
             {error && (
               <div style={{ padding: '8px 10px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', color: '#991b1b', marginBottom: '10px' }}>

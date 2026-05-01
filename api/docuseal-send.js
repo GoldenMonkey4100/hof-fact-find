@@ -26,6 +26,18 @@ const BROKER_EMAILS = {
 
 const API_BASE = 'https://api.docuseal.com';
 
+// DocuSeal requires E.164 phone format: +61412345678
+// Converts Australian local format (0412345678) automatically.
+function toE164(phone) {
+  if (!phone) return undefined;
+  const digits = phone.replace(/\D/g, '');
+  if (!digits) return undefined;
+  if (digits.startsWith('61') && digits.length >= 11) return `+${digits}`;
+  if (digits.startsWith('0') && digits.length >= 9) return `+61${digits.slice(1)}`;
+  if (phone.startsWith('+')) return `+${digits}`;
+  return undefined; // can't reliably format — omit rather than send bad data
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -47,16 +59,18 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `No Credit Guide template found for broker: ${brokerName}` });
 
   try {
+    const formattedPhone = toE164(signerPhone);
+
     const submitterPayload = {
-      role:       'Signer',
-      name:       signerName,
-      email:      signerEmail,
+      role:  'First Party',   // must match the role name in your DocuSeal template
+      name:  signerName,
+      email: signerEmail,
       // Pre-fill any template fields you've named in DocuSeal:
       values: {
         ...(applicantRef ? { 'Applicant Reference': applicantRef } : {}),
       },
     };
-    if (signerPhone) submitterPayload.phone = signerPhone;
+    if (formattedPhone) submitterPayload.phone = formattedPhone;
 
     const response = await fetch(`${API_BASE}/submissions`, {
       method: 'POST',

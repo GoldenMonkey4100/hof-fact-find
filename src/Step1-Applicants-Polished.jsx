@@ -956,6 +956,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             <>
               {renderMercuryBanner(index)}
               {renderDLUpload(applicant, index)}
+              {renderESignatureSection(applicant, index)}
 
               <div className="mb-6">
                 <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Personal Details</h4>
@@ -1077,7 +1078,6 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   </div>
                 </div>
               )}
-              {renderESignatureSection(applicant, index)}
             </>
           )}
 

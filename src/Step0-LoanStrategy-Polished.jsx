@@ -84,6 +84,28 @@ const calcFHOG = (state, propertyValue, isNewHome) => {
   return fhog.amount;
 };
 
+// Transfer fee + mortgage registration fee per state (2024 approx.)
+const calcTransferFees = (state, propVal) => {
+  const v = parseFloat(propVal) || 0;
+  switch (state) {
+    case 'NSW': return {
+      transferFee: v <= 204000 ? 214 : Math.round(214 + Math.ceil((v - 204000) / 1000) * 3.54),
+      mortgageReg: 214,
+    };
+    case 'VIC': return {
+      transferFee: Math.round(120 + Math.max(0, Math.ceil((v - 130000) / 10000)) * 2.34),
+      mortgageReg: 120,
+    };
+    case 'QLD': return { transferFee: 195, mortgageReg: 195 };
+    case 'WA':  return { transferFee: 200, mortgageReg: 175 };
+    case 'SA':  return { transferFee: 177, mortgageReg: 178 };
+    case 'TAS': return { transferFee: Math.round(213 + Math.max(0, v / 10000) * 3.5), mortgageReg: 152 };
+    case 'ACT': return { transferFee: 200, mortgageReg: 200 };
+    case 'NT':  return { transferFee: 150, mortgageReg: 150 };
+    default:    return { transferFee: 0, mortgageReg: 0 };
+  }
+};
+
 const ToggleButton = ({ label, active, onClick, color = 'success' }) => {
   const colors = {
     success: { border: 'var(--color-success)', bg: 'var(--color-success-light)', text: 'var(--color-success-dark)' },
@@ -116,9 +138,12 @@ const FundsToCompleteCard = ({ security, allSecurities }) => {
 
   const deposit    = propVal - loanAmt;
   const stampDuty  = calcStampDuty(propVal, security.state, !!security.isFirstHomeBuyer) || 0;
+  const { transferFee, mortgageReg } = security.state
+    ? calcTransferFees(security.state, propVal)
+    : { transferFee: 0, mortgageReg: 0 };
   const legal      = 2000;
   const inspection = 600;
-  const totalNeeded = deposit + stampDuty + legal + inspection;
+  const totalNeeded = deposit + stampDuty + transferFee + mortgageReg + legal + inspection;
 
   const amounts = security.purchaseCompletionAmounts || {};
   const methods = security.purchaseCompletionMethods  || [];
@@ -156,6 +181,8 @@ const FundsToCompleteCard = ({ security, allSecurities }) => {
       {stampDuty > 0 && <Row label={`Stamp Duty${security.isFirstHomeBuyer ? ' (FHB rate)' : ''}${security.state ? ` — ${security.state}` : ''}`} value={fmt(stampDuty)} />}
       {stampDuty === 0 && security.state && <Row label={`Stamp Duty — ${security.state}`} value="Exempt ✓" green />}
       {!security.state && <Row label="Stamp Duty" value="Select state above" muted />}
+      {transferFee > 0 && <Row label="Transfer Fee (title registration)" value={fmt(transferFee)} muted />}
+      {mortgageReg > 0 && <Row label="Mortgage Registration" value={fmt(mortgageReg)} muted />}
       <Row label="Legal Fees (est.)" value={fmt(legal)} muted />
       <Row label="Building Inspection (est.)" value={fmt(inspection)} muted />
       <Row label="Total Funds Needed" value={fmt(totalNeeded)} bold />
@@ -451,29 +478,74 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
             </div>
 
             {/* Refinance + Cashout breakdown — Option B */}
-            {isRefinanceCashout(security) && (
-              <div className="mb-4" style={{ padding: '14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
-                <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '600', color: '#1e40af' }}>
-                  Refinance + Cashout Breakdown
-                </p>
-                <div className="grid grid-cols-2">
-                  <div>
-                    <label style={{ fontSize: '13px' }}>Current Loan Balance</label>
-                    <input type="text" value={formatCurrency(security.currentLoanBalance || '')}
-                      onChange={(e) => handleRefinanceBreakdown(index, 'currentLoanBalance', e.target.value)}
-                      placeholder="400,000" />
-                    <div className="hint-text" style={{ fontSize: '11px', marginTop: '4px' }}>What you currently owe on this property</div>
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '13px' }}>Cashout Amount</label>
-                    <input type="text" value={formatCurrency(security.cashoutAmount || '')}
-                      onChange={(e) => handleRefinanceBreakdown(index, 'cashoutAmount', e.target.value)}
-                      placeholder="100,000" />
-                    <div className="hint-text" style={{ fontSize: '11px', marginTop: '4px' }}>Additional funds you want to release</div>
+            {isRefinanceCashout(security) && (() => {
+              const propVal     = parseFloat(security.propertyValue) || 0;
+              const currBalance = parseFloat(parseCurrency(security.currentLoanBalance || '')) || 0;
+              const maxLVR80    = propVal * 0.8;
+              const availEquity = Math.max(0, maxLVR80 - currBalance);
+              const cashoutVal  = parseFloat(parseCurrency(security.cashoutAmount || '')) || 0;
+              const overEquity  = cashoutVal > availEquity && availEquity > 0;
+
+              return (
+                <div className="mb-4" style={{ padding: '16px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
+                  <p style={{ margin: '0 0 14px 0', fontSize: '13px', fontWeight: '700', color: '#1e40af' }}>
+                    Refinance + Cashout — Equity Calculator
+                  </p>
+
+                  {/* Equity summary banner */}
+                  {propVal > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+                      {[
+                        { label: 'Property Value', value: `$${propVal.toLocaleString()}` },
+                        { label: 'Max at 80% LVR', value: `$${Math.round(maxLVR80).toLocaleString()}` },
+                        { label: 'Available Equity', value: currBalance > 0 ? `$${Math.round(availEquity).toLocaleString()}` : '—', highlight: currBalance > 0 },
+                      ].map(({ label, value, highlight }) => (
+                        <div key={label} style={{ padding: '10px 12px', background: highlight ? '#dbeafe' : 'white', borderRadius: '6px', border: `1px solid ${highlight ? '#93c5fd' : '#e2e8f0'}`, textAlign: 'center' }}>
+                          <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '3px' }}>{label}</div>
+                          <div style={{ fontSize: '15px', fontWeight: '700', color: highlight ? '#1d4ed8' : '#1e293b' }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2">
+                    <div>
+                      <label style={{ fontSize: '13px' }}>Current Loan Balance</label>
+                      <input type="text" value={formatCurrency(security.currentLoanBalance || '')}
+                        onChange={(e) => handleRefinanceBreakdown(index, 'currentLoanBalance', e.target.value)}
+                        placeholder="400,000" />
+                      <div className="hint-text" style={{ fontSize: '11px', marginTop: '4px' }}>What the client currently owes</div>
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                        <label style={{ fontSize: '13px' }}>Cashout Amount</label>
+                        {availEquity > 0 && (
+                          <button type="button"
+                            onClick={() => handleRefinanceBreakdown(index, 'cashoutAmount', String(Math.round(availEquity)))}
+                            style={{ fontSize: '11px', color: '#1d4ed8', background: 'none', border: 'none', cursor: 'pointer', padding: '0', fontWeight: '600', textDecoration: 'underline' }}>
+                            Use max equity →
+                          </button>
+                        )}
+                      </div>
+                      <input type="text" value={formatCurrency(security.cashoutAmount || '')}
+                        onChange={(e) => handleRefinanceBreakdown(index, 'cashoutAmount', e.target.value)}
+                        placeholder="100,000"
+                        style={overEquity ? { borderColor: '#f97316' } : {}} />
+                      {overEquity && (
+                        <div style={{ fontSize: '11px', color: '#c2410c', marginTop: '4px' }}>
+                          ⚠ Exceeds available equity at 80% LVR
+                        </div>
+                      )}
+                      {!overEquity && availEquity > 0 && (
+                        <div className="hint-text" style={{ fontSize: '11px', marginTop: '4px' }}>
+                          Max available: ${Math.round(availEquity).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Intended Occupancy — button group, above transaction types */}
             <div className="mb-4">
@@ -871,18 +943,67 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
 
       {/* Lender Preference */}
       <div className="mb-8">
-        <label style={{ fontWeight: '500' }}>Lender Preference (select all that apply)</label>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginTop: '12px' }}>
-          {['ANZ','CBA','Westpac','NAB','Macquarie','Bankwest','ING','Suncorp','BOQ','Bendigo','Others'].map(lender => (
-            <label key={lender} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-              <input type="checkbox" checked={(formData.lenderPreference || []).includes(lender)}
-                onChange={() => toggleLender(lender)} style={{ marginRight: '8px' }} />
-              <span>{lender}</span>
-            </label>
-          ))}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '14px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', margin: 0 }}>Lender Preference</h3>
+          {(formData.lenderPreference?.length > 0) && (
+            <button type="button" onClick={() => updateFormData('lenderPreference', [])}
+              style={{ fontSize: '12px', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+              Clear all
+            </button>
+          )}
         </div>
+
+        {[
+          {
+            label: 'Major Banks',
+            color: '#1e40af', bg: '#eff6ff', border: '#bfdbfe',
+            lenders: ['ANZ', 'CBA', 'Westpac', 'NAB', 'St George'],
+          },
+          {
+            label: 'Second-Tier Banks',
+            color: '#065f46', bg: '#f0fdf4', border: '#bbf7d0',
+            lenders: ['Macquarie', 'Bankwest', 'ING', 'Suncorp', 'BOQ', 'AMP', 'Bendigo', 'ME Bank', 'Newcastle Permanent'],
+          },
+          {
+            label: 'Non-Bank / Specialist',
+            color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe',
+            lenders: ['Bluestone', 'Brighten', 'Firstmac', 'Granite Home Loans', 'ORDE Financial', 'Pepper Money', 'RedZed', 'Resimac', 'ThinkTank'],
+          },
+          {
+            label: 'Other',
+            color: '#374151', bg: '#f9fafb', border: '#e5e7eb',
+            lenders: ['Others'],
+          },
+        ].map(({ label, color, bg, border, lenders }) => (
+          <div key={label} style={{ marginBottom: '14px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>
+              {label}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {lenders.map(lender => {
+                const selected = (formData.lenderPreference || []).includes(lender);
+                return (
+                  <button key={lender} type="button" onClick={() => toggleLender(lender)}
+                    style={{
+                      padding: '6px 14px', fontSize: '13px', borderRadius: '20px', cursor: 'pointer',
+                      fontWeight: selected ? '600' : '400',
+                      border: selected ? `2px solid ${color}` : `1px solid ${border}`,
+                      background: selected ? bg : 'white',
+                      color: selected ? color : '#374151',
+                      transition: 'all 0.15s',
+                    }}>
+                    {selected && '✓ '}{lender}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
         {formData.lenderPreference?.length > 0 && (
-          <div className="hint-text" style={{ marginTop: '8px' }}>Selected: {formData.lenderPreference.join(', ')}</div>
+          <div style={{ marginTop: '10px', padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '12px', color: '#475569' }}>
+            Selected ({formData.lenderPreference.length}): <strong>{formData.lenderPreference.join(', ')}</strong>
+          </div>
         )}
       </div>
 

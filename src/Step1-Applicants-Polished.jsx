@@ -249,13 +249,13 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     setESignForm(p => ({ ...p, [index]: { ...(p[index] || {}), [field]: value } }));
 
   const handleSendESign = async (applicant, index) => {
-    const form  = eSignForm[index] || {};
-    const name  = form.name  || [applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ') || applicant.companyName || '';
-    const email = form.email || applicant.email || '';
-    const mobile= form.mobile|| applicant.phone || '';
+    // Use _override fields (set by renderESignatureSection) or fall back to applicant record
+    const name  = applicant._overrideName  || [applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ') || applicant.companyName || '';
+    const email = applicant._overrideEmail || applicant.email || '';
+    const mobile= applicant._overridePhone || applicant.phone || '';
 
     if (!name || !email) {
-      setESignError(p => ({ ...p, [index]: 'Full name and email are required.' }));
+      setESignError(p => ({ ...p, [index]: 'Add the applicant\'s name and email above first.' }));
       return;
     }
     if (!formData.brokerName) {
@@ -322,39 +322,41 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
   const renderESignatureSection = (applicant, index) => {
     const sig        = applicant.eSignature || {};
-    const open       = !!eSignOpen[index];
     const sending    = !!eSignSending[index];
     const checking   = !!eSignChecking[index];
     const error      = eSignError[index];
     const isPending  = sig.status === 'pending';
     const isSigned   = sig.status === 'signed';
     const isDeclined = sig.status === 'declined';
-    const form       = eSignForm[index] || {};
 
-    const defaultName  = form.name  ?? ([applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ') || applicant.companyName || '');
-    const defaultEmail = form.email ?? (applicant.email || '');
-    const defaultMobile= form.mobile?? (applicant.phone || '');
+    // Auto-populate from applicant fields — no re-entry needed
+    const signerName  = [applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ') || applicant.companyName || '';
+    const signerEmail = applicant.email || '';
+    const signerPhone = applicant.phone || '';
+    const canSend     = signerName && signerEmail && formData.brokerName;
 
     const bgColor     = isSigned ? '#f0fdf4' : isDeclined ? '#fef2f2' : isPending ? '#f0f9ff' : '#fafafa';
     const borderColor = isSigned ? '#86efac' : isDeclined ? '#fca5a5' : isPending ? '#bae6fd' : 'var(--border-primary)';
     const icon        = isSigned ? '✅' : isDeclined ? '❌' : isPending ? '🕐' : '✍️';
-    const subtitle    = isSigned   ? `Signed by ${sig.name} — ${sig.signedAt ? new Date(sig.signedAt).toLocaleDateString('en-AU') : ''}`
-                      : isDeclined ? `Declined by ${sig.name}`
-                      : isPending  ? `Sent to ${sig.email} · Awaiting signature`
-                      : 'Send credit guide for digital signing — required for Equifax & illion credit checks';
 
     return (
-      <div style={{ marginTop: '8px', padding: '14px 16px', background: bgColor, border: `1px solid ${borderColor}`, borderRadius: '8px' }}>
+      <div style={{ marginBottom: '12px', padding: '14px 16px', background: bgColor, border: `1px solid ${borderColor}`, borderRadius: '8px' }}>
 
-        {/* Header row */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-            <span style={{ fontSize: '18px', flexShrink: 0 }}>{icon}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '18px' }}>{icon}</span>
             <div>
               <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Credit Guide — E-Signature</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{subtitle}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                {isSigned   ? `Signed by ${sig.name} on ${sig.signedAt ? new Date(sig.signedAt).toLocaleDateString('en-AU') : '—'}`
+                : isDeclined ? `Declined by ${sig.name}`
+                : isPending  ? `Sent to ${sig.email} · Awaiting signature`
+                : signerEmail ? `Will send to: ${signerName} <${signerEmail}>`
+                : 'Complete name & email above before sending'}
+              </div>
             </div>
           </div>
+
           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
             {isPending && sig.submissionId && (
               <button type="button" onClick={() => handleCheckStatus(applicant, index)} disabled={checking}
@@ -363,15 +365,28 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               </button>
             )}
             {!isSigned && (
-              <button type="button" onClick={() => { setESignOpen(p => ({ ...p, [index]: !p[index] })); setESignError(p => ({ ...p, [index]: null })); }}
-                style={{ padding: '5px 12px', background: isPending ? 'white' : 'var(--color-primary)', color: isPending ? 'var(--text-primary)' : 'white', border: isPending ? '1px solid var(--border-primary)' : 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-                {isPending ? 'Resend' : open ? 'Cancel' : 'Request Signature'}
+              <button type="button"
+                disabled={sending || (!isPending && !canSend)}
+                onClick={() => handleSendESign({ ...applicant, _overrideName: signerName, _overrideEmail: signerEmail, _overridePhone: signerPhone }, index)}
+                style={{ padding: '6px 16px', background: !canSend && !isPending ? '#e2e8f0' : sending ? '#93c5fd' : isPending ? 'white' : 'var(--color-primary)', color: !canSend && !isPending ? '#9ca3af' : isPending ? 'var(--text-primary)' : 'white', border: isPending ? '1px solid var(--border-primary)' : 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: !canSend && !isPending || sending ? 'not-allowed' : 'pointer' }}>
+                {sending ? 'Sending…' : isPending ? '↺ Resend' : '✉ Send for Signature'}
               </button>
             )}
           </div>
         </div>
 
-        {/* Signed: show download buttons */}
+        {!canSend && !sig.status && (
+          <div style={{ marginTop: '8px', fontSize: '11px', color: '#92400e', background: '#fefce8', border: '1px solid #fde68a', borderRadius: '5px', padding: '5px 10px' }}>
+            {!formData.brokerName ? '⚠ Select broker in Step 0 first' : !signerEmail ? '⚠ Enter the applicant\'s email above to enable sending' : ''}
+          </div>
+        )}
+
+        {error && (
+          <div style={{ marginTop: '8px', padding: '7px 10px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '5px', fontSize: '12px', color: '#991b1b' }}>
+            ⚠️ {error}
+          </div>
+        )}
+
         {isSigned && sig.submissionId && (
           <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
             <a href={`/api/docuseal-download?submissionId=${sig.submissionId}&type=signed`} target="_blank" rel="noopener noreferrer"
@@ -384,160 +399,113 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             </a>
           </div>
         )}
-
-        {/* Send form */}
-        {open && (
-          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-primary)' }}>
-            <div className="grid grid-cols-3" style={{ marginBottom: '10px' }}>
-              <div>
-                <label style={{ fontSize: '12px' }}>Full Name *</label>
-                <input type="text" value={defaultName} placeholder="Full legal name" style={{ fontSize: '13px' }}
-                  onChange={(e) => updateESignForm(index, 'name', e.target.value)} />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px' }}>Email *</label>
-                <input type="email" value={defaultEmail} placeholder="client@email.com" style={{ fontSize: '13px' }}
-                  onChange={(e) => updateESignForm(index, 'email', e.target.value)} />
-              </div>
-              <div>
-                <label style={{ fontSize: '12px' }}>Mobile</label>
-                <input type="tel" value={defaultMobile} placeholder="0400 000 000" style={{ fontSize: '13px' }}
-                  onChange={(e) => updateESignForm(index, 'mobile', e.target.value)} />
-              </div>
-            </div>
-            <div style={{ padding: '8px 10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', fontSize: '11px', color: '#1e40af', marginBottom: '10px' }}>
-              ℹ️ Sending as broker: <strong>{formData.brokerName || '(select broker in Step 0)'}</strong>. The client will receive an email from DocuSeal with a link to read and sign the Credit Guide.
-            </div>
-            {error && (
-              <div style={{ padding: '8px 10px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', color: '#991b1b', marginBottom: '10px' }}>
-                ⚠️ {error}
-              </div>
-            )}
-            <button type="button" onClick={() => handleSendESign(applicant, index)} disabled={sending}
-              style={{ padding: '7px 20px', background: sending ? '#93c5fd' : 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: sending ? 'not-allowed' : 'pointer' }}>
-              {sending ? 'Sending…' : 'Send Signature Request →'}
-            </button>
-          </div>
-        )}
       </div>
     );
   };
 
-  // ── Driver Licence upload (front + back) with drag-and-drop + AI extraction ──
+  // ── Driver Licence upload — single drop zone (accepts 1–2 files) ────────────
   const renderDLUpload = (applicant, index) => {
-    const files    = dlFiles[index] || {};
-    const hasFront = !!files.front;
-    const hasBack  = !!files.back;
-    const isReady  = hasFront && !dlExtracting[index];
+    const files      = dlFiles[index] || {};
+    const hasFront   = !!files.front;
+    const hasBack    = !!files.back;
+    const fileCount  = (hasFront ? 1 : 0) + (hasBack ? 1 : 0);
+    const isReady    = hasFront && !dlExtracting[index];
+    const isDragging = !!dlDragging[`${index}-zone`];
+    const inputId    = `dl-input-${index}`;
 
-    const FileZone = ({ side, label, hint, file }) => {
-      const dragKey    = `${index}-${side}`;
-      const isDragging = !!dlDragging[dragKey];
-      const inputId    = `dl-input-${index}-${side}`;
-
-      return (
-        <div
-          onClick={() => document.getElementById(inputId)?.click()}
-          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDlDragging(p => ({ ...p, [dragKey]: true })); }}
-          onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDlDragging(p => ({ ...p, [dragKey]: true })); }}
-          onDragLeave={(e) => { e.stopPropagation(); setDlDragging(p => ({ ...p, [dragKey]: false })); }}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDlDragging(p => ({ ...p, [dragKey]: false }));
-            const dropped = e.dataTransfer.files[0];
-            if (dropped) setDLFile(index, side, dropped);
-          }}
-          style={{
-            padding: '12px 10px',
-            background: isDragging ? '#dbeafe' : file ? '#dcfce7' : 'white',
-            border: `${isDragging ? '2px dashed #3b82f6' : `1px solid ${file ? '#86efac' : '#cbd5e1'}`}`,
-            borderRadius: '6px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '4px',
-            fontSize: '12px',
-            cursor: 'pointer',
-            textAlign: 'center',
-            transition: 'all 0.15s',
-            userSelect: 'none'
-          }}
-        >
-          <input
-            id={inputId}
-            type="file"
-            accept="image/*,.pdf,application/pdf"
-            style={{ display: 'none' }}
-            onChange={(e) => setDLFile(index, side, e.target.files[0])}
-          />
-          <span style={{ fontSize: '20px' }}>{isDragging ? '📂' : file ? '✅' : '📷'}</span>
-          <div style={{ fontWeight: '600', color: isDragging ? '#1d4ed8' : file ? '#166534' : '#334155', fontSize: '11px' }}>
-            {label}
-            {hint && <span style={{ fontWeight: '400', color: '#64748b', marginLeft: '4px' }}>{hint}</span>}
-          </div>
-          <div style={{ color: isDragging ? '#3b82f6' : file ? '#166534' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%', fontSize: '11px' }}>
-            {isDragging ? 'Drop to upload' : file ? file.name : 'Drop or click'}
-          </div>
-        </div>
+    const handleFiles = (fileList) => {
+      const arr = Array.from(fileList).filter(f =>
+        f.type.startsWith('image/') || f.type === 'application/pdf'
       );
+      if (arr[0]) setDLFile(index, 'front', arr[0]);
+      if (arr[1]) setDLFile(index, 'back',  arr[1]);
     };
 
     return (
       <div style={{ marginBottom: '20px' }}>
-        <div style={{
-          background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-          border: '1px solid #bae6fd',
-          borderRadius: '8px',
-          padding: '14px 16px'
-        }}>
+        <div style={{ background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', border: '1px solid #bae6fd', borderRadius: '8px', padding: '14px 16px' }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
             <span style={{ fontSize: '20px' }}>🪪</span>
             <div>
               <div style={{ fontSize: '13px', fontWeight: '600', color: '#0369a1' }}>Driver Licence — Auto-fill</div>
               <div style={{ fontSize: '12px', color: '#0284c7' }}>
-                Upload front &amp; back — AI reads both sides and picks the most recent address
+                Drop both sides at once — AI reads front &amp; back and pre-fills all fields
               </div>
             </div>
           </div>
 
-          {/* Front / Back file zones */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-            <FileZone side="front" label="Front *"               file={files.front} />
-            <FileZone side="back"  label="Back"  hint="(recommended)" file={files.back} />
+          {/* Single unified drop zone */}
+          <input id={inputId} type="file" accept="image/*,.pdf,application/pdf" multiple style={{ display: 'none' }}
+            onChange={(e) => handleFiles(e.target.files)} />
+          <div
+            onClick={() => document.getElementById(inputId)?.click()}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDlDragging(p => ({ ...p, [`${index}-zone`]: true })); }}
+            onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDlDragging(p => ({ ...p, [`${index}-zone`]: true })); }}
+            onDragLeave={(e) => { e.stopPropagation(); setDlDragging(p => ({ ...p, [`${index}-zone`]: false })); }}
+            onDrop={(e) => {
+              e.preventDefault(); e.stopPropagation();
+              setDlDragging(p => ({ ...p, [`${index}-zone`]: false }));
+              handleFiles(e.dataTransfer.files);
+            }}
+            style={{
+              padding: fileCount > 0 ? '10px 12px' : '20px 12px',
+              background: isDragging ? '#dbeafe' : fileCount > 0 ? '#dcfce7' : 'white',
+              border: `${isDragging ? '2px dashed #3b82f6' : `1px dashed ${fileCount > 0 ? '#86efac' : '#93c5fd'}`}`,
+              borderRadius: '6px', cursor: 'pointer', transition: 'all 0.15s', marginBottom: '10px',
+              display: 'flex', alignItems: 'center', gap: '12px',
+            }}
+          >
+            <span style={{ fontSize: '24px', flexShrink: 0 }}>{isDragging ? '📂' : fileCount > 0 ? '✅' : '📷'}</span>
+            {fileCount === 0 ? (
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>
+                  Drop licence images here, or click to browse
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                  Drop both sides at once — JPG, PNG, or PDF accepted
+                </div>
+              </div>
+            ) : (
+              <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                {[['front', files.front], ['back', files.back]].map(([side, file]) => (
+                  <div key={side} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '13px' }}>{file ? '✅' : '⬜'}</span>
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: file ? '#166534' : '#94a3b8' }}>
+                        {side === 'front' ? 'Front' : 'Back'}{side === 'front' ? ' *' : ' (optional)'}
+                      </div>
+                      {file && <div style={{ fontSize: '10px', color: '#6b7280', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>}
+                      {!file && (
+                        <button type="button" onClick={(e) => {
+                          e.stopPropagation();
+                          const id = `dl-side-${index}-${side}`;
+                          document.getElementById(id)?.click();
+                        }} style={{ fontSize: '10px', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                          Add separately
+                        </button>
+                      )}
+                      <input id={`dl-side-${index}-${side}`} type="file" accept="image/*,.pdf,application/pdf" style={{ display: 'none' }}
+                        onChange={(e) => { if (e.target.files[0]) setDLFile(index, side, e.target.files[0]); }} />
+                    </div>
+                    {file && (
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setDLFile(index, side, null); }}
+                        style={{ marginLeft: 'auto', fontSize: '14px', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', flexShrink: 0 }}>✕</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Extract button */}
-          <button
-            type="button"
-            disabled={!isReady}
-            onClick={() => handleDLExtract(index)}
-            style={{
-              width: '100%',
-              padding: '8px',
-              background: isReady ? '#0369a1' : '#93c5fd',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: '600',
-              cursor: isReady ? 'pointer' : 'not-allowed',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
-          >
+          <button type="button" disabled={!isReady} onClick={() => handleDLExtract(index)}
+            style={{ width: '100%', padding: '8px', background: isReady ? '#0369a1' : '#93c5fd', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: isReady ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             {dlExtracting[index] ? (
-              <>
-                <span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                Reading licence…
-              </>
+              <><span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Reading licence…</>
             ) : !hasFront
-              ? 'Upload front of licence first'
-              : `Extract & Auto-fill${hasBack ? ' (Front + Back)' : ' (Front only)'}`}
+              ? '📷 Upload licence to auto-fill'
+              : `✨ Extract & Auto-fill${hasBack ? ' (Front + Back)' : ' (Front only)'}`}
           </button>
         </div>
 

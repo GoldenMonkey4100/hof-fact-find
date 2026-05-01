@@ -314,6 +314,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
   const [employmentRecords, setEmploymentRecords] = useState([]);
   const [payslipState,  setPayslipState]  = useState({}); // { [idx]: { files, extracting, data, error, dragging } }
   const [verifierOpen,  setVerifierOpen]  = useState(null); // applicant index
+  const [abnLookup,     setAbnLookup]     = useState({}); // { [key]: { loading, result, error } }
 
   const getApplicantType = (applicantId) =>
     (formData.applicants || []).find(a => a.id === applicantId)?.type || 'Natural Person';
@@ -364,6 +365,59 @@ const Step2Employment = ({ formData, updateFormData }) => {
       if (emp.startDate && emp.endDate) total += calculateTenure(emp.startDate, emp.endDate);
     });
     return total;
+  };
+
+  // ── ABN lookup ─────────────────────────────────────────────────────────────
+  const lookupABN = async (key, abn, onSuccess) => {
+    const clean = (abn || '').replace(/\D/g, '');
+    if (clean.length !== 11) return;
+    setAbnLookup(p => ({ ...p, [key]: { loading: true, result: null, error: null } }));
+    try {
+      const res  = await fetch(`/api/abn-lookup?abn=${clean}`);
+      const data = await res.json();
+      if (data.error) {
+        setAbnLookup(p => ({ ...p, [key]: { loading: false, result: null, error: data.error } }));
+      } else {
+        setAbnLookup(p => ({ ...p, [key]: { loading: false, result: data, error: null } }));
+        if (onSuccess) onSuccess(data);
+      }
+    } catch (err) {
+      setAbnLookup(p => ({ ...p, [key]: { loading: false, result: null, error: err.message } }));
+    }
+  };
+
+  const ABNField = ({ idx, empKey, value, onChange, onABNResult }) => {
+    const key    = `${idx}-${empKey}`;
+    const lookup = abnLookup[key] || {};
+    const clean  = (value || '').replace(/\D/g, '');
+    const ready  = clean.length === 11;
+    return (
+      <div>
+        <label style={{ fontSize: '13px' }}>
+          Employer ABN
+          {lookup.result && <span style={{ marginLeft: '6px', fontSize: '11px', color: lookup.result.status === 'Active' ? '#16a34a' : '#dc2626', fontWeight: '600' }}>
+            {lookup.result.status === 'Active' ? '✓ Active' : '✗ ' + lookup.result.status}
+          </span>}
+        </label>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <input type="text" value={value || ''} placeholder="XX XXX XXX XXX" style={{ flex: 1 }}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={() => ready && lookupABN(key, value, onABNResult)} />
+          <button type="button" disabled={!ready || lookup.loading}
+            onClick={() => lookupABN(key, value, onABNResult)}
+            style={{ padding: '0 10px', background: ready ? '#0369a1' : '#e2e8f0', color: ready ? 'white' : '#9ca3af', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: ready ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>
+            {lookup.loading ? '…' : '🔍 Verify'}
+          </button>
+        </div>
+        {lookup.result && (
+          <div style={{ fontSize: '11px', color: '#166534', marginTop: '3px' }}>
+            {lookup.result.entityName}{lookup.result.tradingNames?.[0] ? ` (${lookup.result.tradingNames[0]})` : ''} · {lookup.result.entityType}
+            {lookup.result.gstRegistered ? ' · GST Registered' : ' · Not GST Registered'}
+          </div>
+        )}
+        {lookup.error && <div style={{ fontSize: '11px', color: '#dc2626', marginTop: '3px' }}>⚠ {lookup.error}</div>}
+      </div>
+    );
   };
 
   // ── State updaters ──────────────────────────────────────────────────────────
@@ -434,7 +488,10 @@ const Step2Employment = ({ formData, updateFormData }) => {
       const data = await res.json();
       if (data.error) { updatePayslip(idx, { extracting: false, error: data.error }); return; }
       updatePayslip(idx, { extracting: false, data });
-      // Prefill income fields from extraction
+      // Prefill all available fields from extraction
+      if (data.employerName)  updateCurrentEmployment(idx, 'employer',    data.employerName);
+      if (data.employerABN)   updateCurrentEmployment(idx, 'abn',         data.employerABN);
+      if (data.jobTitle)      updateCurrentEmployment(idx, 'role',        data.jobTitle);
       if (data.payFrequency && data.payFrequency !== 'unknown') {
         updateCurrentEmployment(idx, 'payFrequency', data.payFrequency);
       }
@@ -442,6 +499,10 @@ const Step2Employment = ({ formData, updateFormData }) => {
         const freq = data.payFrequency || 'fortnightly';
         const annualised = Math.round(parseFloat(data.grossPay) * (PERIODS[freq] || 26));
         updateCurrentEmployment(idx, 'baseIncome', String(annualised));
+      }
+      // Auto-flag HECS if tax analysis suggests it
+      if (data.taxAnalysis?.flag === 'higher_than_expected') {
+        updateCurrentEmployment(idx, 'hecs', 'Yes');
       }
     } catch (err) {
       updatePayslip(idx, { extracting: false, error: err.message });
@@ -528,9 +589,11 @@ const Step2Employment = ({ formData, updateFormData }) => {
         {ps.data && (
           <div style={{ marginTop: '8px', padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
             <div style={{ fontSize: '12px', fontWeight: '600', color: '#166534', marginBottom: '6px' }}>✓ Payslip extracted — form fields pre-filled below</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', marginBottom: ps.data.taxAnalysis ? '8px' : '0' }}>
               {[
                 ['Employer', ps.data.employerName],
+                ['ABN', ps.data.employerABN],
+                ['Job Title', ps.data.jobTitle],
                 ['Pay Date', ps.data.payDate],
                 ['Gross This Period', ps.data.grossPay ? `$${Number(ps.data.grossPay).toLocaleString()}` : ''],
                 ['YTD Gross', ps.data.ytdGross ? `$${Number(ps.data.ytdGross).toLocaleString()}` : ''],
@@ -543,6 +606,23 @@ const Step2Employment = ({ formData, updateFormData }) => {
                 </div>
               ))}
             </div>
+            {/* Tax analysis */}
+            {ps.data.taxAnalysis && (() => {
+              const ta = ps.data.taxAnalysis;
+              const isHigh = ta.flag === 'higher_than_expected';
+              const isLow  = ta.flag === 'lower_than_expected';
+              const color  = isHigh ? '#92400e' : isLow ? '#1e40af' : '#166534';
+              const bg     = isHigh ? '#fefce8' : isLow ? '#eff6ff' : '#f0fdf4';
+              const border = isHigh ? '#fde68a' : isLow ? '#bfdbfe' : '#86efac';
+              return (
+                <div style={{ padding: '7px 10px', background: bg, border: `1px solid ${border}`, borderRadius: '6px', fontSize: '11px', color }}>
+                  <strong>Tax Check:</strong> {ta.note}
+                  <span style={{ marginLeft: '8px', color: 'var(--text-secondary)' }}>
+                    (Expected ${ta.expectedTax?.toLocaleString()} · Actual ${ta.annualisedTax?.toLocaleString()} annualised)
+                  </span>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -695,8 +775,9 @@ const Step2Employment = ({ formData, updateFormData }) => {
                     <input type="text" value={record.currentEmployment.employer} onChange={(e) => updateCurrentEmployment(index, 'employer', e.target.value)} placeholder="Trading name" />
                   </div>
                   <div>
-                    <label>ABN <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginLeft: '4px', fontWeight: '400' }}>(lookup coming soon)</span></label>
-                    <input type="text" value={record.currentEmployment.abn} onChange={(e) => updateCurrentEmployment(index, 'abn', e.target.value)} placeholder="12 345 678 901" />
+                    <ABNField idx={index} empKey="self-current" value={record.currentEmployment.abn}
+                      onChange={(v) => updateCurrentEmployment(index, 'abn', v)}
+                      onABNResult={(r) => { if (!record.currentEmployment.employer && r.tradingNames?.[0]) updateCurrentEmployment(index, 'employer', r.tradingNames[0]); }} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2">
@@ -779,8 +860,9 @@ const Step2Employment = ({ formData, updateFormData }) => {
                           {record.currentEmployment.startDate && <div className="hint-text">{calculateTenure(record.currentEmployment.startDate).toFixed(1)} years</div>}
                         </div>
                         <div>
-                          <label>Employer ABN <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginLeft: '4px', fontWeight: '400' }}>(lookup coming soon)</span></label>
-                          <input type="text" value={record.currentEmployment.abn} onChange={(e) => updateCurrentEmployment(index, 'abn', e.target.value)} placeholder="12 345 678 901" />
+                          <ABNField idx={index} empKey="paye-current" value={record.currentEmployment.abn}
+                            onChange={(v) => updateCurrentEmployment(index, 'abn', v)}
+                            onABNResult={(r) => { if (!record.currentEmployment.employer && r.entityName) updateCurrentEmployment(index, 'employer', r.tradingNames?.[0] || r.entityName); }} />
                         </div>
                       </div>
                     </>
@@ -853,8 +935,9 @@ const Step2Employment = ({ formData, updateFormData }) => {
 
                       {prevEmp.employmentType === 'Self-Employed' && (
                         <div className="mt-4">
-                          <label>ABN <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginLeft: '4px', fontWeight: '400' }}>(lookup coming soon)</span></label>
-                          <input type="text" value={prevEmp.abn} onChange={(e) => updatePreviousEmployment(index, empIdx, 'abn', e.target.value)} placeholder="12 345 678 901" />
+                          <ABNField idx={index} empKey={`prev-${empIdx}`} value={prevEmp.abn}
+                            onChange={(v) => updatePreviousEmployment(index, empIdx, 'abn', v)}
+                            onABNResult={(r) => { if (!prevEmp.employer && r.entityName) updatePreviousEmployment(index, empIdx, 'employer', r.tradingNames?.[0] || r.entityName); }} />
                         </div>
                       )}
                     </div>

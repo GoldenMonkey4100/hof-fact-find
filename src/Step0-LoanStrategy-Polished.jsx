@@ -202,12 +202,31 @@ const FundsToCompleteCard = ({ security, allSecurities }) => {
               amt = calcFHOG(security.state, propVal, !!security.isNewHome);
             return amt > 0 ? <Row key={m} label={m} value={fmt(amt)} green indent /> : null;
           })}
-          <Row
-            label={surplus >= 0 ? '✓ Surplus' : '⚠ Shortfall'}
-            value={fmt(Math.abs(surplus))}
-            bold green={surplus >= 0}
-          />
+          {/* Prominent surplus / shortfall banner */}
+          <div style={{
+            marginTop: '8px', padding: '10px 14px', borderRadius: '8px',
+            background: surplus >= 0 ? '#f0fdf4' : '#fef2f2',
+            border: `2px solid ${surplus >= 0 ? '#86efac' : '#fca5a5'}`,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <span style={{ fontSize: '14px', fontWeight: '700', color: surplus >= 0 ? '#166534' : '#991b1b' }}>
+              {surplus >= 0 ? '✅ Surplus' : '⚠️ Shortfall'}
+            </span>
+            <span style={{ fontSize: '18px', fontWeight: '800', color: surplus >= 0 ? '#16a34a' : '#dc2626' }}>
+              {fmt(Math.abs(surplus))}
+            </span>
+          </div>
+          {surplus < 0 && (
+            <div style={{ fontSize: '11px', color: '#dc2626', marginTop: '4px', fontStyle: 'italic' }}>
+              Client needs an additional {fmt(Math.abs(surplus))} to complete this purchase. Review completion methods above.
+            </div>
+          )}
         </>
+      )}
+      {!hasFunds && (
+        <div style={{ marginTop: '8px', padding: '8px 12px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: '6px', fontSize: '12px', color: '#92400e' }}>
+          ⚠ Select how the client intends to complete the purchase above to verify funds
+        </div>
       )}
       <div style={{ marginTop: '6px', fontSize: '11px', color: '#6b7280' }}>
         * Estimates only. Stamp duty and FHOG figures should be confirmed with a solicitor.

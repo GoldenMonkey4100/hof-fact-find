@@ -154,7 +154,12 @@ const FundsToCompleteCard = ({ security, allSecurities }) => {
     if (m === 'Equity from Existing Property') {
       const ep = (security.equityPropertyIndex !== '' && security.equityPropertyIndex !== undefined)
         ? allSecurities[parseInt(security.equityPropertyIndex)] : null;
-      if (ep) confirmed += Math.max(0, (parseFloat(ep.propertyValue)||0)*0.8 - (parseFloat(ep.loanAmount)||0));
+      if (ep) {
+        const epIsCashout = ep.primaryTransactionTypes?.includes('Refinance') && ep.secondaryTransactionTypes?.includes('Cashout');
+        confirmed += epIsCashout
+          ? (parseFloat(parseCurrency(ep.cashoutAmount || '')) || 0)
+          : Math.max(0, (parseFloat(ep.propertyValue)||0)*0.8 - (parseFloat(ep.loanAmount)||0));
+      }
     }
     if (m === 'First Home Owner Grant')
       confirmed += calcFHOG(security.state, propVal, !!security.isNewHome);
@@ -196,7 +201,12 @@ const FundsToCompleteCard = ({ security, allSecurities }) => {
             if (m === 'Equity from Existing Property') {
               const ep = (security.equityPropertyIndex !== '' && security.equityPropertyIndex !== undefined)
                 ? allSecurities[parseInt(security.equityPropertyIndex)] : null;
-              if (ep) amt = Math.max(0, (parseFloat(ep.propertyValue)||0)*0.8 - (parseFloat(ep.loanAmount)||0));
+              if (ep) {
+                const epIsCashout = ep.primaryTransactionTypes?.includes('Refinance') && ep.secondaryTransactionTypes?.includes('Cashout');
+                amt = epIsCashout
+                  ? (parseFloat(parseCurrency(ep.cashoutAmount || '')) || 0)
+                  : Math.max(0, (parseFloat(ep.propertyValue)||0)*0.8 - (parseFloat(ep.loanAmount)||0));
+              }
             }
             if (m === 'First Home Owner Grant')
               amt = calcFHOG(security.state, propVal, !!security.isNewHome);
@@ -256,7 +266,8 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
       state: '', isFirstHomeBuyer: false, isNewHome: false,
       purchaseCompletionAmounts: {}, purchaseCompletionOther: '',
       equityPropertyIndex: '', giftRelationship: '',
-      hasOffset: false, hasRedraw: false
+      hasOffset: false, hasRedraw: false,
+      owners: [], guarantors: [], crossCollateralise: false
     }];
     updateFormData('securities', securities);
   };
@@ -496,6 +507,82 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               </div>
             </div>
 
+            {/* Property Ownership */}
+            {(formData.applicants?.length > 0) && (
+              <div className="mb-4" style={{ padding: '14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: '#374151' }}>🏠 Property Ownership</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Property Owners</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                      {formData.applicants.map(a => {
+                        const name = a.type === 'Company Borrower'
+                          ? (a.companyName || `${a.role} ${a.number}`)
+                          : `${a.firstName || ''} ${a.lastName || ''}`.trim() || `${a.role} ${a.number}`;
+                        const isOwner = (security.owners || []).includes(a.id);
+                        return (
+                          <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', margin: 0,
+                            padding: '6px 10px', borderRadius: '6px',
+                            background: isOwner ? '#eff6ff' : 'white',
+                            border: `1px solid ${isOwner ? '#bfdbfe' : '#e5e7eb'}` }}>
+                            <input type="checkbox" checked={isOwner}
+                              onChange={(e) => {
+                                const current = security.owners || [];
+                                updateSecurity(index, 'owners', e.target.checked
+                                  ? [...current, a.id]
+                                  : current.filter(id => id !== a.id));
+                              }} />
+                            <span style={{ fontWeight: isOwner ? '600' : '400', color: isOwner ? '#1d4ed8' : '#374151' }}>{name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Guarantors (if any)</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '12px' }}>
+                      {formData.applicants.map(a => {
+                        const name = a.type === 'Company Borrower'
+                          ? (a.companyName || `${a.role} ${a.number}`)
+                          : `${a.firstName || ''} ${a.lastName || ''}`.trim() || `${a.role} ${a.number}`;
+                        const isGuarantor = (security.guarantors || []).includes(a.id);
+                        return (
+                          <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', margin: 0,
+                            padding: '6px 10px', borderRadius: '6px',
+                            background: isGuarantor ? '#fdf4ff' : 'white',
+                            border: `1px solid ${isGuarantor ? '#e9d5ff' : '#e5e7eb'}` }}>
+                            <input type="checkbox" checked={isGuarantor}
+                              onChange={(e) => {
+                                const current = security.guarantors || [];
+                                updateSecurity(index, 'guarantors', e.target.checked
+                                  ? [...current, a.id]
+                                  : current.filter(id => id !== a.id));
+                              }} />
+                            <span style={{ fontWeight: isGuarantor ? '600' : '400', color: isGuarantor ? '#7c3aed' : '#374151' }}>{name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', margin: 0,
+                      padding: '8px 10px', borderRadius: '6px',
+                      background: security.crossCollateralise ? '#fff7ed' : 'white',
+                      border: `1px solid ${security.crossCollateralise ? '#fed7aa' : '#e5e7eb'}` }}>
+                      <input type="checkbox" checked={!!security.crossCollateralise}
+                        onChange={(e) => updateSecurity(index, 'crossCollateralise', e.target.checked)} />
+                      <span style={{ fontWeight: security.crossCollateralise ? '600' : '400', color: security.crossCollateralise ? '#c2410c' : '#374151' }}>
+                        🔗 Cross-Collateralise
+                      </span>
+                    </label>
+                    {security.crossCollateralise && (
+                      <div style={{ fontSize: '11px', color: '#92400e', marginTop: '4px', marginLeft: '2px' }}>
+                        This property will be used as collateral across multiple loans in this application
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Refinance + Cashout breakdown — Option B */}
             {isRefinanceCashout(security) && (() => {
               const propVal     = parseFloat(security.propertyValue) || 0;
@@ -696,8 +783,11 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                     {method === 'Equity from Existing Property' && (() => {
                       const eqIdx = security.equityPropertyIndex;
                       const equityProp = (eqIdx !== '' && eqIdx !== undefined) ? formData.securities[parseInt(eqIdx)] : null;
+                      const epIsCashout = equityProp?.primaryTransactionTypes?.includes('Refinance') && equityProp?.secondaryTransactionTypes?.includes('Cashout');
                       const availEquity = equityProp
-                        ? Math.max(0, (parseFloat(equityProp.propertyValue)||0) * 0.8 - (parseFloat(equityProp.loanAmount)||0))
+                        ? epIsCashout
+                          ? (parseFloat(parseCurrency(equityProp.cashoutAmount || '')) || 0)
+                          : Math.max(0, (parseFloat(equityProp.propertyValue)||0) * 0.8 - (parseFloat(equityProp.loanAmount)||0))
                         : null;
                       return (
                         <div>
@@ -712,10 +802,21 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                           {equityProp && (
                             <div style={{ marginTop: '8px', padding: '8px 10px', background: '#f0fdf4', borderRadius: '4px', fontSize: '12px' }}>
                               <div>Property Value: <strong>{formatCurrencyDisplay(equityProp.propertyValue)}</strong></div>
-                              <div>Existing Loan: <strong>{formatCurrencyDisplay(equityProp.loanAmount)}</strong></div>
-                              <div style={{ marginTop: '4px', color: availEquity > 0 ? '#166534' : '#dc2626', fontWeight: '600' }}>
-                                Available Equity (80% LVR): <strong>${(availEquity || 0).toLocaleString()}</strong>
-                              </div>
+                              {epIsCashout ? (
+                                <>
+                                  <div>Transaction: <strong style={{ color: '#1d4ed8' }}>Refinance + Cashout</strong></div>
+                                  <div style={{ marginTop: '4px', color: availEquity > 0 ? '#166534' : '#dc2626', fontWeight: '600' }}>
+                                    Cashout Amount (funds to Security {index + 1}): <strong>${(availEquity || 0).toLocaleString()}</strong>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div>Existing Loan: <strong>{formatCurrencyDisplay(equityProp.loanAmount)}</strong></div>
+                                  <div style={{ marginTop: '4px', color: availEquity > 0 ? '#166534' : '#dc2626', fontWeight: '600' }}>
+                                    Available Equity (80% LVR): <strong>${(availEquity || 0).toLocaleString()}</strong>
+                                  </div>
+                                </>
+                              )}
                             </div>
                           )}
                         </div>

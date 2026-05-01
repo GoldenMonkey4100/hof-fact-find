@@ -112,23 +112,21 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
   const inputStyle = { fontSize: '13px', marginBottom: 0 };
 
   return (
-    <>
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.15)', zIndex: 99999 }} onClick={onClose} />
-    <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '520px', background: 'white', boxShadow: '-6px 0 40px rgba(0,0,0,0.18)', zIndex: 100000, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-      <div style={{ flex: 1 }}>
+    <div style={{ marginTop: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+      <div>
 
         {/* Header */}
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white' }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>
+            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
               💰 Income Verification Tool
             </h2>
-            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>{applicantName}</p>
+            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>{applicantName}</p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px 8px' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px 8px' }}>✕</button>
         </div>
 
-        <div style={{ padding: '24px' }}>
+        <div style={{ padding: '16px' }}>
 
           {/* Two methods side by side */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -291,7 +289,7 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'flex-end', gap: '12px', background: 'white' }}>
           <button onClick={onClose} className="btn-secondary">Cancel</button>
           <button
             onClick={handleSave}
@@ -304,7 +302,6 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
         </div>
       </div>
     </div>
-    </>
   );
 };
 
@@ -312,9 +309,9 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
 
 const Step2Employment = ({ formData, updateFormData }) => {
   const [employmentRecords, setEmploymentRecords] = useState([]);
-  const [payslipState,  setPayslipState]  = useState({}); // { [idx]: { files, extracting, data, error, dragging } }
-  const [verifierOpen,  setVerifierOpen]  = useState(null); // applicant index
-  const [abnLookup,     setAbnLookup]     = useState({}); // { [key]: { loading, result, error } }
+  const [payslipState,    setPayslipState]    = useState({}); // { [idx]: { files, extracting, data, error, dragging } }
+  const [verifierExpanded, setVerifierExpanded] = useState({}); // { [idx]: bool }
+  const [abnLookup,        setAbnLookup]        = useState({}); // { [key]: { loading, result, error } }
 
   const getApplicantType = (applicantId) =>
     (formData.applicants || []).find(a => a.id === applicantId)?.type || 'Natural Person';
@@ -511,13 +508,14 @@ const Step2Employment = ({ formData, updateFormData }) => {
 
   // ── Payslip upload zone ─────────────────────────────────────────────────────
   const renderPayslipUpload = (record, idx) => {
-    const ps         = payslipState[idx] || {};
-    const file       = ps.files?.[0];
-    const hasFile    = !!file;
-    const isDragging = !!ps.dragging;
-    const isPDF      = file?.type === 'application/pdf';
-    const emp        = record.currentEmployment;
+    const ps          = payslipState[idx] || {};
+    const file        = ps.files?.[0];
+    const hasFile     = !!file;
+    const isDragging  = !!ps.dragging;
+    const isPDF       = file?.type === 'application/pdf';
+    const emp         = record.currentEmployment;
     const fileInputId = `payslip-input-${idx}`;
+    const isVerOpen   = !!verifierExpanded[idx];
 
     const HECSBtn = ({ val }) => (
       <button type="button" onClick={() => updateCurrentEmployment(idx, 'hecs', val)}
@@ -529,10 +527,22 @@ const Step2Employment = ({ formData, updateFormData }) => {
         }}>{val}</button>
     );
 
-    return (
-      <div style={{ marginBottom: '20px' }}>
+    // Currency display helpers for income fields
+    const fmtInc = (v) => {
+      const n = parseFloat((v || '').toString().replace(/,/g, ''));
+      if (!n) return '';
+      return n.toLocaleString('en-AU');
+    };
+    const fmtIncDisplay = (v) => {
+      const n = parseFloat((v || '').toString().replace(/,/g, ''));
+      if (!n) return null;
+      return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 2 }).format(n);
+    };
 
-        {/* ── Upload bar ── */}
+    // ── Left column: form fields ─────────────────────────────────────────────
+    const leftPanel = (
+      <div>
+        {/* Upload bar */}
         <div
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); updatePayslip(idx, { dragging: true }); }}
           onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); updatePayslip(idx, { dragging: true }); }}
@@ -556,40 +566,40 @@ const Step2Employment = ({ formData, updateFormData }) => {
               {isDragging ? 'Drop to attach' : 'Drag & drop or click Browse — JPG, PNG, PDF'}
             </div>
           </div>
-          <button type="button" onClick={() => document.getElementById(fileInputId)?.click()}
-            style={{ padding: '5px 14px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}>
-            Browse
-          </button>
-          {hasFile && (
-            <button type="button" onClick={() => handlePayslipExtract(idx)} disabled={ps.extracting}
-              style={{ padding: '5px 14px', background: ps.extracting ? '#93c5fd' : 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: ps.extracting ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
-              {ps.extracting ? 'Reading…' : '✨ Extract'}
+          {!hasFile && (
+            <button type="button" onClick={() => document.getElementById(fileInputId)?.click()}
+              style={{ padding: '5px 14px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}>
+              Browse
             </button>
+          )}
+          {hasFile && (
+            <>
+              <button type="button" onClick={() => handlePayslipExtract(idx)} disabled={ps.extracting}
+                style={{ padding: '5px 14px', background: ps.extracting ? '#93c5fd' : 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: ps.extracting ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
+                {ps.extracting ? 'Reading…' : '✨ Extract'}
+              </button>
+              {!ps.previewUrl && (
+                <button type="button" onClick={() => setPayslipFile(idx, null)}
+                  style={{ padding: '5px 10px', background: 'white', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', flexShrink: 0 }}>
+                  ✕
+                </button>
+              )}
+            </>
           )}
         </div>
 
-        {/* ── Always-visible payslip preview ── */}
-        {hasFile && ps.previewUrl && (
-          <div style={{ marginTop: '8px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-primary)', background: '#f8fafc' }}>
-            {isPDF
-              ? <embed src={ps.previewUrl} type="application/pdf" width="100%" style={{ height: '340px', display: 'block' }} />
-              : <img src={ps.previewUrl} alt="Payslip preview" style={{ width: '100%', display: 'block', maxHeight: '400px', objectFit: 'contain', background: '#f8fafc' }} />
-            }
-          </div>
-        )}
-
-        {/* ── Extraction error ── */}
+        {/* Extraction error */}
         {ps.error && (
           <div style={{ marginTop: '6px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', color: '#991b1b' }}>
             ⚠️ {ps.error}
           </div>
         )}
 
-        {/* ── Extracted summary ── */}
+        {/* Extracted summary */}
         {ps.data && (
           <div style={{ marginTop: '8px', padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
             <div style={{ fontSize: '12px', fontWeight: '600', color: '#166534', marginBottom: '6px' }}>✓ Payslip extracted — form fields pre-filled below</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', marginBottom: ps.data.taxAnalysis ? '8px' : '0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', marginBottom: ps.data.taxAnalysis ? '8px' : '0' }}>
               {[
                 ['Employer', ps.data.employerName],
                 ['ABN', ps.data.employerABN],
@@ -606,7 +616,6 @@ const Step2Employment = ({ formData, updateFormData }) => {
                 </div>
               ))}
             </div>
-            {/* Tax analysis */}
             {ps.data.taxAnalysis && (() => {
               const ta = ps.data.taxAnalysis;
               const isHigh = ta.flag === 'higher_than_expected';
@@ -626,7 +635,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
           </div>
         )}
 
-        {/* ── Income Details card ── */}
+        {/* Income Details card */}
         <div style={{ marginTop: '12px', padding: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px' }}>
           <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Income Details</h4>
           <div className="grid grid-cols-2 mb-3">
@@ -641,23 +650,32 @@ const Step2Employment = ({ formData, updateFormData }) => {
             </div>
             <div>
               <label style={{ fontSize: '12px' }}>Base Income (annual)</label>
-              <input type="text" value={emp.baseIncome || ''} placeholder="$0"
-                onChange={(e) => updateCurrentEmployment(idx, 'baseIncome', e.target.value)}
+              <input type="text" value={fmtInc(emp.baseIncome)} placeholder="0"
+                onChange={(e) => updateCurrentEmployment(idx, 'baseIncome', parseCurrency(e.target.value))}
                 style={{ fontSize: '13px' }} />
+              {fmtIncDisplay(emp.baseIncome) && (
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>{fmtIncDisplay(emp.baseIncome)}</div>
+              )}
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
             <div>
               <label style={{ fontSize: '12px' }}>Bonus Income (annual)</label>
-              <input type="text" value={emp.bonusIncome || ''} placeholder="$0"
-                onChange={(e) => updateCurrentEmployment(idx, 'bonusIncome', e.target.value)}
+              <input type="text" value={fmtInc(emp.bonusIncome)} placeholder="0"
+                onChange={(e) => updateCurrentEmployment(idx, 'bonusIncome', parseCurrency(e.target.value))}
                 style={{ fontSize: '13px' }} />
+              {fmtIncDisplay(emp.bonusIncome) && (
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>{fmtIncDisplay(emp.bonusIncome)}</div>
+              )}
             </div>
             <div>
               <label style={{ fontSize: '12px' }}>Commissions (annual)</label>
-              <input type="text" value={emp.commissions || ''} placeholder="$0"
-                onChange={(e) => updateCurrentEmployment(idx, 'commissions', e.target.value)}
+              <input type="text" value={fmtInc(emp.commissions)} placeholder="0"
+                onChange={(e) => updateCurrentEmployment(idx, 'commissions', parseCurrency(e.target.value))}
                 style={{ fontSize: '13px' }} />
+              {fmtIncDisplay(emp.commissions) && (
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>{fmtIncDisplay(emp.commissions)}</div>
+              )}
             </div>
             <div>
               <label style={{ fontSize: '12px' }}>HECS Debt</label>
@@ -668,13 +686,13 @@ const Step2Employment = ({ formData, updateFormData }) => {
             </div>
           </div>
 
-          {/* Income Verification */}
-          {record.currentEmployment.incomeVerification ? (() => {
+          {/* Income Verification — saved summary */}
+          {record.currentEmployment.incomeVerification && !isVerOpen && (() => {
             const v = record.currentEmployment.incomeVerification;
             const statusColors = { consistent: '#166534', ytd_higher: '#0369a1', ytd_lower: '#9a3412', incomplete: '#64748b' };
             const statusLabels = { consistent: '✓ Consistent', ytd_higher: 'ℹ️ YTD Higher', ytd_lower: '⚠️ YTD Lower — flagged', incomplete: '—' };
             return (
-              <div style={{ padding: '10px 12px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '12px' }}>
+              <div style={{ padding: '10px 12px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '12px', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <span style={{ fontWeight: '600' }}>Income Verification</span>
                   <span style={{ color: statusColors[v.status] || '#64748b', fontWeight: '600' }}>{statusLabels[v.status] || v.status}</span>
@@ -684,38 +702,64 @@ const Step2Employment = ({ formData, updateFormData }) => {
                   <span>YTD: <strong style={{ color: 'var(--text-primary)' }}>{fmt(v.m2Annual)}</strong></span>
                   <span>Var: <strong style={{ color: v.variancePct < -2 ? '#dc2626' : 'var(--text-primary)' }}>{v.variancePct?.toFixed(1)}%</strong></span>
                 </div>
-                <button type="button" onClick={() => setVerifierOpen(idx)}
-                  style={{ marginTop: '4px', fontSize: '11px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
-                  Edit verification →
-                </button>
               </div>
             );
-          })() : (
-            <button type="button" onClick={() => setVerifierOpen(idx)}
+          })()}
+
+          {/* Income Verification — toggle button or inline widget */}
+          {isVerOpen ? (
+            <IncomeVerifierModal
+              applicantName={record.applicantName}
+              initialData={ps.data || null}
+              onClose={() => setVerifierExpanded(p => ({ ...p, [idx]: false }))}
+              onSave={(result) => {
+                updateCurrentEmployment(idx, 'incomeVerification', result);
+                setVerifierExpanded(p => ({ ...p, [idx]: false }));
+              }}
+            />
+          ) : (
+            <button type="button"
+              onClick={() => setVerifierExpanded(p => ({ ...p, [idx]: true }))}
               style={{ width: '100%', padding: '7px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-              💰 Open Income Verification Tool
+              {record.currentEmployment.incomeVerification ? '✏️ Edit Income Verification' : '💰 Open Income Verification Tool'}
             </button>
           )}
         </div>
       </div>
     );
+
+    // ── Two-column layout when preview is available ────────────────────────
+    if (hasFile && ps.previewUrl) {
+      return (
+        <div style={{ display: 'grid', gridTemplateColumns: '55% 43%', gap: '16px', alignItems: 'start', marginBottom: '20px' }}>
+          <div>{leftPanel}</div>
+          <div>
+            {/* Preview header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: '#475569' }}>📄 Payslip Preview</span>
+              <button type="button" onClick={() => setPayslipFile(idx, null)}
+                style={{ fontSize: '12px', color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: '5px', cursor: 'pointer', padding: '3px 10px' }}>
+                ✕ Remove
+              </button>
+            </div>
+            {/* Preview panel */}
+            <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-primary)', background: '#f8fafc', position: 'sticky', top: '16px' }}>
+              {isPDF
+                ? <embed src={ps.previewUrl} type="application/pdf" width="100%" style={{ height: '560px', display: 'block' }} />
+                : <img src={ps.previewUrl} alt="Payslip preview" style={{ width: '100%', display: 'block', objectFit: 'contain', background: '#f8fafc' }} />
+              }
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return <div style={{ marginBottom: '20px' }}>{leftPanel}</div>;
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="fade-in">
-      {/* Income Verifier Modal */}
-      {verifierOpen !== null && employmentRecords[verifierOpen] && (
-        <IncomeVerifierModal
-          applicantName={employmentRecords[verifierOpen].applicantName}
-          initialData={payslipState[verifierOpen]?.data || null}
-          onClose={() => setVerifierOpen(null)}
-          onSave={(result) => {
-            updateCurrentEmployment(verifierOpen, 'incomeVerification', result);
-            setVerifierOpen(null);
-          }}
-        />
-      )}
 
       <div className="mb-6">
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>

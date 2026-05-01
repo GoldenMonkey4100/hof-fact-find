@@ -508,9 +508,13 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
             </div>
 
             {/* Property Ownership */}
-            {(formData.applicants?.length > 0) && (
-              <div className="mb-4" style={{ padding: '14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
-                <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: '#374151' }}>🏠 Property Ownership</p>
+            <div className="mb-4" style={{ padding: '14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+              <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: '#374151' }}>🏠 Property Ownership</p>
+              {!(formData.applicants?.length > 0) ? (
+                <div style={{ fontSize: '12px', color: '#9ca3af', padding: '8px 0' }}>
+                  Complete Step 1 (Applicants) first — owners and guarantors will appear here
+                </div>
+              ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Property Owners</label>
@@ -580,8 +584,8 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                     )}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Refinance + Cashout breakdown — Option B */}
             {isRefinanceCashout(security) && (() => {

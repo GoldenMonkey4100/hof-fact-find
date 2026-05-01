@@ -460,7 +460,8 @@ const Step2Employment = ({ formData, updateFormData }) => {
     const old = payslipState[idx]?.previewUrl;
     if (old) URL.revokeObjectURL(old);
     const previewUrl = file ? URL.createObjectURL(file) : null;
-    updatePayslip(idx, { files: file ? [file] : [], previewUrl, data: null, error: null });
+    // auto-open preview when a file is attached; close when removed
+    updatePayslip(idx, { files: file ? [file] : [], previewUrl, data: null, error: null, previewOpen: !!file });
   };
 
   const handlePayslipDrop = (idx, e) => {
@@ -508,14 +509,15 @@ const Step2Employment = ({ formData, updateFormData }) => {
 
   // ── Payslip upload zone ─────────────────────────────────────────────────────
   const renderPayslipUpload = (record, idx) => {
-    const ps          = payslipState[idx] || {};
-    const file        = ps.files?.[0];
-    const hasFile     = !!file;
-    const isDragging  = !!ps.dragging;
-    const isPDF       = file?.type === 'application/pdf';
-    const emp         = record.currentEmployment;
-    const fileInputId = `payslip-input-${idx}`;
-    const isVerOpen   = !!verifierExpanded[idx];
+    const ps           = payslipState[idx] || {};
+    const file         = ps.files?.[0];
+    const hasFile      = !!file;
+    const isDragging   = !!ps.dragging;
+    const isPDF        = file?.type === 'application/pdf';
+    const isPreviewOpen = !!ps.previewOpen;
+    const emp          = record.currentEmployment;
+    const fileInputId  = `payslip-input-${idx}`;
+    const isVerOpen    = !!verifierExpanded[idx];
 
     const HECSBtn = ({ val }) => (
       <button type="button" onClick={() => updateCurrentEmployment(idx, 'hecs', val)}
@@ -527,7 +529,6 @@ const Step2Employment = ({ formData, updateFormData }) => {
         }}>{val}</button>
     );
 
-    // Currency display helpers for income fields
     const fmtInc = (v) => {
       const n = parseFloat((v || '').toString().replace(/,/g, ''));
       if (!n) return '';
@@ -539,10 +540,10 @@ const Step2Employment = ({ formData, updateFormData }) => {
       return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 2 }).format(n);
     };
 
-    // ── Left column: form fields ─────────────────────────────────────────────
-    const leftPanel = (
-      <div>
-        {/* Upload bar */}
+    return (
+      <div style={{ marginBottom: '20px' }}>
+
+        {/* ── Upload zone ── */}
         <div
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); updatePayslip(idx, { dragging: true }); }}
           onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); updatePayslip(idx, { dragging: true }); }}
@@ -557,49 +558,65 @@ const Step2Employment = ({ formData, updateFormData }) => {
         >
           <input id={fileInputId} type="file" accept="image/*,.pdf,application/pdf" style={{ display: 'none' }}
             onChange={(e) => { if (e.target.files[0]) setPayslipFile(idx, e.target.files[0]); }} />
-          <span style={{ fontSize: '18px' }}>{isDragging ? '📂' : '📄'}</span>
+          <span style={{ fontSize: '18px' }}>{isDragging ? '📂' : hasFile ? '✅' : '📄'}</span>
           <div style={{ flex: 1, minWidth: '120px' }}>
             <div style={{ fontSize: '13px', fontWeight: '600', color: hasFile ? '#166534' : 'var(--text-primary)' }}>
               {hasFile ? file.name : 'Payslip / Income Document'}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-              {isDragging ? 'Drop to attach' : 'Drag & drop or click Browse — JPG, PNG, PDF'}
+              {isDragging ? 'Drop to attach' : hasFile ? 'Attached — click Extract to auto-fill form fields' : 'Drag & drop or click Browse — JPG, PNG, PDF'}
             </div>
           </div>
           {!hasFile && (
             <button type="button" onClick={() => document.getElementById(fileInputId)?.click()}
-              style={{ padding: '5px 14px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}>
+              style={{ padding: '6px 16px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}>
               Browse
             </button>
           )}
           {hasFile && (
-            <>
-              <button type="button" onClick={() => handlePayslipExtract(idx)} disabled={ps.extracting}
-                style={{ padding: '5px 14px', background: ps.extracting ? '#93c5fd' : 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: ps.extracting ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
-                {ps.extracting ? 'Reading…' : '✨ Extract'}
-              </button>
-              {!ps.previewUrl && (
-                <button type="button" onClick={() => setPayslipFile(idx, null)}
-                  style={{ padding: '5px 10px', background: 'white', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', flexShrink: 0 }}>
-                  ✕
-                </button>
-              )}
-            </>
+            <button type="button" onClick={() => handlePayslipExtract(idx)} disabled={ps.extracting}
+              style={{ padding: '6px 16px', background: ps.extracting ? '#93c5fd' : 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: ps.extracting ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
+              {ps.extracting ? '⏳ Reading…' : '✨ Extract'}
+            </button>
           )}
         </div>
 
-        {/* Extraction error */}
+        {/* ── File controls: preview toggle + remove ── */}
+        {hasFile && ps.previewUrl && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', padding: '7px 12px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '7px' }}>
+            <button type="button" onClick={() => updatePayslip(idx, { previewOpen: !isPreviewOpen })}
+              style={{ fontSize: '12px', fontWeight: '600', color: isPreviewOpen ? '#475569' : 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '5px' }}>
+              {isPreviewOpen ? '▲ Hide payslip' : '👁 View payslip'}
+            </button>
+            <button type="button" onClick={() => setPayslipFile(idx, null)}
+              style={{ fontSize: '12px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              ✕ Remove
+            </button>
+          </div>
+        )}
+
+        {/* ── Collapsible inline preview ── */}
+        {hasFile && ps.previewUrl && isPreviewOpen && (
+          <div style={{ marginTop: '8px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            {isPDF
+              ? <embed src={ps.previewUrl} type="application/pdf" width="100%" style={{ height: '520px', display: 'block' }} />
+              : <img src={ps.previewUrl} alt="Payslip preview" style={{ width: '100%', display: 'block', objectFit: 'contain', background: '#f8fafc' }} />
+            }
+          </div>
+        )}
+
+        {/* ── Extraction error ── */}
         {ps.error && (
-          <div style={{ marginTop: '6px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', color: '#991b1b' }}>
+          <div style={{ marginTop: '8px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', color: '#991b1b' }}>
             ⚠️ {ps.error}
           </div>
         )}
 
-        {/* Extracted summary */}
+        {/* ── Extracted summary ── */}
         {ps.data && (
-          <div style={{ marginTop: '8px', padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: '#166534', marginBottom: '6px' }}>✓ Payslip extracted — form fields pre-filled below</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', marginBottom: ps.data.taxAnalysis ? '8px' : '0' }}>
+          <div style={{ marginTop: '8px', padding: '12px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#166534', marginBottom: '8px' }}>✓ Payslip extracted — form fields pre-filled below</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', marginBottom: ps.data.taxAnalysis ? '8px' : '0' }}>
               {[
                 ['Employer', ps.data.employerName],
                 ['ABN', ps.data.employerABN],
@@ -635,7 +652,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
           </div>
         )}
 
-        {/* Income Details card */}
+        {/* ── Income Details card ── */}
         <div style={{ marginTop: '12px', padding: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px' }}>
           <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Income Details</h4>
           <div className="grid grid-cols-2 mb-3">
@@ -658,7 +675,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
               )}
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
             <div>
               <label style={{ fontSize: '12px' }}>Bonus Income (annual)</label>
               <input type="text" value={fmtInc(emp.bonusIncome)} placeholder="0"
@@ -686,7 +703,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
             </div>
           </div>
 
-          {/* Income Verification — saved summary */}
+          {/* ── Saved verification summary ── */}
           {record.currentEmployment.incomeVerification && !isVerOpen && (() => {
             const v = record.currentEmployment.incomeVerification;
             const statusColors = { consistent: '#166534', ytd_higher: '#0369a1', ytd_lower: '#9a3412', incomplete: '#64748b' };
@@ -706,7 +723,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
             );
           })()}
 
-          {/* Income Verification — toggle button or inline widget */}
+          {/* ── Income Verifier inline toggle ── */}
           {isVerOpen ? (
             <IncomeVerifierModal
               applicantName={record.applicantName}
@@ -720,41 +737,13 @@ const Step2Employment = ({ formData, updateFormData }) => {
           ) : (
             <button type="button"
               onClick={() => setVerifierExpanded(p => ({ ...p, [idx]: true }))}
-              style={{ width: '100%', padding: '7px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              style={{ width: '100%', padding: '8px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
               {record.currentEmployment.incomeVerification ? '✏️ Edit Income Verification' : '💰 Open Income Verification Tool'}
             </button>
           )}
         </div>
       </div>
     );
-
-    // ── Two-column layout when preview is available ────────────────────────
-    if (hasFile && ps.previewUrl) {
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: '55% 43%', gap: '16px', alignItems: 'start', marginBottom: '20px' }}>
-          <div>{leftPanel}</div>
-          <div>
-            {/* Preview header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <span style={{ fontSize: '12px', fontWeight: '600', color: '#475569' }}>📄 Payslip Preview</span>
-              <button type="button" onClick={() => setPayslipFile(idx, null)}
-                style={{ fontSize: '12px', color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: '5px', cursor: 'pointer', padding: '3px 10px' }}>
-                ✕ Remove
-              </button>
-            </div>
-            {/* Preview panel */}
-            <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-primary)', background: '#f8fafc', position: 'sticky', top: '16px' }}>
-              {isPDF
-                ? <embed src={ps.previewUrl} type="application/pdf" width="100%" style={{ height: '560px', display: 'block' }} />
-                : <img src={ps.previewUrl} alt="Payslip preview" style={{ width: '100%', display: 'block', objectFit: 'contain', background: '#f8fafc' }} />
-              }
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return <div style={{ marginBottom: '20px' }}>{leftPanel}</div>;
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────

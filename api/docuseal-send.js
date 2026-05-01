@@ -83,7 +83,7 @@ export default async function handler(req, res) {
         send_email:  true,
         message: {
           subject: `Credit Guide — Please sign before we proceed`,
-          body: `Hi ${signerName.split(' ')[0]},\n\nPlease review and sign the attached Credit Guide. This is required before we can run a credit check on your behalf.\n\nKind regards,\n${brokerName}\nHouse of Finance`,
+          body: `Hi {{submitter.first_name}},\n\nPlease review and sign the Credit Guide before we proceed with your loan application. This is required before we can run a credit check on your behalf.\n\n{{submitter.link}}\n\nKind regards,\n${brokerName}\nHouse of Finance`,
         },
         submitters: [submitterPayload],
       }),

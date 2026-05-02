@@ -18,6 +18,55 @@ const PRIMARY_TYPES = ['Purchase', 'Refinance'];
 const SECONDARY_TYPES = ['Bridging', 'Cashout', 'Construction', 'Off the Plan', 'Pre-approval', 'SMSF', 'Vacant Land'];
 const PURCHASE_COMPLETION = ['Own Savings', 'Gift from Family', 'Equity from Existing Property', 'First Home Owner Grant', 'Other'];
 
+// ── Ownership helpers ─────────────────────────────────────────────────────────
+const OWNERSHIP_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#06b6d4'];
+
+const getApplicantDisplayName = (a) => {
+  if (!a) return '';
+  if (a.type === 'Company Borrower') return a.companyName || '';
+  return `${a.firstName || ''} ${a.lastName || ''}`.trim();
+};
+
+/** Compute display-ready ownershipRows, merging stored data with live applicant names */
+const computeOwnershipRows = (security, applicants) => {
+  const stored = security.ownershipRows || [];
+  const apps   = applicants || [];
+
+  if (stored.length === 0 && apps.length > 0) {
+    // Initialise with equal split
+    const base      = Math.floor(100 / apps.length);
+    const remainder = 100 - base * apps.length;
+    return apps.map((a, i) => ({
+      id: `applicant-${a.id}`, type: 'applicant', applicantId: a.id,
+      name: getApplicantDisplayName(a) || `${a.role} ${a.number}`,
+      percentage: i === 0 ? base + remainder : base,
+    }));
+  }
+
+  // Merge: update applicant names if filled in later steps; add new applicants; drop removed ones
+  const existingIds = new Set(stored.filter(r => r.type === 'applicant').map(r => r.applicantId));
+  const newApps     = apps.filter(a => !existingIds.has(a.id));
+
+  const merged = stored
+    .map(row => {
+      if (row.type !== 'applicant') return row;               // keep non-applicant rows as-is
+      const app = apps.find(a => a.id === row.applicantId);
+      if (!app) return null;                                   // applicant was removed from Step1
+      const liveName = getApplicantDisplayName(app) || `${app.role} ${app.number}`;
+      return { ...row, name: liveName || row.name };
+    })
+    .filter(Boolean);
+
+  newApps.forEach(a => {
+    merged.push({
+      id: `applicant-${a.id}`, type: 'applicant', applicantId: a.id,
+      name: getApplicantDisplayName(a) || `${a.role} ${a.number}`, percentage: 0,
+    });
+  });
+
+  return merged;
+};
+
 // [from, base, rate] — duty = base + rate × (value − from)
 const SD_BRACKETS = {
   NSW: [[0,0,0.0125],[17000,212.5,0.015],[36000,497.5,0.0175],[97000,1565,0.035],[364000,10929.5,0.045],[1094000,43789.5,0.055]],
@@ -267,7 +316,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
       purchaseCompletionAmounts: {}, purchaseCompletionOther: '',
       equityPropertyIndex: '', giftRelationship: '',
       hasOffset: false, hasRedraw: false,
-      owners: [], guarantors: [], crossCollateralise: false
+      ownershipRows: [], guarantors: [], crossCollateralise: false
     }];
     updateFormData('securities', securities);
   };
@@ -507,85 +556,157 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               </div>
             </div>
 
-            {/* Property Ownership */}
-            <div className="mb-4" style={{ padding: '14px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
-              <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: '#374151' }}>🏠 Property Ownership</p>
-              {!(formData.applicants?.length > 0) ? (
-                <div style={{ fontSize: '12px', color: '#9ca3af', padding: '8px 0' }}>
-                  Complete Step 1 (Applicants) first — owners and guarantors will appear here
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                  <div>
-                    <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Property Owners</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                      {formData.applicants.map(a => {
-                        const name = a.type === 'Company Borrower'
-                          ? (a.companyName || `${a.role} ${a.number}`)
-                          : `${a.firstName || ''} ${a.lastName || ''}`.trim() || `${a.role} ${a.number}`;
-                        const isOwner = (security.owners || []).includes(a.id);
-                        return (
-                          <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', margin: 0,
-                            padding: '6px 10px', borderRadius: '6px',
-                            background: isOwner ? '#eff6ff' : 'white',
-                            border: `1px solid ${isOwner ? '#bfdbfe' : '#e5e7eb'}` }}>
-                            <input type="checkbox" checked={isOwner}
-                              onChange={(e) => {
-                                const current = security.owners || [];
-                                updateSecurity(index, 'owners', e.target.checked
-                                  ? [...current, a.id]
-                                  : current.filter(id => id !== a.id));
-                              }} />
-                            <span style={{ fontWeight: isOwner ? '600' : '400', color: isOwner ? '#1d4ed8' : '#374151' }}>{name}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Guarantors (if any)</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '12px' }}>
-                      {formData.applicants.map(a => {
-                        const name = a.type === 'Company Borrower'
-                          ? (a.companyName || `${a.role} ${a.number}`)
-                          : `${a.firstName || ''} ${a.lastName || ''}`.trim() || `${a.role} ${a.number}`;
-                        const isGuarantor = (security.guarantors || []).includes(a.id);
-                        return (
-                          <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', margin: 0,
-                            padding: '6px 10px', borderRadius: '6px',
-                            background: isGuarantor ? '#fdf4ff' : 'white',
-                            border: `1px solid ${isGuarantor ? '#e9d5ff' : '#e5e7eb'}` }}>
-                            <input type="checkbox" checked={isGuarantor}
-                              onChange={(e) => {
-                                const current = security.guarantors || [];
-                                updateSecurity(index, 'guarantors', e.target.checked
-                                  ? [...current, a.id]
-                                  : current.filter(id => id !== a.id));
-                              }} />
-                            <span style={{ fontWeight: isGuarantor ? '600' : '400', color: isGuarantor ? '#7c3aed' : '#374151' }}>{name}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', margin: 0,
-                      padding: '8px 10px', borderRadius: '6px',
-                      background: security.crossCollateralise ? '#fff7ed' : 'white',
-                      border: `1px solid ${security.crossCollateralise ? '#fed7aa' : '#e5e7eb'}` }}>
-                      <input type="checkbox" checked={!!security.crossCollateralise}
-                        onChange={(e) => updateSecurity(index, 'crossCollateralise', e.target.checked)} />
-                      <span style={{ fontWeight: security.crossCollateralise ? '600' : '400', color: security.crossCollateralise ? '#c2410c' : '#374151' }}>
-                        🔗 Cross-Collateralise
+            {/* ── Property Ownership ── */}
+            {(() => {
+              const ownershipRows = computeOwnershipRows(security, formData.applicants);
+              const totalPct = ownershipRows.reduce((s, r) => s + (parseFloat(r.percentage) || 0), 0);
+              const totalOk  = Math.abs(totalPct - 100) < 0.01;
+
+              const saveRows = (rows) => updateSecurity(index, 'ownershipRows', rows);
+
+              return (
+                <div className="mb-4" style={{ padding: '16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                  {/* Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#374151' }}>🏠 Property Ownership</p>
+                    {ownershipRows.length > 0 && (
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: totalOk ? '#16a34a' : '#dc2626' }}>
+                        {totalOk ? '✓ 100%' : `⚠ ${totalPct.toFixed(1)}% — must equal 100%`}
                       </span>
-                    </label>
-                    {security.crossCollateralise && (
-                      <div style={{ fontSize: '11px', color: '#92400e', marginTop: '4px', marginLeft: '2px' }}>
-                        This property will be used as collateral across multiple loans in this application
-                      </div>
                     )}
                   </div>
+
+                  {!(formData.applicants?.length > 0) ? (
+                    <div style={{ fontSize: '12px', color: '#9ca3af', padding: '6px 0' }}>
+                      Complete Step 1 (Applicants) first — ownership will be pre-allocated and names auto-filled as you add applicant details
+                    </div>
+                  ) : (
+                    <>
+                      {/* ── Visual percentage bar ── */}
+                      {ownershipRows.length > 0 && (
+                        <div style={{ marginBottom: '14px' }}>
+                          <div style={{ height: '8px', background: '#e5e7eb', borderRadius: '4px', overflow: 'hidden', display: 'flex', marginBottom: '6px' }}>
+                            {ownershipRows.map((row, i) => {
+                              const pct = parseFloat(row.percentage) || 0;
+                              return (
+                                <div key={row.id} style={{
+                                  width: `${totalPct > 0 ? (pct / totalPct) * 100 : 0}%`,
+                                  background: OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length],
+                                  transition: 'width 0.2s ease',
+                                }} />
+                              );
+                            })}
+                          </div>
+                          {/* Legend */}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                            {ownershipRows.map((row, i) => (
+                              <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#6b7280' }}>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length], flexShrink: 0 }} />
+                                <span style={{ fontWeight: '500' }}>{row.name || 'New Owner'}</span>
+                                <span>({parseFloat(row.percentage) || 0}%)</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ── Owner rows ── */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '10px' }}>
+                        {ownershipRows.map((row, i) => (
+                          <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '10px 1fr 80px auto', gap: '8px', alignItems: 'center' }}>
+                            {/* Colour swatch */}
+                            <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length], flexShrink: 0 }} />
+
+                            {/* Name */}
+                            {row.type === 'applicant' ? (
+                              <div style={{ fontSize: '13px', fontWeight: '500', color: '#374151', padding: '7px 10px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
+                                {row.name}
+                                <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '8px', fontWeight: '400' }}>applicant</span>
+                              </div>
+                            ) : (
+                              <input type="text" value={row.name} placeholder="Owner / entity name"
+                                onChange={(e) => {
+                                  const rows = [...ownershipRows];
+                                  rows[i] = { ...rows[i], name: e.target.value };
+                                  saveRows(rows);
+                                }}
+                                style={{ fontSize: '13px' }} />
+                            )}
+
+                            {/* Percentage */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <input type="number" value={row.percentage} min="0" max="100" step="1"
+                                onChange={(e) => {
+                                  const rows = [...ownershipRows];
+                                  rows[i] = { ...rows[i], percentage: parseFloat(e.target.value) || 0 };
+                                  saveRows(rows);
+                                }}
+                                style={{ fontSize: '13px', textAlign: 'right', width: '54px' }} />
+                              <span style={{ fontSize: '12px', color: '#6b7280' }}>%</span>
+                            </div>
+
+                            {/* Remove (non-applicant only) */}
+                            {row.type !== 'applicant' ? (
+                              <button type="button"
+                                onClick={() => saveRows(ownershipRows.filter((_, j) => j !== i))}
+                                style={{ padding: '4px 8px', fontSize: '12px', color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: '5px', cursor: 'pointer' }}>✕</button>
+                            ) : <div />}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Add non-applicant owner */}
+                      <button type="button"
+                        onClick={() => saveRows([...ownershipRows, { id: `other-${Date.now()}`, type: 'other', name: '', percentage: 0 }])}
+                        style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'none', border: '1px dashed #bfdbfe', borderRadius: '6px', cursor: 'pointer', padding: '6px 14px', width: '100%', marginBottom: '14px', fontWeight: '600' }}>
+                        + Add non-applicant owner (company, trust, SMSF…)
+                      </button>
+
+                      {/* ── Guarantors ── */}
+                      <div style={{ paddingTop: '12px', borderTop: '1px solid #e5e7eb', marginBottom: '12px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Guarantors (if any)</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {formData.applicants.map(a => {
+                            const name = getApplicantDisplayName(a) || `${a.role} ${a.number}`;
+                            const isG  = (security.guarantors || []).includes(a.id);
+                            return (
+                              <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', margin: 0,
+                                padding: '6px 12px', borderRadius: '20px',
+                                background: isG ? '#fdf4ff' : 'white',
+                                border: `1px solid ${isG ? '#d8b4fe' : '#e5e7eb'}` }}>
+                                <input type="checkbox" checked={isG}
+                                  onChange={(e) => {
+                                    const curr = security.guarantors || [];
+                                    updateSecurity(index, 'guarantors', e.target.checked ? [...curr, a.id] : curr.filter(id => id !== a.id));
+                                  }} />
+                                <span style={{ fontWeight: isG ? '600' : '400', color: isG ? '#7c3aed' : '#374151' }}>{name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* ── Cross-collateralise ── */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', margin: 0,
+                        padding: '8px 12px', borderRadius: '6px',
+                        background: security.crossCollateralise ? '#fff7ed' : 'white',
+                        border: `1px solid ${security.crossCollateralise ? '#fed7aa' : '#e5e7eb'}` }}>
+                        <input type="checkbox" checked={!!security.crossCollateralise}
+                          onChange={(e) => updateSecurity(index, 'crossCollateralise', e.target.checked)} />
+                        <span style={{ fontWeight: security.crossCollateralise ? '600' : '400', color: security.crossCollateralise ? '#c2410c' : '#374151' }}>
+                          🔗 Cross-Collateralise with other securities
+                        </span>
+                      </label>
+                      {security.crossCollateralise && (
+                        <div style={{ fontSize: '11px', color: '#92400e', marginTop: '5px', marginLeft: '4px' }}>
+                          This property will be pledged as collateral across multiple loans in this application
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* Refinance + Cashout breakdown — Option B */}
             {isRefinanceCashout(security) && (() => {

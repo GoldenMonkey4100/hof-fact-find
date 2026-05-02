@@ -20,23 +20,45 @@ const AddressAutocomplete = ({ value, onChange, placeholder, style, className })
   // Keep inputVal in sync with external changes (AI pre-fill etc.)
   useEffect(() => { setInputVal(value || ''); }, [value]);
 
-  // Init AutocompleteService — poll until Google Maps SDK loads
-  // Check specifically for AutocompleteService, not just the places namespace,
-  // because loading=async can populate the namespace before all classes are ready.
+  // Init AutocompleteService.
+  // When Google Maps is loaded with loading=async (the modern loader), the places
+  // namespace is NOT pre-populated — you must call importLibrary('places') instead.
+  // This effect handles both the new and legacy loaders.
   useEffect(() => {
-    const init = () => {
+    let cancelled = false;
+
+    const loadService = async () => {
+      // Wait up to 10 s for window.google.maps to appear
+      let attempts = 0;
+      while (!window.google?.maps && attempts < 40) {
+        await new Promise(r => setTimeout(r, 250));
+        attempts++;
+      }
+      if (cancelled || !window.google?.maps) {
+        console.warn('[AddressAutocomplete] Google Maps SDK did not load in time');
+        return;
+      }
+
       try {
-        if (typeof window.google?.maps?.places?.AutocompleteService === 'function') {
-          serviceRef.current = new window.google.maps.places.AutocompleteService();
-          return true;
+        let AutocompleteService;
+        if (typeof window.google.maps.importLibrary === 'function') {
+          // New async loader — importLibrary is the correct path
+          const lib = await window.google.maps.importLibrary('places');
+          AutocompleteService = lib.AutocompleteService;
+        } else if (window.google.maps.places?.AutocompleteService) {
+          // Legacy synchronous loader fallback
+          AutocompleteService = window.google.maps.places.AutocompleteService;
         }
-      } catch (e) { /* retry */ }
-      return false;
+        if (!cancelled && AutocompleteService) {
+          serviceRef.current = new AutocompleteService();
+        }
+      } catch (e) {
+        if (!cancelled) console.warn('[AddressAutocomplete] Places init error:', e);
+      }
     };
-    if (!init()) {
-      const id = setInterval(() => { if (init()) clearInterval(id); }, 300);
-      return () => clearInterval(id);
-    }
+
+    loadService();
+    return () => { cancelled = true; };
   }, []);
 
   const fetchSuggestions = useCallback((input) => {

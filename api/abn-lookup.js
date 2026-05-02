@@ -10,6 +10,18 @@
 
 const API_BASE = 'https://abr.business.gov.au/json';
 
+/**
+ * The ABR API wraps all responses in a JSONP callback: callback({...})
+ * This helper strips the wrapper before parsing.
+ */
+function parseABR(text) {
+  // Strip leading callback name + '(' and trailing ')' / ';'
+  const stripped = text
+    .replace(/^[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(\s*/, '')
+    .replace(/\s*\)\s*;?\s*$/, '');
+  return JSON.parse(stripped);
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -29,7 +41,7 @@ export default async function handler(req, res) {
 
       const response = await fetch(`${API_BASE}/AbnDetails.aspx?abn=${cleanABN}&guid=${guid}`);
       const text     = await response.text();
-      const data     = JSON.parse(text);
+      const data     = parseABR(text);
 
       if (!data.EntityName && data.Message) {
         return res.status(404).json({ error: data.Message || 'ABN not found or invalid' });

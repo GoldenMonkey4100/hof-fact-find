@@ -642,7 +642,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                                   rows[i] = { ...rows[i], percentage: parseFloat(e.target.value) || 0 };
                                   saveRows(rows);
                                 }}
-                                style={{ fontSize: '13px', textAlign: 'right', width: '54px' }} />
+                                style={{ fontSize: '13px', textAlign: 'right', width: '72px' }} />
                               <span style={{ fontSize: '12px', color: '#6b7280' }}>%</span>
                             </div>
 

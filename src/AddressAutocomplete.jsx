@@ -20,23 +20,30 @@ const AddressAutocomplete = ({ value, onChange, placeholder, style, className })
   // Keep inputVal in sync with external changes (AI pre-fill etc.)
   useEffect(() => { setInputVal(value || ''); }, [value]);
 
-  // Init AutocompleteService.
-  // Uses synchronous Google Maps loader (no loading=async) so places namespace is
-  // available directly on window.google.maps.places. Poll until it appears.
+  // Init AutocompleteService using the __mapsQueue bridge defined in index.html.
+  // The bridge fires __onMapsLoad (set as the Google Maps callback= param) which
+  // resolves all queued initialisers.  If Maps is already loaded when this component
+  // mounts, we initialise immediately.
   useEffect(() => {
-    const tryInit = () => {
+    const init = () => {
       try {
-        if (typeof window.google?.maps?.places?.AutocompleteService === 'function') {
-          serviceRef.current = new window.google.maps.places.AutocompleteService();
-          return true;
-        }
-      } catch (e) { /* not ready yet */ }
-      return false;
+        serviceRef.current = new window.google.maps.places.AutocompleteService();
+      } catch (e) {
+        console.warn('[AddressAutocomplete] AutocompleteService init failed:', e);
+      }
     };
 
-    if (!tryInit()) {
-      const id = setInterval(() => { if (tryInit()) clearInterval(id); }, 300);
-      return () => clearInterval(id);
+    if (window.__mapsReady) {
+      // Maps already loaded (e.g. component re-mounted after first load)
+      init();
+    } else {
+      // Queue for when __onMapsLoad fires
+      window.__mapsQueue = window.__mapsQueue || [];
+      window.__mapsQueue.push(init);
+      return () => {
+        // Remove from queue if component unmounts before Maps fires
+        window.__mapsQueue = (window.__mapsQueue || []).filter(fn => fn !== init);
+      };
     }
   }, []);
 

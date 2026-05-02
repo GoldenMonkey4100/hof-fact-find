@@ -972,7 +972,6 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   </div>
                 </div>
               </div>
-              {renderESignatureSection(applicant, index)}
             </>
           )}
 

@@ -407,9 +407,14 @@ const Step2Employment = ({ formData, updateFormData }) => {
           </button>
         </div>
         {lookup.result && (
-          <div style={{ fontSize: '11px', color: '#166534', marginTop: '3px' }}>
-            {lookup.result.entityName}{lookup.result.tradingNames?.[0] ? ` (${lookup.result.tradingNames[0]})` : ''} · {lookup.result.entityType}
-            {lookup.result.gstRegistered ? ' · GST Registered' : ' · Not GST Registered'}
+          <div style={{ fontSize: '11px', color: '#166534', marginTop: '3px', lineHeight: '1.6' }}>
+            <div>{lookup.result.entityName}{lookup.result.tradingNames?.[0] ? ` (${lookup.result.tradingNames[0]})` : ''} · {lookup.result.entityType}</div>
+            <div style={{ color: '#374151' }}>
+              {lookup.result.abnFrom ? `ABN from: ${lookup.result.abnFrom}` : ''}
+              {lookup.result.gstRegistered
+                ? ` · GST Registered${lookup.result.gstDate ? ` from ${lookup.result.gstDate}` : ''}`
+                : ' · Not GST Registered'}
+            </div>
           </div>
         )}
         {lookup.error && <div style={{ fontSize: '11px', color: '#dc2626', marginTop: '3px' }}>⚠ {lookup.error}</div>}

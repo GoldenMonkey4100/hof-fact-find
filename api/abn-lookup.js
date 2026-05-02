@@ -54,6 +54,7 @@ export default async function handler(req, res) {
         tradingNames: data.BusinessName || [], // array of trading names
         entityType:   data.EntityTypeName,
         entityCode:   data.EntityTypeCode,
+        abnFrom:      data.AbnStatusEffectiveFrom || null,
         gstRegistered: !!data.Gst,
         gstDate:      data.Gst || null,
         state:        data.AddressState,

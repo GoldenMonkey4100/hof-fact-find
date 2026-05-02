@@ -21,44 +21,23 @@ const AddressAutocomplete = ({ value, onChange, placeholder, style, className })
   useEffect(() => { setInputVal(value || ''); }, [value]);
 
   // Init AutocompleteService.
-  // When Google Maps is loaded with loading=async (the modern loader), the places
-  // namespace is NOT pre-populated — you must call importLibrary('places') instead.
-  // This effect handles both the new and legacy loaders.
+  // Uses synchronous Google Maps loader (no loading=async) so places namespace is
+  // available directly on window.google.maps.places. Poll until it appears.
   useEffect(() => {
-    let cancelled = false;
-
-    const loadService = async () => {
-      // Wait up to 10 s for window.google.maps to appear
-      let attempts = 0;
-      while (!window.google?.maps && attempts < 40) {
-        await new Promise(r => setTimeout(r, 250));
-        attempts++;
-      }
-      if (cancelled || !window.google?.maps) {
-        console.warn('[AddressAutocomplete] Google Maps SDK did not load in time');
-        return;
-      }
-
+    const tryInit = () => {
       try {
-        let AutocompleteService;
-        if (typeof window.google.maps.importLibrary === 'function') {
-          // New async loader — importLibrary is the correct path
-          const lib = await window.google.maps.importLibrary('places');
-          AutocompleteService = lib.AutocompleteService;
-        } else if (window.google.maps.places?.AutocompleteService) {
-          // Legacy synchronous loader fallback
-          AutocompleteService = window.google.maps.places.AutocompleteService;
+        if (typeof window.google?.maps?.places?.AutocompleteService === 'function') {
+          serviceRef.current = new window.google.maps.places.AutocompleteService();
+          return true;
         }
-        if (!cancelled && AutocompleteService) {
-          serviceRef.current = new AutocompleteService();
-        }
-      } catch (e) {
-        if (!cancelled) console.warn('[AddressAutocomplete] Places init error:', e);
-      }
+      } catch (e) { /* not ready yet */ }
+      return false;
     };
 
-    loadService();
-    return () => { cancelled = true; };
+    if (!tryInit()) {
+      const id = setInterval(() => { if (tryInit()) clearInterval(id); }, 300);
+      return () => clearInterval(id);
+    }
   }, []);
 
   const fetchSuggestions = useCallback((input) => {

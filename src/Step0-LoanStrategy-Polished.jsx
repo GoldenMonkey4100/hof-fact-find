@@ -585,12 +585,13 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                       {/* ── Visual percentage bar ── */}
                       {ownershipRows.length > 0 && (
                         <div style={{ marginBottom: '14px' }}>
-                          <div style={{ height: '8px', background: '#e5e7eb', borderRadius: '4px', overflow: 'hidden', display: 'flex', marginBottom: '6px' }}>
+                          <div style={{ height: '12px', background: '#e5e7eb', borderRadius: '6px', overflow: 'hidden', display: 'flex', marginBottom: '8px' }}>
                             {ownershipRows.map((row, i) => {
                               const pct = parseFloat(row.percentage) || 0;
                               return (
                                 <div key={row.id} style={{
-                                  width: `${totalPct > 0 ? (pct / totalPct) * 100 : 0}%`,
+                                  width: `${pct}%`,
+                                  minWidth: pct > 0 ? '2px' : '0',
                                   background: OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length],
                                   transition: 'width 0.2s ease',
                                 }} />
@@ -659,7 +660,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                       <button type="button"
                         onClick={() => saveRows([...ownershipRows, { id: `other-${Date.now()}`, type: 'other', name: '', percentage: 0 }])}
                         style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'none', border: '1px dashed #bfdbfe', borderRadius: '6px', cursor: 'pointer', padding: '6px 14px', width: '100%', marginBottom: '14px', fontWeight: '600' }}>
-                        + Add non-applicant owner (company, trust, SMSF…)
+                        + Add non-applicant owner (natural person, company, trust, SMSF…)
                       </button>
 
                       {/* ── Guarantors ── */}

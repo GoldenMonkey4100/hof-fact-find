@@ -28,6 +28,7 @@ const normalizeMediaType = (file) => {
 const Step1Applicants = ({ formData, updateFormData }) => {
   const [applicants,    setApplicants]    = useState([]);
   const [mercuryMatches, setMercuryMatches] = useState({});
+  const [abnLookup,     setAbnLookup]     = useState({}); // { [index]: { loading, result, error } }
 
   // DL upload state: { [index]: { front: File|null, back: File|null } }
   const [dlFiles,      setDlFilesState]  = useState({});
@@ -61,6 +62,31 @@ const Step1Applicants = ({ formData, updateFormData }) => {
       }
     } catch (err) {
       setMercuryMatches(prev => ({ ...prev, [applicantIndex]: { status: 'error', message: err.message } }));
+    }
+  };
+
+  // ── ABN lookup (Company Borrower) ───────────────────────────────────────────
+  const lookupCompanyABN = async (index, abn) => {
+    const clean = (abn || '').replace(/\D/g, '');
+    if (clean.length !== 11) return;
+    setAbnLookup(p => ({ ...p, [index]: { loading: true, result: null, error: null } }));
+    try {
+      const res  = await fetch(`/api/abn-lookup?abn=${clean}`);
+      const data = await res.json();
+      if (data.error) {
+        setAbnLookup(p => ({ ...p, [index]: { loading: false, result: null, error: data.error } }));
+      } else {
+        setAbnLookup(p => ({ ...p, [index]: { loading: false, result: data, error: null } }));
+        // Pre-fill entity type if not already set
+        updateApplicant(index, 'abnVerification', data);
+        if (!applicants[index]?.entityType && data.entityCode) {
+          const code = data.entityCode;
+          const mapped = code === 'PRV' || code === 'PUB' ? 'Company' : code === 'TRU' || code === 'ATF' ? 'Trust' : '';
+          if (mapped) updateApplicant(index, 'entityType', mapped);
+        }
+      }
+    } catch (err) {
+      setAbnLookup(p => ({ ...p, [index]: { loading: false, result: null, error: err.message } }));
     }
   };
 
@@ -540,7 +566,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             id: i + 1, type: 'Company Borrower', role, number: applicantNumber,
             companyName: '', tradingName: '', companyABN: '', companyACN: '',
             entityType: '', registeredAddress: '', phone: '', email: '',
-            assets: [], liabilities: [], eSignature: null
+            assets: [], liabilities: [], eSignature: null, abnVerification: null
           });
         } else {
           newApplicants.push(existing && existing.type === 'Director Guarantor' ? existing : {
@@ -806,9 +832,43 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                 </div>
                 <div className="grid grid-cols-3 mb-4">
                   <div>
-                    <label>ABN</label>
-                    <input type="text" value={applicant.companyABN || ''} placeholder="12 345 678 901"
-                      onChange={(e) => updateApplicant(index, 'companyABN', e.target.value)} />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      ABN
+                      {abnLookup[index]?.result && (
+                        <span style={{ fontSize: '11px', fontWeight: '600', color: abnLookup[index].result.status === 'Active' ? '#16a34a' : '#dc2626' }}>
+                          {abnLookup[index].result.status === 'Active' ? '✓ Active' : '✗ ' + abnLookup[index].result.status}
+                        </span>
+                      )}
+                    </label>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      <input type="text" value={applicant.companyABN || ''} placeholder="12 345 678 901"
+                        style={{ flex: 1 }}
+                        onChange={(e) => updateApplicant(index, 'companyABN', e.target.value)}
+                        onBlur={(e) => (e.target.value.replace(/\D/g,'').length === 11) && lookupCompanyABN(index, e.target.value)} />
+                      <button type="button"
+                        disabled={!(applicant.companyABN || '').replace(/\D/g,'').length === 11 || abnLookup[index]?.loading}
+                        onClick={() => lookupCompanyABN(index, applicant.companyABN)}
+                        style={{ padding: '0 8px', background: (applicant.companyABN || '').replace(/\D/g,'').length === 11 ? '#0369a1' : '#e2e8f0', color: (applicant.companyABN || '').replace(/\D/g,'').length === 11 ? 'white' : '#9ca3af', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        {abnLookup[index]?.loading ? '…' : '🔍'}
+                      </button>
+                    </div>
+                    {abnLookup[index]?.result && (
+                      <div style={{ fontSize: '11px', color: '#166534', marginTop: '3px', lineHeight: '1.6' }}>
+                        <div style={{ fontWeight: '500' }}>{abnLookup[index].result.entityName}{abnLookup[index].result.tradingNames?.[0] ? ` (${abnLookup[index].result.tradingNames[0]})` : ''}</div>
+                        <div style={{ color: '#374151' }}>
+                          {abnLookup[index].result.entityType}
+                          {abnLookup[index].result.abnFrom ? ` · From ${abnLookup[index].result.abnFrom}` : ''}
+                        </div>
+                        <div style={{ color: '#374151' }}>
+                          {abnLookup[index].result.gstRegistered
+                            ? `GST Registered${abnLookup[index].result.gstDate ? ` from ${abnLookup[index].result.gstDate}` : ''}`
+                            : 'Not GST Registered'}
+                        </div>
+                      </div>
+                    )}
+                    {abnLookup[index]?.error && (
+                      <div style={{ fontSize: '11px', color: '#dc2626', marginTop: '3px' }}>⚠ {abnLookup[index].error}</div>
+                    )}
                   </div>
                   <div>
                     <label>ACN</label>
@@ -851,6 +911,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             <>
               {renderMercuryBanner(index)}
               {renderDLUpload(applicant, index)}
+              {renderESignatureSection(applicant, index)}
 
               <div className="mb-6">
                 <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Director / Guarantor Details</h4>
@@ -916,7 +977,6 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               </div>
 
               {renderDependants(applicant, index)}
-              {renderESignatureSection(applicant, index)}
             </>
           )}
 

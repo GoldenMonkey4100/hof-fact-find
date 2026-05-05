@@ -1,5 +1,5 @@
 /**
- * Notion Pipeline Integration — Enhanced Layout
+ * Notion Pipeline Integration — Enhanced Layout v2
  *
  * POST /api/notion-submit   { action: 'check', formData }
  *   → { exists: bool, matches: [{ id, url, title, status }] }
@@ -9,12 +9,12 @@
  *
  * Environment variable required:
  *   NOTION_API_KEY  — internal integration token from notion.so/my-integrations
- *   (The integration must be connected to both the Pipeline and Brokers databases)
  */
 
-const NOTION_VERSION = '2022-06-28';
-const PIPELINE_DB_ID = '264d5849ccf68068b10ffe2b2d18125f';
-const BROKERS_DB_ID  = '87ea47cb17de4ca9856fbccd2c4f360a';
+const NOTION_VERSION  = '2022-06-28';
+const PIPELINE_DB_ID  = '264d5849ccf68068b10ffe2b2d18125f';
+const BROKERS_DB_ID   = '87ea47cb17de4ca9856fbccd2c4f360a';
+const RITA_USER_ID    = '263d872b-594c-81bf-8c33-00024f1c5613';
 
 // ── Notion REST helper ────────────────────────────────────────────────────────
 const notionFetch = async (path, method, body, apiKey) => {
@@ -77,22 +77,10 @@ const rt = (content, bold = false) => [{
   annotations: { bold },
 }];
 
-const para = (content, bold = false) => ({
-  object: 'block', type: 'paragraph',
-  paragraph: { rich_text: rt(content, bold) },
-});
-
-const h2 = (content) => ({
-  object: 'block', type: 'heading_2',
-  heading_2: { rich_text: rt(content), is_toggleable: false },
-});
-
-const h3 = (content) => ({
-  object: 'block', type: 'heading_3',
-  heading_3: { rich_text: rt(content), is_toggleable: false },
-});
-
-const divider = () => ({ object: 'block', type: 'divider', divider: {} });
+const para    = (content, bold = false) => ({ object: 'block', type: 'paragraph',  paragraph:  { rich_text: rt(content, bold) } });
+const h2      = (content)               => ({ object: 'block', type: 'heading_2',  heading_2:  { rich_text: rt(content), is_toggleable: false } });
+const h3      = (content)               => ({ object: 'block', type: 'heading_3',  heading_3:  { rich_text: rt(content), is_toggleable: false } });
+const divider = ()                      => ({ object: 'block', type: 'divider',    divider: {} });
 
 const callout = (text, emoji = '💡', color = 'gray_background') => ({
   object: 'block', type: 'callout',
@@ -104,7 +92,6 @@ const toggle = (title, children) => ({
   toggle: { rich_text: rt(title, true), children: children.slice(0, 96) },
 });
 
-// Table helpers — rows are passed as children of the table block
 const tableCell = (content, bold = false) =>
   [{ type: 'text', text: { content: String(content ?? '').slice(0, 2000) }, annotations: { bold } }];
 
@@ -119,27 +106,13 @@ const table = (headers, rows) => ({
     table_width: headers.length,
     has_column_header: true,
     has_row_header: false,
-    children: [
-      tableRow(headers, true),
-      ...rows.map(r => tableRow(r)),
-    ],
+    children: [tableRow(headers, true), ...rows.map(r => tableRow(r))],
   },
 });
 
-const imageBlock = (url) => ({
-  object: 'block', type: 'image',
-  image: { type: 'external', external: { url } },
-});
-
-const bookmarkBlock = (url) => ({
-  object: 'block', type: 'bookmark',
-  bookmark: { url, caption: [] },
-});
-
-const toDo = (text, checked = false) => ({
-  object: 'block', type: 'to_do',
-  to_do: { rich_text: rt(text), checked },
-});
+const imageBlock    = (url) => ({ object: 'block', type: 'image',    image:    { type: 'external', external: { url } } });
+const bookmarkBlock = (url) => ({ object: 'block', type: 'bookmark', bookmark: { url, caption: [] } });
+const toDo          = (text, checked = false) => ({ object: 'block', type: 'to_do', to_do: { rich_text: rt(text), checked } });
 
 // column_list — top-level page only (not inside toggles)
 const colList = (...columns) => ({
@@ -171,20 +144,43 @@ const getTransactionTypes = (formData) => {
   return [...types];
 };
 
-const VALID_LENDERS = new Set(['Bluestone', 'Pepper', 'Thinktank', 'anz', 'St George', 'Bankwest', 'CBA', 'Westpac', 'NAB']);
-const getLenders = (formData) => (formData.lenderPreference || []).filter(l => VALID_LENDERS.has(l));
+// ── Document URL collector (for Files & media property) ───────────────────────
+const collectDocumentFiles = (formData) => {
+  const files = [];
+  (formData.applicants || []).forEach(app => {
+    const name = app.type === 'Company Borrower'
+      ? (app.companyName || 'Company')
+      : `${app.firstName || ''} ${app.lastName || ''}`.trim() || 'Applicant';
+    if (app.dlFrontUrl) files.push({ name: `DL Front — ${name}`, type: 'external', external: { url: app.dlFrontUrl } });
+    if (app.dlBackUrl)  files.push({ name: `DL Back — ${name}`,  type: 'external', external: { url: app.dlBackUrl  } });
+  });
+  (formData.employment || []).forEach((emp, i) => {
+    const ce = emp.currentEmployment || {};
+    if (ce.payslipUrl) files.push({ name: `Payslip — ${emp.applicantName || 'Applicant ' + (i + 1)}`, type: 'external', external: { url: ce.payslipUrl } });
+  });
+  return files;
+};
+
+// ── Address history total ─────────────────────────────────────────────────────
+const calcAddressMonths = (app) => {
+  const cy = parseInt(app.yearsAtCurrentAddress)  || 0;
+  const cm = parseInt(app.monthsAtCurrentAddress) || 0;
+  const hy = (app.addressHistory || []).reduce((s, a) => s + (parseInt(a.yearsAtAddress)  || 0), 0);
+  const hm = (app.addressHistory || []).reduce((s, a) => s + (parseInt(a.monthsAtAddress) || 0), 0);
+  return cy * 12 + cm + hy * 12 + hm;
+};
 
 // ── Page body builder ─────────────────────────────────────────────────────────
 const buildPageBody = (formData) => {
-  const blocks = [];
+  const blocks     = [];
   const securities = formData.securities || [];
   const applicants = formData.applicants || [];
   const employment = formData.employment || [];
 
-  // ── Calculate summary stats ───────────────────────────────────────────────
-  const totalLoan = securities.reduce((s, sec) => s + parseCurrency(sec.loanAmount), 0);
-  const totalSecurity = securities.reduce((s, sec) => s + parseCurrency(sec.propertyValue), 0);
-  const blendedLVR = totalSecurity > 0 ? (totalLoan / totalSecurity * 100) : 0;
+  // ── Summary stats ─────────────────────────────────────────────────────────
+  const totalLoan     = securities.reduce((s, sec) => s + parseCurrency(sec.loanAmount),     0);
+  const totalSecurity = securities.reduce((s, sec) => s + parseCurrency(sec.propertyValue),  0);
+  const blendedLVR    = totalSecurity > 0 ? (totalLoan / totalSecurity * 100) : 0;
 
   const totalIncome = employment.reduce((sum, emp) => {
     const ce = emp.currentEmployment || {};
@@ -197,19 +193,22 @@ const buildPageBody = (formData) => {
     sum + (app.liabilities || []).reduce((s, l) => s + parseCurrency(l.balance || l.amount || l.limit), 0), 0);
   const netPosition = totalAssets - totalLiabilities;
 
-  // ── 1. Summary callouts (column_list — must be at page level) ─────────────
-  const lvrFlag  = blendedLVR > 80 ? '⚠️' : '✅';
-  const netFlag  = netPosition >= 0 ? '✅' : '⚠️';
+  const lvrFlag = blendedLVR > 80 ? '⚠️' : '✅';
+  const netFlag = netPosition >= 0 ? '✅' : '⚠️';
 
+  // ── 1. Summary callouts (column_list — page level only) ───────────────────
   blocks.push(colList(
+    // Col 1: Loan totals — Total Security FIRST then Total Loan
     callout(
-      `Total Loan: ${fmtCurrency(totalLoan)}\nTotal Security: ${fmtCurrency(totalSecurity)}\nBlended LVR: ${blendedLVR ? blendedLVR.toFixed(1) + '%' : '—'} ${lvrFlag}`,
+      `Total Security: ${fmtCurrency(totalSecurity)}\nTotal Loan: ${fmtCurrency(totalLoan)}\nBlended LVR: ${blendedLVR ? blendedLVR.toFixed(1) + '%' : '—'} ${lvrFlag}`,
       '🏠', 'blue_background'
     ),
+    // Col 2: Income & Position — includes Total Liabilities
     callout(
-      `Gross Income: ${fmtCurrency(totalIncome)} p.a.\nTotal Assets: ${fmtCurrency(totalAssets)}\nNet Position: ${fmtCurrency(netPosition)} ${netFlag}`,
+      `Gross Income: ${fmtCurrency(totalIncome)} p.a.\nTotal Assets: ${fmtCurrency(totalAssets)}\nTotal Liabilities: ${fmtCurrency(totalLiabilities)}\nNet Position: ${fmtCurrency(netPosition)} ${netFlag}`,
       '💰', 'green_background'
     ),
+    // Col 3: Deal info
     callout(
       `Lender: ${(formData.lenderPreference || []).join(', ') || '—'}\nPriority: ${formData.priority || '—'}\nClient: ${formData.clientType || '—'}`,
       '📋', 'gray_background'
@@ -222,13 +221,13 @@ const buildPageBody = (formData) => {
   blocks.push(h2('📋 Broker Details'));
 
   const brokerRows = [
-    ['Broker', formData.brokerName || '—'],
-    ['Email', formData.brokerEmail || '—'],
-    ['Lead Source', formData.leadSource || '—'],
-    ['Client Type', formData.clientType || '—'],
-    ['Priority', formData.priority || '—'],
-    ['Lender Preference', (formData.lenderPreference || []).join(', ') || '—'],
-    ['Applicant Type', formData.applicantType || '—'],
+    ['Broker',                formData.brokerName    || '—'],
+    ['Email',                 formData.brokerEmail   || '—'],
+    ['Lead Source',           formData.leadSource    || '—'],
+    ['Client Type',           formData.clientType    || '—'],
+    ['Priority',              formData.priority      || '—'],
+    ['Lender Preference',     (formData.lenderPreference || []).join(', ') || '—'],
+    ['Applicant Type',        formData.applicantType || '—'],
     ['Applicants / Guarantors', `${formData.numApplicants || 1} / ${formData.numGuarantors || 0}`],
   ];
   if (formData.brokerNotes) brokerRows.push(['Broker Notes', formData.brokerNotes]);
@@ -236,55 +235,61 @@ const buildPageBody = (formData) => {
 
   blocks.push(divider());
 
-  // ── 3. Securities ─────────────────────────────────────────────────────────
+  // ── 3. Securities — per-security layout with full loan structure ──────────
   blocks.push(h2('🏠 Securities'));
 
-  if (securities.length > 0) {
-    const secRows = securities.map((sec, i) => {
-      const txTypes = [
-        ...(sec.primaryTransactionTypes  || []),
-        ...(sec.secondaryTransactionTypes || []),
-      ].join(', ') || '—';
+  securities.forEach((sec, i) => {
+    const lvr       = sec.lvr ? sec.lvr + '%' : '—';
+    const txTypes   = [...(sec.primaryTransactionTypes || []), ...(sec.secondaryTransactionTypes || [])].join(', ') || '—';
+    const features  = [
+      sec.isFirstHomeBuyer ? 'First Home Buyer' : '',
+      sec.hasOffset        ? 'Offset Account'   : '',
+      sec.hasRedraw        ? 'Redraw Facility'   : '',
+    ].filter(Boolean).join(', ') || '—';
 
-      const lvr = sec.lvr ? sec.lvr + '%' : '—';
+    const ownersText = (sec.owners || []).length > 0
+      ? sec.owners.map(o => `${o.name} (${o.pct}%)`).join(', ')
+      : '—';
 
-      const ownersText = (sec.owners || []).length > 0
-        ? sec.owners.map(o => `${o.name} (${o.pct}%)`).join(', ')
-        : '—';
+    // Build loan structure lines (only show populated fields)
+    const loanLines = [
+      `Amount: ${fmtCurrency(sec.loanAmount)}`,
+      `LVR: ${lvr}`,
+      sec.loanType      ? `Type: ${sec.loanType}`           : '',
+      sec.repaymentType ? `Repayment: ${sec.repaymentType}` : '',
+      sec.loanTerm      ? `Term: ${sec.loanTerm} years`      : '',
+      features !== '—'  ? `Features: ${features}`           : '',
+    ].filter(Boolean).join('\n');
 
-      return [
-        String(i + 1),
-        sec.address || '—',
-        sec.state || '—',
-        fmtCurrency(sec.propertyValue),
-        fmtCurrency(sec.loanAmount),
-        lvr,
-        txTypes,
-        sec.intendedOccupancy || '—',
-        ownersText,
-      ];
-    });
+    // Build transaction lines
+    const txLines = [
+      `Transaction: ${txTypes}`,
+      parseCurrency(sec.cashoutAmount)    > 0 ? `Cashout Amount: ${fmtCurrency(sec.cashoutAmount)}`       : '',
+      parseCurrency(sec.currentLoanBalance) > 0 ? `Current Loan Balance: ${fmtCurrency(sec.currentLoanBalance)}` : '',
+      (sec.purchaseCompletionMethods || []).length > 0 ? `Purchase via: ${sec.purchaseCompletionMethods.join(', ')}` : '',
+    ].filter(Boolean).join('\n');
 
-    blocks.push(table(
-      ['#', 'Address', 'State', 'Value', 'Loan', 'LVR', 'Transaction Types', 'Occupancy', 'Ownership'],
-      secRows
+    // Security heading
+    blocks.push(h3(`Security ${i + 1}${sec.address ? ' — ' + sec.address : ''}`));
+
+    // 2-column callout layout: Property | Loan Structure
+    blocks.push(colList(
+      [callout(
+        [
+          `Address: ${sec.address || '—'}`,
+          `State: ${sec.state || '—'}`,
+          `Value: ${fmtCurrency(sec.propertyValue)}`,
+          `Occupancy: ${sec.intendedOccupancy || '—'}`,
+          `Ownership: ${ownersText}`,
+        ].join('\n'),
+        '📍', 'blue_background'
+      )],
+      [callout(loanLines,  '🏦', 'green_background')],
+      [callout(txLines,    '📄', 'gray_background')]
     ));
 
-    // Extra detail rows for each security (features, cashout, etc.)
-    securities.forEach((sec, i) => {
-      const extras = [];
-      if (sec.loanType)        extras.push(`Loan: ${sec.loanType}`);
-      if (sec.repaymentType)   extras.push(`Repayment: ${sec.repaymentType}`);
-      if (sec.loanTerm)        extras.push(`Term: ${sec.loanTerm}y`);
-      if (sec.isFirstHomeBuyer) extras.push('FHB');
-      if (sec.hasOffset)        extras.push('Offset');
-      if (sec.hasRedraw)        extras.push('Redraw');
-      if (parseCurrency(sec.cashoutAmount) > 0) extras.push(`Cashout: ${fmtCurrency(sec.cashoutAmount)}`);
-      if (sec.currentLoanBalance)               extras.push(`Current Balance: ${fmtCurrency(sec.currentLoanBalance)}`);
-      if ((sec.purchaseCompletionMethods || []).length > 0) extras.push(`Purchase via: ${sec.purchaseCompletionMethods.join(', ')}`);
-      if (extras.length > 0) blocks.push(para(`Security ${i + 1} — ${extras.join(' · ')}`));
-    });
-  }
+    if (i < securities.length - 1) blocks.push(divider());
+  });
 
   blocks.push(divider());
 
@@ -302,56 +307,86 @@ const buildPageBody = (formData) => {
     const toggleTitle = `${app.role} ${app.number}: ${name} (${app.type})`;
     const inner = [];
 
-    // ── Personal Details ──────────────────────────────────────────────────
+    // ── Personal Details ────────────────────────────────────────────────
     inner.push(h3('Personal Details'));
 
     if (app.type === 'Company Borrower') {
       inner.push(table(['Field', 'Value'], [
-        ['ABN',                   app.companyABN || '—'],
-        ['ACN',                   app.companyACN || '—'],
-        ['Entity Type',           app.entityType || '—'],
-        ['ABN Status',            app.abnStatus || '—'],
-        ['ABN Registered From',   app.abnFrom || '—'],
-        ['GST',                   app.gstRegistered ? `Registered${app.gstDate ? ' from ' + app.gstDate : ''}` : 'Not Registered'],
-        ['Main Business Location',app.mainBusinessLocation || '—'],
-        ['Registered Address',    app.registeredAddress || '—'],
-        ['Trading Name',          app.tradingName || '—'],
-        ['Phone',                 app.phone || '—'],
-        ['Email',                 app.email || '—'],
+        ['ABN',                    app.companyABN          || '—'],
+        ['ACN',                    app.companyACN          || '—'],
+        ['Entity Type',            app.entityType          || '—'],
+        ['ABN Status',             app.abnStatus           || '—'],
+        ['ABN Registered From',    app.abnFrom             || '—'],
+        ['GST',                    app.gstRegistered ? `Registered${app.gstDate ? ' from ' + app.gstDate : ''}` : 'Not Registered'],
+        ['Main Business Location', app.mainBusinessLocation || '—'],
+        ['Registered Address',     app.registeredAddress   || '—'],
+        ['Trading Name',           app.tradingName         || '—'],
+        ['Phone',                  app.phone               || '—'],
+        ['Email',                  app.email               || '—'],
       ]));
     } else {
+      // Always include core identity fields (even if empty) for required fields
       const personalRows = [
         ['Full Name',      [app.firstName, app.middleName, app.lastName].filter(Boolean).join(' ') || '—'],
-        ['Date of Birth',  app.dob || '—'],
-        ['Phone',          app.phone || '—'],
-        ['Email',          app.email || '—'],
-        ['Licence Number', app.licenceNumber || '—'],
-        ['Gender',         app.gender || '—'],
-        ['Marital Status', app.maritalStatus || '—'],
+        ['Date of Birth',  app.dob             || '—'],
+        ['Gender',         app.gender          || '—'],
+        ['Phone',          app.phone           || '—'],
+        ['Email',          app.email           || '—'],
+        ['Licence Number', app.licenceNumber   || '—'],
+        ['Marital Status', app.maritalStatus   || '—'],
         ['Residency',      app.residencyStatus || '—'],
-        ['Visa Number',    app.visaNumber || '—'],
-        ['Current Address',app.address || '—'],
-        ['Dependants',     String(app.numDependants || 0)],
-      ].filter(r => r[1] !== '—' || ['Full Name','Date of Birth','Phone','Email','Current Address','Dependants'].includes(r[0]));
+      ];
 
-      if (app.type === 'Director Guarantor' && app.relationshipToCompany)
-        personalRows.push(['Relationship to Company', app.relationshipToCompany]);
-      if (app.type === 'Natural Person' && i > 0 && app.relationshipToApplicant1)
-        personalRows.push(['Relationship to Applicant 1', app.relationshipToApplicant1]);
+      if (app.visaNumber) personalRows.push(['Visa Number', app.visaNumber]);
+
+      personalRows.push(['Current Address', app.address || '—']);
+
+      if (app.yearsAtCurrentAddress || app.monthsAtCurrentAddress) {
+        personalRows.push(['Time at Current Address',
+          [app.yearsAtCurrentAddress && app.yearsAtCurrentAddress + ' years',
+           app.monthsAtCurrentAddress && app.monthsAtCurrentAddress + ' months']
+          .filter(Boolean).join(', ')]);
+      }
 
       (app.addressHistory || []).forEach((ah, j) => {
         const dur = [ah.yearsAtAddress && ah.yearsAtAddress + 'y', ah.monthsAtAddress && ah.monthsAtAddress + 'm'].filter(Boolean).join(' ');
         personalRows.push([`Previous Address ${j + 1}`, [ah.address, dur].filter(Boolean).join(' — ') || '—']);
       });
 
+      if (app.numDependants > 0) {
+        personalRows.push(['Dependants', String(app.numDependants)]);
+        (app.dependants || []).forEach((d, di) => {
+          personalRows.push([`Dependant ${di + 1}`, `${d.name || '—'}, Age ${d.age || '—'}`]);
+        });
+      } else {
+        personalRows.push(['Dependants', '0']);
+      }
+
+      if (app.type === 'Director Guarantor' && app.relationshipToCompany)
+        personalRows.push(['Relationship to Company', app.relationshipToCompany]);
+      if (app.type === 'Natural Person' && i > 0 && app.relationshipToApplicant1)
+        personalRows.push(['Relationship to Applicant 1', app.relationshipToApplicant1]);
+
       inner.push(table(['Field', 'Value'], personalRows));
+
+      // Address history callout (like employment history)
+      const totalAddrMonths = calcAddressMonths(app);
+      const addrYears  = Math.floor(totalAddrMonths / 12);
+      const addrMonths = totalAddrMonths % 12;
+      const addrMeets  = totalAddrMonths >= 36;
+      const addrLabel  = `${addrYears} years ${addrMonths} months${addrMeets ? ' ✓' : ' ⚠ (< 3 years required)'}`;
+      inner.push(callout(
+        `Address History: ${addrLabel}`,
+        addrMeets ? '✅' : '⚠️',
+        addrMeets ? 'green_background' : 'orange_background'
+      ));
     }
 
-    // ── Employment & Income ───────────────────────────────────────────────
+    // ── Employment & Income ─────────────────────────────────────────────
     if (ce.employmentType || ce.employer || ce.baseIncome) {
       inner.push(h3('Employment & Income'));
 
-      const iv = ce.incomeVerification || {};
+      const iv           = ce.incomeVerification || {};
       const declaredTotal = parseCurrency(ce.baseIncome) + parseCurrency(ce.bonusIncome) + parseCurrency(ce.commissions);
       const ytdAnnualised = iv.m2Annual || 0;
 
@@ -363,39 +398,42 @@ const buildPageBody = (formData) => {
       }[iv.status] || '';
 
       const empRows = [
-        ['Employment Type',      ce.employmentType || '—'],
-        ['Employer',             ce.employer || '—'],
-        ['Role / Position',      ce.role || '—'],
-        ['Employer ABN',         ce.abn || '—'],
-        ['Start Date',           ce.startDate || '—'],
-        ['Pay Frequency',        ce.payFrequency || '—'],
-        ['Base Income (p.a.)',   fmtCurrency(ce.baseIncome)],
-        ['Bonus (p.a.)',         ce.bonusIncome ? fmtCurrency(ce.bonusIncome) : '—'],
-        ['Commissions (p.a.)',   ce.commissions ? fmtCurrency(ce.commissions) : '—'],
-        ['Total Declared Income',fmtCurrency(declaredTotal)],
+        ['Employment Type',       ce.employmentType || '—'],
+        ['Employer',              ce.employer       || '—'],
+        ['Role / Position',       ce.role           || '—'],
+        ['Employer ABN',          ce.abn            || '—'],
+        ['Start Date',            ce.startDate      || '—'],
+        ['Pay Frequency',         ce.payFrequency   || '—'],
+        ['Base Income (p.a.)',    fmtCurrency(ce.baseIncome)],
+        ['Bonus (p.a.)',          ce.bonusIncome  ? fmtCurrency(ce.bonusIncome)  : '—'],
+        ['Commissions (p.a.)',    ce.commissions  ? fmtCurrency(ce.commissions)  : '—'],
+        ['Total Declared Income', fmtCurrency(declaredTotal)],
       ];
 
       if (ytdAnnualised) {
         empRows.push(['YTD Annualised Income', `${fmtCurrency(ytdAnnualised)}${varLabel ? '  ' + varLabel : ''}`]);
-        if (iv.explanations?.length > 0) {
-          empRows.push(['Income Variance Notes', iv.explanations.join('; ')]);
-        }
+        if (iv.explanations?.length > 0) empRows.push(['Variance Notes', iv.explanations.join('; ')]);
+        if (iv.otherNotes) empRows.push(['Variance Notes (Other)', iv.otherNotes]);
       }
-
       if (ce.hecs) empRows.push(['HECS/HELP Debt', ce.hecs]);
 
       inner.push(table(['Field', 'Value'], empRows));
 
-      // Previous employments (as paragraphs to avoid deep nesting)
       (empRecord.previousEmployments || []).forEach((prev, pi) => {
-        inner.push(para(`Previous ${pi + 1}: ${prev.employmentType || '—'} · ${prev.employer || '—'} · ${[prev.startDate || '?', prev.endDate || 'present'].join(' → ')}`));
+        inner.push(para(
+          `Previous ${pi + 1}: ${prev.employmentType || '—'} · ${prev.employer || '—'}${prev.role ? ' · ' + prev.role : ''} · ${[prev.startDate || '?', prev.endDate || 'present'].join(' → ')}`
+        ));
       });
 
       const yearsLabel = `${(empRecord.totalYears || 0).toFixed(1)} years${empRecord.meetsRequirement ? ' ✓' : ' ⚠ (< 3 years required)'}`;
-      inner.push(callout(`Employment History: ${yearsLabel}`, empRecord.meetsRequirement ? '✅' : '⚠️', empRecord.meetsRequirement ? 'green_background' : 'orange_background'));
+      inner.push(callout(
+        `Employment History: ${yearsLabel}`,
+        empRecord.meetsRequirement ? '✅' : '⚠️',
+        empRecord.meetsRequirement ? 'green_background' : 'orange_background'
+      ));
     }
 
-    // ── Financial Position ────────────────────────────────────────────────
+    // ── Financial Position ──────────────────────────────────────────────
     const assets      = app.assets      || [];
     const liabilities = app.liabilities || [];
 
@@ -403,25 +441,29 @@ const buildPageBody = (formData) => {
       inner.push(h3('Financial Position'));
 
       if (assets.length > 0) {
-        const assetRows = assets.map(a => [
-          a.type || a.category || '—',
-          a.description || a.address || a.institution || a.name || '—',
-          fmtCurrency(a.value || a.amount),
-        ]);
-        inner.push(table(['Asset Type', 'Description', 'Value'], assetRows));
+        inner.push(table(
+          ['Asset Type', 'Description', 'Value'],
+          assets.map(a => [
+            a.type || a.category || '—',
+            a.description || a.address || a.institution || a.name || '—',
+            fmtCurrency(a.value || a.amount),
+          ])
+        ));
       }
 
       if (liabilities.length > 0) {
-        const liabRows = liabilities.map(l => [
-          l.type || l.category || '—',
-          l.lender || l.institution || l.description || '—',
-          fmtCurrency(l.balance || l.amount || l.limit),
-          l.repayment ? fmtCurrency(l.repayment) + '/mo' : '—',
-        ]);
-        inner.push(table(['Liability Type', 'Lender / Description', 'Balance', 'Repayment'], liabRows));
+        inner.push(table(
+          ['Liability Type', 'Lender / Description', 'Balance', 'Repayment'],
+          liabilities.map(l => [
+            l.type || l.category || '—',
+            l.lender || l.institution || l.description || '—',
+            fmtCurrency(l.balance || l.amount || l.limit),
+            l.repayment ? fmtCurrency(l.repayment) + '/mo' : '—',
+          ])
+        ));
       }
 
-      const appAssets = assets.reduce((s, a) => s + parseCurrency(a.value || a.amount), 0);
+      const appAssets = assets.reduce((s, a)      => s + parseCurrency(a.value   || a.amount), 0);
       const appLiabs  = liabilities.reduce((s, l) => s + parseCurrency(l.balance || l.amount || l.limit), 0);
       const appNet    = appAssets - appLiabs;
       inner.push(callout(
@@ -431,20 +473,30 @@ const buildPageBody = (formData) => {
       ));
     }
 
-    // ── Documents ─────────────────────────────────────────────────────────
+    // ── Documents ───────────────────────────────────────────────────────
     if (app.type !== 'Company Borrower') {
-      inner.push(h3('Documents'));
+      inner.push(h3('📎 Documents'));
 
       const hasDLFront = !!app.dlFrontUrl;
       const hasDLBack  = !!app.dlBackUrl;
       const hasPayslip = !!ce.payslipUrl;
       const hasSigned  = app.eSignature?.status === 'signed';
+      const signedDate = hasSigned && app.eSignature?.signedAt
+        ? new Date(app.eSignature.signedAt).toLocaleDateString('en-AU')
+        : null;
 
-      inner.push(toDo('Driver Licence — Front', hasDLFront));
-      inner.push(toDo('Driver Licence — Back',  hasDLBack));
-      inner.push(toDo('Payslip / Income Document', hasPayslip));
-      inner.push(toDo('Credit Guide — E-Signature', hasSigned));
+      // Document status table — more scannable than plain to_do blocks
+      inner.push(table(
+        ['Document', 'Status', 'Details'],
+        [
+          ['🪪 Driver Licence — Front', hasDLFront ? '✅ Uploaded'  : '⬜ Missing', hasDLFront ? 'Stored in Files & media' : 'Upload in fact find → Step 1'],
+          ['🪪 Driver Licence — Back',  hasDLBack  ? '✅ Uploaded'  : '⬜ Missing', hasDLBack  ? 'Stored in Files & media' : 'Upload in fact find → Step 1'],
+          ['💰 Payslip / Income Doc',   hasPayslip ? '✅ Uploaded'  : '⬜ Missing', hasPayslip ? 'Stored in Files & media' : 'Upload in fact find → Step 2'],
+          ['✍️ Credit Guide',           hasSigned  ? '✅ Signed'    : '⬜ Pending', hasSigned  ? `Signed ${signedDate || '—'}` : 'Send via Step 1 e-signature'],
+        ]
+      ));
 
+      // Inline images for DL (visual quick-check)
       if (hasDLFront) inner.push(imageBlock(app.dlFrontUrl));
       if (hasDLBack)  inner.push(imageBlock(app.dlBackUrl));
       if (hasPayslip) inner.push(bookmarkBlock(ce.payslipUrl));
@@ -453,7 +505,7 @@ const buildPageBody = (formData) => {
     blocks.push(toggle(toggleTitle, inner));
   });
 
-  // ── 5. Broker Notes (if long — as standalone block after toggles) ─────────
+  // ── 5. Broker Notes standalone (if long) ─────────────────────────────────
   if (formData.brokerNotes && formData.brokerNotes.length > 200) {
     blocks.push(divider());
     blocks.push(callout(formData.brokerNotes, '📝', 'yellow_background'));
@@ -469,7 +521,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST')   return res.status(405).json({ error: 'Method not allowed' });
 
   const apiKey = process.env.NOTION_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'NOTION_API_KEY not configured in Vercel environment variables' });
@@ -478,36 +530,41 @@ export default async function handler(req, res) {
 
   try {
 
-    // ── Duplicate check ───────────────────────────────────────────────────
+    // ── Duplicate check ─────────────────────────────────────────────────
     if (action === 'check') {
       const name    = getApplicantTitle(formData);
       const matches = await checkDuplicate(name, apiKey);
       return res.status(200).json({ exists: matches.length > 0, matches, applicantName: name });
     }
 
-    // ── Create Pipeline page ──────────────────────────────────────────────
+    // ── Create Pipeline page ────────────────────────────────────────────
     if (action === 'submit') {
       const title        = getApplicantTitle(formData);
       const brokerPageId = await findBrokerPageId(formData.brokerName, apiKey);
       const txTypes      = getTransactionTypes(formData);
-      const lenders      = getLenders(formData);
+      // Lender: pass all values from lender preference directly (no filtering)
+      const lenders      = formData.lenderPreference || [];
+      const docFiles     = collectDocumentFiles(formData);
 
       const properties = {
-        'Applicant':             { title: [{ text: { content: title } }] },
-        'Application Received':  { date: { start: new Date().toISOString().split('T')[0] } },
-        'Status':                { status: { name: 'Pending Assignment' } },
+        'Applicant':            { title: [{ text: { content: title } }] },
+        'Application Received': { date: { start: new Date().toISOString().split('T')[0] } },
+        'Status':               { status: { name: 'Pending Assignment' } },
+        'Manager':              { people: [{ id: RITA_USER_ID }] },
       };
 
-      if (txTypes.length > 0)       properties['Transaction Type'] = { multi_select: txTypes.map(t => ({ name: t })) };
-      if (formData.clientType)      properties['Client Type']      = { multi_select: [{ name: formData.clientType }] };
-      if (formData.priority)        properties['Priority']         = { select: { name: formData.priority } };
-      if (lenders.length > 0)       properties['Lender']           = { multi_select: lenders.map(l => ({ name: l })) };
-      if (brokerPageId)             properties['Broker']           = { relation: [{ id: brokerPageId }] };
+      if (txTypes.length > 0)    properties['Transaction Type'] = { multi_select: txTypes.map(t => ({ name: t })) };
+      if (formData.clientType)   properties['Client Type']      = { multi_select: [{ name: formData.clientType }] };
+      if (formData.priority)     properties['Priority']         = { select: { name: formData.priority } };
+      if (lenders.length > 0)    properties['Lender']           = { multi_select: lenders.map(l => ({ name: l })) };
+      if (brokerPageId)          properties['Broker']           = { relation: [{ id: brokerPageId }] };
+      if (docFiles.length > 0)   properties['Files & media']    = { files: docFiles };
 
       const pageBody = buildPageBody(formData);
 
       const page = await notionFetch('/pages', 'POST', {
         parent:     { database_id: PIPELINE_DB_ID },
+        icon:       { type: 'emoji', emoji: '📋' },
         properties,
         children:   pageBody,
       }, apiKey);

@@ -176,6 +176,47 @@ const Step1Applicants = ({ formData, updateFormData }) => {
       }
 
       setDlExtracted(prev => ({ ...prev, [index]: { success: true, fields: Object.keys(updates) } }));
+
+      // ── Upload DL images to Vercel Blob so URLs can be stored in Notion ──
+      const uploadToBlob = async (file, side) => {
+        try {
+          const b64 = await fileToBase64(file);
+          const ext = file.name.split('.').pop() || 'jpg';
+          const blobRes = await fetch('/api/upload-blob', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              base64: b64,
+              filename: `dl-${side}-${Date.now()}.${ext}`,
+              contentType: normalizeMediaType(file),
+            }),
+          });
+          const blobData = await blobRes.json();
+          return blobData.url || null;
+        } catch (e) {
+          console.warn(`[DL Blob upload ${side}] failed:`, e.message);
+          return null;
+        }
+      };
+
+      const [frontUrl, backUrl] = await Promise.all([
+        front ? uploadToBlob(front, 'front') : Promise.resolve(null),
+        back  ? uploadToBlob(back,  'back')  : Promise.resolve(null),
+      ]);
+
+      if (frontUrl || backUrl) {
+        setApplicants(prev => {
+          const updated = [...prev];
+          updated[index] = {
+            ...updated[index],
+            ...(frontUrl ? { dlFrontUrl: frontUrl } : {}),
+            ...(backUrl  ? { dlBackUrl:  backUrl  } : {}),
+          };
+          updateFormData('applicants', updated);
+          return updated;
+        });
+      }
+
     } catch (err) {
       setDlExtracting(prev => ({ ...prev, [index]: false }));
       setDlExtracted(prev => ({ ...prev, [index]: { error: err.message } }));

@@ -491,6 +491,25 @@ const Step2Employment = ({ formData, updateFormData }) => {
       const data = await res.json();
       if (data.error) { updatePayslip(idx, { extracting: false, error: data.error }); return; }
       updatePayslip(idx, { extracting: false, data });
+
+      // ── Upload payslip to Vercel Blob so URL can be stored in Notion ──────
+      try {
+        const ext = file.name.split('.').pop() || 'pdf';
+        const blobRes = await fetch('/api/upload-blob', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            base64,
+            filename: `payslip-${idx}-${Date.now()}.${ext}`,
+            contentType: normalizeMediaType(file),
+          }),
+        });
+        const blobData = await blobRes.json();
+        if (blobData.url) updateCurrentEmployment(idx, 'payslipUrl', blobData.url);
+      } catch (e) {
+        console.warn('[Payslip Blob upload] failed:', e.message);
+      }
+
       // Prefill all available fields from extraction
       if (data.employerName)  updateCurrentEmployment(idx, 'employer',    data.employerName);
       if (data.employerABN)   updateCurrentEmployment(idx, 'abn',         data.employerABN);

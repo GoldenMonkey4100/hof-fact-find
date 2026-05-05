@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import './styles.css';
 import { getBrokerEmail } from './utils';
 import Step0LoanStrategy from './Step0-LoanStrategy-Polished';
@@ -53,6 +53,7 @@ const FactFindApp = () => {
       hasRedraw: false
     }],
     lenderPreference: [],
+    priority: 'Medium',
     brokerNotes: '',
     
     // Step 1 - Applicants
@@ -93,29 +94,59 @@ const FactFindApp = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = async () => {
+  // ── Submission state ──────────────────────────────────────────────────────
+  // status: 'idle' | 'checking' | 'duplicate' | 'submitting' | 'success' | 'error'
+  const [submission, setSubmission] = useState({
+    status: 'idle',
+    message: '',
+    notionUrl: '',
+    notionTitle: '',
+    duplicates: [],
+  });
+
+  const doSubmit = useCallback(async () => {
+    setSubmission(s => ({ ...s, status: 'submitting', message: '' }));
     try {
       const submissionData = {
         ...formData,
         submittedAt: new Date().toISOString(),
-        submittedBy: formData.brokerEmail
+        submittedBy: formData.brokerEmail,
       };
-
-      console.log('Submitting fact find:', submissionData);
-
-      // TODO: Call Mercury API
-      // await submitToMercury(submissionData);
-      
-      // TODO: Call Notion pipeline
-      // await submitToNotion(submissionData);
-
-      alert('✅ Fact Find submitted successfully!\n\n(Mercury API integration pending)');
-      
-    } catch (error) {
-      console.error('Submission error:', error);
-      alert('❌ Error submitting fact find. Please try again.');
+      const res  = await fetch('/api/notion-submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'submit', formData: submissionData }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setSubmission({ status: 'success', message: '', notionUrl: data.pageUrl, notionTitle: data.title, duplicates: [] });
+    } catch (err) {
+      setSubmission(s => ({ ...s, status: 'error', message: err.message }));
     }
-  };
+  }, [formData]);
+
+  const handleSubmit = useCallback(async () => {
+    setSubmission(s => ({ ...s, status: 'checking', message: '' }));
+    try {
+      const res  = await fetch('/api/notion-submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'check', formData }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      if (data.exists) {
+        // Duplicates found — ask broker what to do
+        setSubmission(s => ({ ...s, status: 'duplicate', duplicates: data.matches, message: '' }));
+      } else {
+        // No duplicates — submit immediately
+        await doSubmit();
+      }
+    } catch (err) {
+      setSubmission(s => ({ ...s, status: 'error', message: err.message }));
+    }
+  }, [formData, doSubmit]);
 
   const goToNextStep = () => {
     if (currentStep < steps.length - 1) {
@@ -147,7 +178,7 @@ const FactFindApp = () => {
       case 3:
         return <Step3AssetsLiabilities formData={formData} updateFormData={updateFormData} />;
       case 4:
-        return <Step4Review formData={formData} updateFormData={updateFormData} onSubmit={handleSubmit} />;
+        return <Step4Review formData={formData} updateFormData={updateFormData} onSubmit={handleSubmit} submission={submission} />;
       default:
         return null;
     }
@@ -341,6 +372,89 @@ const FactFindApp = () => {
         </div>
 
       </div>
+
+      {/* ── Submission overlays ─────────────────────────────────────────── */}
+
+      {/* Success screen */}
+      {submission.status === 'success' && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '40px', maxWidth: '500px', width: '100%', textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ fontSize: '56px', marginBottom: '16px' }}>🎉</div>
+            <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#166534', margin: '0 0 8px' }}>Submitted Successfully!</h2>
+            <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 24px' }}>
+              <strong>{submission.notionTitle}</strong> has been added to the Pipeline as <strong>Pending Assignment</strong>.
+            </p>
+            <a href={submission.notionUrl} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-block', padding: '12px 28px', background: '#0369a1', color: 'white', borderRadius: '8px', fontWeight: '600', fontSize: '14px', textDecoration: 'none', marginBottom: '12px' }}>
+              Open in Notion →
+            </a>
+            <br />
+            <button onClick={() => setSubmission(s => ({ ...s, status: 'idle' }))}
+              style={{ marginTop: '8px', padding: '10px 20px', background: 'none', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: '#6b7280' }}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate found — ask broker */}
+      {submission.status === 'duplicate' && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '36px', maxWidth: '520px', width: '100%', boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px', textAlign: 'center' }}>⚠️</div>
+            <h2 style={{ fontSize: '19px', fontWeight: '700', color: '#92400e', margin: '0 0 8px', textAlign: 'center' }}>Existing Record Found</h2>
+            <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 16px', textAlign: 'center' }}>
+              The following pipeline {submission.duplicates.length === 1 ? 'entry matches' : 'entries match'} this applicant name:
+            </p>
+            <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {submission.duplicates.map(d => (
+                <div key={d.id} style={{ padding: '12px 14px', background: '#fef9c3', border: '1px solid #fde68a', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: '600', fontSize: '14px' }}>{d.title}</div>
+                    <div style={{ fontSize: '12px', color: '#92400e' }}>{d.status}</div>
+                  </div>
+                  <a href={d.url} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: '12px', color: '#0369a1', textDecoration: 'none', fontWeight: '500', whiteSpace: 'nowrap', marginLeft: '12px' }}>
+                    View →
+                  </a>
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: '13px', color: '#374151', margin: '0 0 20px', textAlign: 'center' }}>
+              Would you like to create a new page anyway, or cancel to review?
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setSubmission(s => ({ ...s, status: 'idle' }))}
+                style={{ flex: 1, padding: '11px', background: 'none', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
+                Cancel — Review
+              </button>
+              <button onClick={doSubmit}
+                style={{ flex: 1, padding: '11px', background: '#0369a1', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                Create New Page Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error overlay */}
+      {submission.status === 'error' && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '36px', maxWidth: '460px', width: '100%', textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>❌</div>
+            <h2 style={{ fontSize: '19px', fontWeight: '700', color: '#991b1b', margin: '0 0 8px' }}>Submission Failed</h2>
+            <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 8px' }}>An error occurred while submitting to Notion:</p>
+            <p style={{ fontSize: '12px', color: '#dc2626', background: '#fef2f2', padding: '10px', borderRadius: '6px', margin: '0 0 24px', fontFamily: 'monospace', wordBreak: 'break-word' }}>
+              {submission.message}
+            </p>
+            <button onClick={() => setSubmission(s => ({ ...s, status: 'idle' }))}
+              style={{ padding: '11px 28px', background: '#0369a1', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+              Close &amp; Try Again
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

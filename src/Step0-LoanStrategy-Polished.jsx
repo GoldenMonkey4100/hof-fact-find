@@ -447,7 +447,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
       <div className="card mb-8">
         <h3 className="card-title">Broker Details</h3>
 
-        <div className="grid grid-cols-2 mb-4">
+        <div className="grid grid-cols-3 mb-4">
           <div>
             <label>Broker Name</label>
             <select value={formData.brokerName} onChange={handleBrokerChange}>
@@ -463,6 +463,17 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               <option value="">Select...</option>
               <option value="New">New</option>
               <option value="Existing">Existing</option>
+            </select>
+          </div>
+          <div>
+            <label>Priority</label>
+            <select value={formData.priority || ''} onChange={(e) => updateFormData('priority', e.target.value)}
+              style={{ borderColor: formData.priority === 'Urgent' ? '#ef4444' : formData.priority === 'High' ? '#f97316' : undefined }}>
+              <option value="">Select...</option>
+              <option value="Urgent">🔴 Urgent</option>
+              <option value="High">🟠 High</option>
+              <option value="Medium">🟡 Medium</option>
+              <option value="Low">🟢 Low</option>
             </select>
           </div>
         </div>

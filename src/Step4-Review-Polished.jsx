@@ -1,7 +1,7 @@
 import React from 'react';
 import './styles.css';
 
-const Step4Review = ({ formData, onSubmit }) => {
+const Step4Review = ({ formData, onSubmit, submission = {} }) => {
   // Validation checks
   const validateForm = () => {
     const errors = [];
@@ -87,10 +87,16 @@ const Step4Review = ({ formData, onSubmit }) => {
           </div>
         </div>
 
-        {formData.lenderPreference && (
+        {formData.lenderPreference?.length > 0 && (
           <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-primary)' }}>
             <label style={{ marginBottom: '4px' }}>Lender Preference</label>
-            <div style={{ fontSize: '15px', fontWeight: '500' }}>{formData.lenderPreference}</div>
+            <div style={{ fontSize: '15px', fontWeight: '500' }}>{formData.lenderPreference.join(', ')}</div>
+          </div>
+        )}
+        {formData.priority && (
+          <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-primary)' }}>
+            <label style={{ marginBottom: '4px' }}>Priority</label>
+            <div style={{ fontSize: '15px', fontWeight: '500' }}>{formData.priority}</div>
           </div>
         )}
       </div>
@@ -240,15 +246,19 @@ const Step4Review = ({ formData, onSubmit }) => {
         
         <button
           onClick={onSubmit}
-          disabled={!isValid}
+          disabled={!isValid || submission.status === 'checking' || submission.status === 'submitting'}
           className="btn-success"
-          style={{ 
+          style={{
             fontSize: '16px',
             padding: '14px 40px',
-            minWidth: '200px'
+            minWidth: '220px',
+            opacity: (submission.status === 'checking' || submission.status === 'submitting') ? 0.7 : 1,
           }}
         >
-          {isValid ? 'Submit to Processing →' : '⚠️ Complete Required Fields'}
+          {submission.status === 'checking'   ? '🔍 Checking for duplicates…' :
+           submission.status === 'submitting' ? '📤 Submitting to Notion…'    :
+           isValid                            ? 'Submit to Processing →'      :
+                                               '⚠️ Complete Required Fields'}
         </button>
 
         {!isValid && (

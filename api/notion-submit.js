@@ -239,51 +239,131 @@ const buildPageBody = (formData) => {
   blocks.push(h2('🏠 Securities'));
 
   securities.forEach((sec, i) => {
-    const lvr       = sec.lvr ? sec.lvr + '%' : '—';
-    const txTypes   = [...(sec.primaryTransactionTypes || []), ...(sec.secondaryTransactionTypes || [])].join(', ') || '—';
-    const features  = [
+    const lvr = sec.lvr ? sec.lvr + '%' : '—';
+
+    const txTypes = [
+      ...(sec.primaryTransactionTypes  || []),
+      ...(sec.secondaryTransactionTypes || []),
+    ].join(', ') || '—';
+
+    const features = [
       sec.isFirstHomeBuyer ? 'First Home Buyer' : '',
       sec.hasOffset        ? 'Offset Account'   : '',
       sec.hasRedraw        ? 'Redraw Facility'   : '',
     ].filter(Boolean).join(', ') || '—';
 
-    const ownersText = (sec.owners || []).length > 0
-      ? sec.owners.map(o => `${o.name} (${o.pct}%)`).join(', ')
+    // ── Ownership — field is ownershipRows, not owners ──────────────────
+    const ownersText = (sec.ownershipRows || []).length > 0
+      ? sec.ownershipRows.map(o => `${o.name || 'Unknown'} (${o.percentage || 0}%)`).join(', ')
       : '—';
 
-    // Build loan structure lines (only show populated fields)
-    const loanLines = [
-      `Amount: ${fmtCurrency(sec.loanAmount)}`,
-      `LVR: ${lvr}`,
-      sec.loanType      ? `Type: ${sec.loanType}`           : '',
-      sec.repaymentType ? `Repayment: ${sec.repaymentType}` : '',
-      sec.loanTerm      ? `Term: ${sec.loanTerm} years`      : '',
-      features !== '—'  ? `Features: ${features}`           : '',
-    ].filter(Boolean).join('\n');
+    // ── Guarantors — look up names from applicant IDs ───────────────────
+    const guarantorText = (sec.guarantors || []).length > 0
+      ? sec.guarantors.map(gId => {
+          const app = applicants.find(a => a.id === gId);
+          if (!app) return null;
+          return app.type === 'Company Borrower'
+            ? (app.companyName || 'Company')
+            : `${app.firstName || ''} ${app.lastName || ''}`.trim();
+        }).filter(Boolean).join(', ')
+      : '—';
 
-    // Build transaction lines
-    const txLines = [
-      `Transaction: ${txTypes}`,
-      parseCurrency(sec.cashoutAmount)    > 0 ? `Cashout Amount: ${fmtCurrency(sec.cashoutAmount)}`       : '',
-      parseCurrency(sec.currentLoanBalance) > 0 ? `Current Loan Balance: ${fmtCurrency(sec.currentLoanBalance)}` : '',
-      (sec.purchaseCompletionMethods || []).length > 0 ? `Purchase via: ${sec.purchaseCompletionMethods.join(', ')}` : '',
+    // ── Loan structure — handle Split repayment type separately ─────────
+    let loanLines;
+    if (sec.repaymentType === 'Split') {
+      const buildSplit = (n) => {
+        const amt      = sec[`split${n}Amount`];
+        const type     = sec[`split${n}Type`];
+        const rateType = sec[`split${n}RateType`];
+        const fixedYrs = sec[`split${n}FixedYears`];
+        const ioYrs    = sec[`split${n}IOYears`];
+        if (!amt && !type) return '';
+        return [
+          `Split ${n}: ${amt ? fmtCurrency(amt) : '—'}`,
+          type     ? `  └ ${type}`                                          : '',
+          rateType ? `  └ ${rateType}${fixedYrs ? ' (' + fixedYrs + 'yr fixed)' : ''}` : '',
+          type === 'Interest Only' && ioYrs ? `  └ IO: ${ioYrs} yrs`       : '',
+        ].filter(Boolean).join('\n');
+      };
+      loanLines = [
+        `Amount: ${fmtCurrency(sec.loanAmount)}`,
+        `LVR: ${lvr}`,
+        `Repayment: Split`,
+        sec.loanTerm ? `Term: ${sec.loanTerm} years` : '',
+        buildSplit(1),
+        buildSplit(2),
+        features !== '—' ? `Features: ${features}` : '',
+      ].filter(Boolean).join('\n');
+    } else {
+      loanLines = [
+        `Amount: ${fmtCurrency(sec.loanAmount)}`,
+        `LVR: ${lvr}`,
+        sec.loanType      ? `Type: ${sec.loanType}`           : '',
+        sec.repaymentType ? `Repayment: ${sec.repaymentType}` : '',
+        sec.repaymentType === 'Fixed' && sec.fixedRatePeriod
+          ? `Fixed Period: ${sec.fixedRatePeriod} years`       : '',
+        sec.loanTerm      ? `Term: ${sec.loanTerm} years`      : '',
+        sec.loanType === 'Interest Only' && sec.interestOnlyPeriod
+          ? `IO Period: ${sec.interestOnlyPeriod} years`        : '',
+        features !== '—'  ? `Features: ${features}`           : '',
+      ].filter(Boolean).join('\n');
+    }
+
+    // ── Transaction / purchase lines — resolve equity link ──────────────
+    const txLineItems = [`Transaction: ${txTypes}`];
+
+    if (parseCurrency(sec.cashoutAmount) > 0)
+      txLineItems.push(`Cashout Amount: ${fmtCurrency(sec.cashoutAmount)}`);
+    if (parseCurrency(sec.currentLoanBalance) > 0)
+      txLineItems.push(`Current Loan Balance: ${fmtCurrency(sec.currentLoanBalance)}`);
+
+    (sec.purchaseCompletionMethods || []).forEach(method => {
+      if (method === 'Equity from Existing Property') {
+        const srcIdx = sec.equityPropertyIndex;
+        const srcSec = (srcIdx !== '' && srcIdx !== undefined) ? securities[parseInt(srcIdx)] : null;
+        txLineItems.push(`Equity Source: Security ${parseInt(srcIdx) + 1}${srcSec?.address ? ' — ' + srcSec.address : ''}`);
+        if (srcSec) {
+          const equityAmt = parseCurrency(srcSec.cashoutAmount) > 0
+            ? fmtCurrency(srcSec.cashoutAmount)
+            : `~${fmtCurrency(Math.max(0, (parseFloat(srcSec.propertyValue)||0)*0.8 - (parseFloat(srcSec.loanAmount)||0)))} (est. 80% LVR equity)`;
+          txLineItems.push(`Equity Available: ${equityAmt}`);
+        }
+      } else if (method === 'Own Savings') {
+        const amt = sec.purchaseCompletionAmounts?.[method];
+        txLineItems.push(`Own Savings: ${amt ? fmtCurrency(amt) : 'amount not entered'}`);
+      } else if (method === 'Gift from Family') {
+        const amt = sec.purchaseCompletionAmounts?.[method];
+        txLineItems.push(`Gift from Family${sec.giftRelationship ? ' (' + sec.giftRelationship + ')' : ''}: ${amt ? fmtCurrency(amt) : 'amount not entered'}`);
+      } else if (method === 'First Home Owner Grant') {
+        txLineItems.push('Purchase via: First Home Owner Grant');
+      } else if (method === 'Other') {
+        txLineItems.push(`Other: ${sec.purchaseCompletionOther || 'see notes'}`);
+      } else {
+        txLineItems.push(`Purchase via: ${method}`);
+      }
+    });
+
+    if (sec.applicationType) txLineItems.push(`Application Type: ${sec.applicationType}`);
+    if (sec.crossCollateralise) txLineItems.push('⚠️ Cross-Collateralised');
+
+    const txLines = txLineItems.join('\n');
+
+    // ── Property callout ─────────────────────────────────────────────────
+    const propLines = [
+      `Address: ${sec.address || '—'}`,
+      `State: ${sec.state || '—'}`,
+      `Value: ${fmtCurrency(sec.propertyValue)}`,
+      `Occupancy: ${sec.intendedOccupancy || '—'}`,
+      `Ownership: ${ownersText}`,
+      guarantorText !== '—' ? `Guarantors: ${guarantorText}` : '',
     ].filter(Boolean).join('\n');
 
     // Security heading
     blocks.push(h3(`Security ${i + 1}${sec.address ? ' — ' + sec.address : ''}`));
 
-    // 2-column callout layout: Property | Loan Structure
+    // 3-column callout layout: Property | Loan Structure | Transaction
     blocks.push(colList(
-      [callout(
-        [
-          `Address: ${sec.address || '—'}`,
-          `State: ${sec.state || '—'}`,
-          `Value: ${fmtCurrency(sec.propertyValue)}`,
-          `Occupancy: ${sec.intendedOccupancy || '—'}`,
-          `Ownership: ${ownersText}`,
-        ].join('\n'),
-        '📍', 'blue_background'
-      )],
+      [callout(propLines,  '📍', 'blue_background')],
       [callout(loanLines,  '🏦', 'green_background')],
       [callout(txLines,    '📄', 'gray_background')]
     ));
@@ -421,7 +501,13 @@ const buildPageBody = (formData) => {
 
       (empRecord.previousEmployments || []).forEach((prev, pi) => {
         inner.push(para(
-          `Previous ${pi + 1}: ${prev.employmentType || '—'} · ${prev.employer || '—'}${prev.role ? ' · ' + prev.role : ''} · ${[prev.startDate || '?', prev.endDate || 'present'].join(' → ')}`
+          [
+            `Previous ${pi + 1}: ${prev.employmentType || '—'}`,
+            prev.employer  ? `Employer: ${prev.employer}`              : '',
+            prev.abn       ? `ABN: ${prev.abn}`                       : '',
+            prev.role      ? `Role: ${prev.role}`                     : '',
+            `Period: ${prev.startDate || '?'} → ${prev.endDate || 'present'}`,
+          ].filter(Boolean).join(' · ')
         ));
       });
 
@@ -500,6 +586,10 @@ const buildPageBody = (formData) => {
       if (hasDLFront) inner.push(imageBlock(app.dlFrontUrl));
       if (hasDLBack)  inner.push(imageBlock(app.dlBackUrl));
       if (hasPayslip) inner.push(bookmarkBlock(ce.payslipUrl));
+      // eSignature audit trail link
+      if (hasSigned && app.eSignature?.submissionId) {
+        inner.push(bookmarkBlock(`/api/docuseal-download?submissionId=${app.eSignature.submissionId}&type=signed`));
+      }
     }
 
     blocks.push(toggle(toggleTitle, inner));

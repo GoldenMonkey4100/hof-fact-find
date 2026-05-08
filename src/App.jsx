@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import './styles.css';
 import { getBrokerEmail } from './utils';
 import Step0LoanStrategy from './Step0-LoanStrategy-Polished';
@@ -82,12 +82,21 @@ const FactFindApp = () => {
     submittedBy: ''
   });
 
+  const [theme, setTheme] = useState(() => localStorage.getItem('hof-theme') || 'light');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('hof-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
+
   const steps = [
-    { id: 0, name: 'Loan Strategy', icon: '🏠' },
-    { id: 1, name: 'Applicants', icon: '👥' },
-    { id: 2, name: 'Employment', icon: '💼' },
-    { id: 3, name: 'Assets & Liabilities', icon: '💰' },
-    { id: 4, name: 'Review & Submit', icon: '✓' }
+    { id: 0, name: 'Loan Strategy' },
+    { id: 1, name: 'Applicants' },
+    { id: 2, name: 'Employment' },
+    { id: 3, name: 'Assets & Liabilities' },
+    { id: 4, name: 'Review & Submit' }
   ];
 
   const updateFormData = (field, value) => {
@@ -185,149 +194,84 @@ const FactFindApp = () => {
   };
 
   return (
-    <div style={{ 
-      minHeight: '100vh',
-      background: 'var(--bg-tertiary)',
-      padding: '32px 16px'
-    }}>
-      <div className="container">
-        
-        {/* Header Card */}
-        <div className="card fade-in" style={{ marginBottom: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
-            <div>
-              <h1 style={{ 
-                fontSize: 'var(--text-3xl)', 
-                fontWeight: 'var(--font-semibold)', 
-                margin: '0 0 8px 0',
-                color: 'var(--text-primary)',
-                lineHeight: '1.2'
-              }}>
-                HOF Broker Fact Find
-              </h1>
-              <p style={{ 
-                fontSize: 'var(--text-base)', 
-                color: 'var(--text-secondary)', 
-                margin: 0 
-              }}>
-                Complete all sections to submit to your processing team
-              </p>
-            </div>
-            
-            <div className="badge badge-info" style={{ fontSize: 'var(--text-sm)', padding: '8px 16px' }}>
-              Step {currentStep + 1} of {steps.length}
-            </div>
-          </div>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-tertiary)' }}>
 
-          {/* Progress Bar */}
-          <div style={{ marginTop: '24px' }}>
-            <div className="progress-bar">
-              <div 
-                className="progress-fill" 
-                style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
-              />
-            </div>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between',
-              marginTop: '8px',
-              fontSize: 'var(--text-xs)',
-              color: 'var(--text-tertiary)'
-            }}>
-              <span>Start</span>
-              <span>{Math.round(((currentStep + 1) / steps.length) * 100)}% Complete</span>
-            </div>
+      {/* ── App Header ───────────────────────────────────────────────────── */}
+      <header className="app-header">
+        <div className="container">
+          <div className="app-logo">
+            <div className="app-logo-mark">HOF</div>
+            <span className="app-logo-text">
+              HOUSE <span>OF</span> FINANCE
+            </span>
+          </div>
+          <div className="app-header-meta">
+            <span style={{ display: 'none' }} className="app-header-tagline">Broker Fact Find</span>
+            <button
+              className="theme-toggle"
+              onClick={toggleTheme}
+              title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            >
+              {theme === 'light' ? '🌙' : '☀️'}
+            </button>
           </div>
         </div>
+      </header>
 
-        {/* Step Navigation */}
-        <div className="card fade-in" style={{ marginBottom: '24px', padding: '16px', overflowX: 'auto' }}>
-          <div style={{ 
-            display: 'flex', 
-            gap: '12px',
-            minWidth: 'fit-content'
-          }}>
+      {/* ── Step Progress Strip ───────────────────────────────────────────── */}
+      <div className="app-step-strip">
+        <div className="container">
+          <div className="app-steps-row">
             {steps.map((step, index) => {
-              const isActive = currentStep === step.id;
+              const isActive    = currentStep === step.id;
               const isCompleted = currentStep > step.id;
-              
+              const status      = isCompleted ? 'completed' : isActive ? 'active' : 'pending';
               return (
-                <button
-                  key={step.id}
-                  onClick={() => goToStep(step.id)}
-                  className="btn-secondary"
-                  style={{
-                    flex: '1',
-                    minWidth: '160px',
-                    padding: '16px',
-                    border: `2px solid ${isActive ? 'var(--color-primary)' : isCompleted ? 'var(--color-success)' : 'var(--border-primary)'}`,
-                    background: isActive 
-                      ? 'var(--color-primary-light)' 
-                      : isCompleted 
-                        ? 'var(--color-success-light)'
-                        : 'white',
-                    color: isActive 
-                      ? 'var(--color-primary)' 
-                      : isCompleted 
-                        ? 'var(--color-success)'
-                        : 'var(--text-secondary)',
-                    textAlign: 'left',
-                    position: 'relative'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div className={`step-number ${isCompleted ? 'completed' : isActive ? 'active' : 'pending'}`}>
-                      {isCompleted ? '✓' : step.icon}
+                <React.Fragment key={step.id}>
+                  <button className="app-step-btn" onClick={() => goToStep(step.id)}>
+                    <div className={`app-step-circle ${status}`}>
+                      {isCompleted ? '✓' : index + 1}
                     </div>
-                    <div>
-                      <div style={{ 
-                        fontSize: 'var(--text-xs)', 
-                        opacity: 0.7,
-                        marginBottom: '2px'
-                      }}>
-                        Step {index + 1}
-                      </div>
-                      <div style={{ 
-                        fontSize: 'var(--text-sm)', 
-                        fontWeight: 'var(--font-medium)'
-                      }}>
-                        {step.name}
-                      </div>
-                    </div>
-                  </div>
-                </button>
+                    <span className={`app-step-label ${status}`}>{step.name}</span>
+                  </button>
+                  {index < steps.length - 1 && (
+                    <div className={`app-step-connector ${isCompleted ? 'completed' : 'pending'}`} />
+                  )}
+                </React.Fragment>
               );
             })}
           </div>
+          <div className="app-progress-bar">
+            <div
+              className="app-progress-fill"
+              style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+            />
+          </div>
         </div>
+      </div>
+
+      {/* ── Main Content ─────────────────────────────────────────────────── */}
+      <div className="container" style={{ padding: '32px 16px 60px' }}>
 
         {/* Step Content Card */}
-        <div className="card slide-in-right" style={{ 
-          marginBottom: '24px',
-          minHeight: '500px'
-        }}>
-          <div style={{ marginBottom: '32px' }}>
-            <h2 style={{ 
-              fontSize: 'var(--text-2xl)', 
-              fontWeight: 'var(--font-semibold)', 
-              margin: '0 0 8px 0',
-              color: 'var(--text-primary)'
+        <div className="card slide-in-right" style={{ marginBottom: '24px', minHeight: '500px' }}>
+          <div style={{ marginBottom: '28px' }}>
+            <h2 style={{
+              fontSize: 'var(--text-2xl)',
+              fontWeight: 'var(--font-bold)',
+              margin: 0,
+              color: 'var(--text-primary)',
+              letterSpacing: '-0.02em'
             }}>
-              {steps[currentStep].icon} {steps[currentStep].name}
+              {steps[currentStep].name}
             </h2>
-            <div style={{ 
-              width: '60px',
-              height: '3px',
-              background: 'var(--color-primary)',
-              borderRadius: 'var(--radius-full)'
-            }} />
+            <div className="step-accent-bar" />
           </div>
-
           {renderStepContent()}
         </div>
 
         {/* Navigation Buttons */}
-        <div className="card" style={{ 
+        <div className="card" style={{
           padding: '20px 24px',
           display: 'flex',
           justifyContent: 'space-between',
@@ -339,33 +283,28 @@ const FactFindApp = () => {
             onClick={goToPreviousStep}
             disabled={currentStep === 0}
             className="btn-secondary"
-            style={{ minWidth: '120px' }}
+            style={{ minWidth: '140px' }}
           >
             ← Previous
           </button>
 
-          <div style={{ 
-            fontSize: 'var(--text-sm)',
-            color: 'var(--text-secondary)',
-            fontWeight: 'var(--font-medium)',
-            textAlign: 'center'
+          <span style={{
+            fontSize: 'var(--text-xs)',
+            color: 'var(--text-tertiary)',
+            fontWeight: 600,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            fontFamily: 'var(--font-heading)'
           }}>
-            Step {currentStep + 1} of {steps.length}
-          </div>
+            {currentStep + 1} / {steps.length}
+          </span>
 
           {currentStep < steps.length - 1 ? (
-            <button
-              onClick={goToNextStep}
-              className="btn-primary"
-              style={{ minWidth: '120px' }}
-            >
-              Next →
+            <button onClick={goToNextStep} className="btn-primary" style={{ minWidth: '140px' }}>
+              Continue →
             </button>
           ) : (
-            <button
-              onClick={handleSubmit}
-              className="btn-success"
-            >
+            <button onClick={handleSubmit} className="btn-success">
               Submit to Processing →
             </button>
           )}
@@ -373,82 +312,82 @@ const FactFindApp = () => {
 
       </div>
 
-      {/* ── Submission overlays ─────────────────────────────────────────── */}
+      {/* ── Submission Overlays ───────────────────────────────────────────── */}
 
-      {/* Success screen */}
+      {/* Success */}
       {submission.status === 'success' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ background: 'white', borderRadius: '16px', padding: '40px', maxWidth: '500px', width: '100%', textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
-            <div style={{ fontSize: '56px', marginBottom: '16px' }}>🎉</div>
-            <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#166534', margin: '0 0 8px' }}>Submitted Successfully!</h2>
-            <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 24px' }}>
-              <strong>{submission.notionTitle}</strong> has been added to the Pipeline as <strong>Pending Assignment</strong>.
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '16px', padding: '40px', maxWidth: '480px', width: '100%', textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.35)' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
+            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '20px', fontWeight: 700, color: 'var(--color-success)', margin: '0 0 10px' }}>Submitted Successfully!</h2>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: '0 0 24px', lineHeight: 1.6 }}>
+              <strong style={{ color: 'var(--text-primary)' }}>{submission.notionTitle}</strong> has been added to the Pipeline as <strong>Pending Assignment</strong>.
             </p>
             <a href={submission.notionUrl} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'inline-block', padding: '12px 28px', background: '#0369a1', color: 'white', borderRadius: '8px', fontWeight: '600', fontSize: '14px', textDecoration: 'none', marginBottom: '12px' }}>
+              style={{ display: 'inline-block', padding: '12px 28px', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', borderRadius: '8px', fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '13px', letterSpacing: '0.06em', textDecoration: 'none', textTransform: 'uppercase', marginBottom: '12px' }}>
               Open in Notion →
             </a>
             <br />
             <button onClick={() => setSubmission(s => ({ ...s, status: 'idle' }))}
-              style={{ marginTop: '8px', padding: '10px 20px', background: 'none', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: '#6b7280' }}>
+              style={{ marginTop: '8px', padding: '10px 20px', background: 'none', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>
               Close
             </button>
           </div>
         </div>
       )}
 
-      {/* Duplicate found — ask broker */}
+      {/* Duplicate */}
       {submission.status === 'duplicate' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ background: 'white', borderRadius: '16px', padding: '36px', maxWidth: '520px', width: '100%', boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '16px', padding: '36px', maxWidth: '520px', width: '100%', boxShadow: '0 25px 60px rgba(0,0,0,0.35)' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px', textAlign: 'center' }}>⚠️</div>
-            <h2 style={{ fontSize: '19px', fontWeight: '700', color: '#92400e', margin: '0 0 8px', textAlign: 'center' }}>Existing Record Found</h2>
-            <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 16px', textAlign: 'center' }}>
+            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '18px', fontWeight: 700, color: 'var(--color-warning-dark)', margin: '0 0 8px', textAlign: 'center' }}>Existing Record Found</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 16px', textAlign: 'center' }}>
               The following pipeline {submission.duplicates.length === 1 ? 'entry matches' : 'entries match'} this applicant name:
             </p>
             <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {submission.duplicates.map(d => (
-                <div key={d.id} style={{ padding: '12px 14px', background: '#fef9c3', border: '1px solid #fde68a', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={d.id} style={{ padding: '12px 14px', background: 'var(--color-warning-light)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontWeight: '600', fontSize: '14px' }}>{d.title}</div>
-                    <div style={{ fontSize: '12px', color: '#92400e' }}>{d.status}</div>
+                    <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>{d.title}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-warning-dark)' }}>{d.status}</div>
                   </div>
                   <a href={d.url} target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize: '12px', color: '#0369a1', textDecoration: 'none', fontWeight: '500', whiteSpace: 'nowrap', marginLeft: '12px' }}>
+                    style={{ fontSize: '12px', color: 'var(--color-gold)', textDecoration: 'none', fontWeight: 600, whiteSpace: 'nowrap', marginLeft: '12px' }}>
                     View →
                   </a>
                 </div>
               ))}
             </div>
-            <p style={{ fontSize: '13px', color: '#374151', margin: '0 0 20px', textAlign: 'center' }}>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 20px', textAlign: 'center' }}>
               Would you like to create a new page anyway, or cancel to review?
             </p>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => setSubmission(s => ({ ...s, status: 'idle' }))}
-                style={{ flex: 1, padding: '11px', background: 'none', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
+                style={{ flex: 1, padding: '11px', background: 'none', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>
                 Cancel — Review
               </button>
               <button onClick={doSubmit}
-                style={{ flex: 1, padding: '11px', background: '#0369a1', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
-                Create New Page Anyway
+                style={{ flex: 1, padding: '11px', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontFamily: 'var(--font-heading)', fontWeight: 700, letterSpacing: '0.04em' }}>
+                Create Anyway
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Error overlay */}
+      {/* Error */}
       {submission.status === 'error' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ background: 'white', borderRadius: '16px', padding: '36px', maxWidth: '460px', width: '100%', textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '16px', padding: '36px', maxWidth: '460px', width: '100%', textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.35)' }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>❌</div>
-            <h2 style={{ fontSize: '19px', fontWeight: '700', color: '#991b1b', margin: '0 0 8px' }}>Submission Failed</h2>
-            <p style={{ fontSize: '13px', color: '#6b7280', margin: '0 0 8px' }}>An error occurred while submitting to Notion:</p>
-            <p style={{ fontSize: '12px', color: '#dc2626', background: '#fef2f2', padding: '10px', borderRadius: '6px', margin: '0 0 24px', fontFamily: 'monospace', wordBreak: 'break-word' }}>
+            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '18px', fontWeight: 700, color: 'var(--color-danger)', margin: '0 0 8px' }}>Submission Failed</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 8px' }}>An error occurred while submitting to Notion:</p>
+            <p style={{ fontSize: '12px', color: 'var(--color-danger)', background: 'var(--color-danger-light)', padding: '10px', borderRadius: '6px', margin: '0 0 24px', fontFamily: 'monospace', wordBreak: 'break-word' }}>
               {submission.message}
             </p>
             <button onClick={() => setSubmission(s => ({ ...s, status: 'idle' }))}
-              style={{ padding: '11px 28px', background: '#0369a1', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+              style={{ padding: '11px 28px', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontFamily: 'var(--font-heading)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               Close &amp; Try Again
             </button>
           </div>

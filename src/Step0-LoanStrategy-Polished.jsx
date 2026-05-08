@@ -471,10 +471,6 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
         <div className="grid grid-cols-3 mb-4">
           <div>
             <label>Broker Name</label>
-
-        <div className="grid grid-cols-3 mb-4">
-          <div>
-            <label>Broker Name</label>
             <select value={formData.brokerName} onChange={handleBrokerChange}>
               <option value="">Select Broker...</option>
               <option value="Laith Hana">Laith Hana</option>

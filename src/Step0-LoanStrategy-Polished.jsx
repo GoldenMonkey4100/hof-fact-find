@@ -1237,6 +1237,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                   <span>Redraw Facility</span>
                 </label>
               </div>
+            </div>
           </SmartCard>
         );
       })}

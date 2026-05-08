@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import './styles.css';
 import AddressAutocomplete from './AddressAutocomplete';
 
@@ -230,7 +230,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
     if (match.status === 'loading') {
       return (
-        <div style={{ padding: '10px 14px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: '#0369a1' }}>
+        <div style={{ padding: '10px 14px', background: 'var(--bg-info-surface)', border: '1px solid var(--border-info)', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: 'var(--text-info)' }}>
           Searching Mercury database…
         </div>
       );
@@ -269,8 +269,8 @@ const Step1Applicants = ({ formData, updateFormData }) => {
       };
 
       return (
-        <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', overflow: 'hidden' }}>
-          <div style={{ padding: '10px 14px', borderBottom: contacts.length > 1 ? '1px solid #bbf7d0' : 'none', color: '#166534', fontWeight: '600' }}>
+        <div style={{ background: 'var(--bg-success-surface)', border: '1px solid var(--border-success)', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', overflow: 'hidden' }}>
+          <div style={{ padding: '10px 14px', borderBottom: contacts.length > 1 ? '1px solid var(--border-success)' : 'none', color: 'var(--text-success-emphasis)', fontWeight: '600' }}>
             ✓ {totalCount} existing {totalCount === 1 ? 'client' : 'clients'} found in Mercury
             {totalCount > contacts.length && <span style={{ fontWeight: '400' }}> (showing {contacts.length})</span>}
           </div>
@@ -288,16 +288,16 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               <div key={contact.uniqueId || i} style={{
                 padding: '10px 14px',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px',
-                borderBottom: i < contacts.length - 1 ? '1px solid #bbf7d0' : 'none',
+                borderBottom: i < contacts.length - 1 ? '1px solid var(--border-success)' : 'none',
                 background: i % 2 === 0 ? 'transparent' : 'rgba(134,239,172,0.1)'
               }}>
                 <div>
-                  <span style={{ color: '#166534', fontWeight: '500' }}>{name}</span>
+                  <span style={{ color: 'var(--text-success-emphasis)', fontWeight: '500' }}>{name}</span>
                   <span style={{ marginLeft: '8px', fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: isCompany ? '#dbeafe' : '#f3f4f6', color: isCompany ? '#1d4ed8' : '#374151' }}>
                     {type}
                   </span>
                   {contactPerson && (
-                    <span style={{ marginLeft: '6px', fontSize: '11px', color: '#6b7280' }}>
+                    <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--text-secondary)' }}>
                       c/- {contactPerson}
                     </span>
                   )}
@@ -315,7 +315,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
     if (match.status === 'not_found') {
       return (
-        <div style={{ padding: '10px 14px', background: '#fefce8', border: '1px solid #fde047', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: '#854d0e' }}>
+        <div style={{ padding: '10px 14px', background: 'var(--bg-warning-surface)', border: '1px solid var(--border-warning)', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: 'var(--text-warning-emphasis)' }}>
           No existing client found in Mercury for these details.
         </div>
       );
@@ -323,7 +323,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
     if (match.status === 'error') {
       return (
-        <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: '#991b1b' }}>
+        <div style={{ padding: '10px 14px', background: 'var(--bg-danger-surface)', border: '1px solid var(--border-danger)', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: 'var(--text-danger-emphasis)' }}>
           Mercury lookup error: {match.message || 'Unknown error — check Vercel function logs.'}
         </div>
       );
@@ -455,7 +455,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
             {isPending && sig.submissionId && (
               <button type="button" onClick={() => handleCheckStatus(applicant, index)} disabled={checking}
-                style={{ padding: '5px 10px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '11px', cursor: checking ? 'not-allowed' : 'pointer', color: 'var(--text-secondary)' }}>
+                style={{ padding: '5px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '11px', cursor: checking ? 'not-allowed' : 'pointer', color: 'var(--text-secondary)' }}>
                 {checking ? 'Checking…' : '↻ Check Status'}
               </button>
             )}
@@ -463,7 +463,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               <button type="button"
                 disabled={sending || (!isPending && !canSend)}
                 onClick={() => handleSendESign({ ...applicant, _overrideName: signerName, _overrideEmail: signerEmail, _overridePhone: signerPhone }, index)}
-                style={{ padding: '6px 16px', background: !canSend && !isPending ? '#e2e8f0' : sending ? '#93c5fd' : isPending ? 'white' : 'var(--color-primary)', color: !canSend && !isPending ? '#9ca3af' : isPending ? 'var(--text-primary)' : 'white', border: isPending ? '1px solid var(--border-primary)' : 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: !canSend && !isPending || sending ? 'not-allowed' : 'pointer' }}>
+                style={{ padding: '6px 16px', background: !canSend && !isPending ? '#e2e8f0' : sending ? '#93c5fd' : isPending ? 'white' : 'var(--color-primary)', color: !canSend && !isPending ? '#9ca3af' : isPending ? 'var(--text-primary)' : 'var(--bg-primary)', border: isPending ? '1px solid var(--border-primary)' : 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: !canSend && !isPending || sending ? 'not-allowed' : 'pointer' }}>
                 {sending ? 'Sending…' : isPending ? '↺ Resend' : '✉ Send for Signature'}
               </button>
             )}
@@ -471,13 +471,13 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         </div>
 
         {!canSend && !sig.status && (
-          <div style={{ marginTop: '8px', fontSize: '11px', color: '#92400e', background: '#fefce8', border: '1px solid #fde68a', borderRadius: '5px', padding: '5px 10px' }}>
+          <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-warning-emphasis)', background: 'var(--bg-warning-surface)', border: '1px solid var(--border-warning)', borderRadius: '5px', padding: '5px 10px' }}>
             {!formData.brokerName ? '⚠ Select broker in Step 0 first' : !signerEmail ? '⚠ Enter the applicant\'s email above to enable sending' : ''}
           </div>
         )}
 
         {error && (
-          <div style={{ marginTop: '8px', padding: '7px 10px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '5px', fontSize: '12px', color: '#991b1b' }}>
+          <div style={{ marginTop: '8px', padding: '7px 10px', background: 'var(--bg-danger-surface)', border: '1px solid var(--border-danger)', borderRadius: '5px', fontSize: '12px', color: 'var(--text-danger-emphasis)' }}>
             ⚠️ {error}
           </div>
         )}
@@ -485,11 +485,11 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         {isSigned && sig.submissionId && (
           <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
             <a href={`/api/docuseal-download?submissionId=${sig.submissionId}&type=signed`} target="_blank" rel="noopener noreferrer"
-              style={{ padding: '5px 12px', background: '#166534', color: 'white', borderRadius: '6px', fontSize: '12px', fontWeight: '600', textDecoration: 'none', display: 'inline-block' }}>
+              style={{ padding: '5px 12px', background: 'var(--color-success)', color: 'var(--bg-primary)', borderRadius: '6px', fontSize: '12px', fontWeight: '600', textDecoration: 'none', display: 'inline-block' }}>
               ⬇ Signed Credit Guide
             </a>
             <a href={`/api/docuseal-download?submissionId=${sig.submissionId}&type=audit`} target="_blank" rel="noopener noreferrer"
-              style={{ padding: '5px 12px', background: '#0369a1', color: 'white', borderRadius: '6px', fontSize: '12px', fontWeight: '600', textDecoration: 'none', display: 'inline-block' }}>
+              style={{ padding: '5px 12px', background: 'var(--color-gold)', color: 'var(--bg-primary)', borderRadius: '6px', fontSize: '12px', fontWeight: '600', textDecoration: 'none', display: 'inline-block' }}>
               ⬇ Audit Trail
             </a>
           </div>
@@ -518,12 +518,12 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
     return (
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', border: '1px solid #bae6fd', borderRadius: '8px', padding: '14px 16px' }}>
+        <div style={{ background: 'var(--bg-info-surface)', border: '1px solid var(--border-info)', borderRadius: '8px', padding: '14px 16px' }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
             <span style={{ fontSize: '20px' }}>🪪</span>
             <div>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: '#0369a1' }}>Driver Licence — Auto-fill</div>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-info)' }}>Driver Licence — Auto-fill</div>
               <div style={{ fontSize: '12px', color: '#0284c7' }}>
                 Drop both sides at once — AI reads front &amp; back and pre-fills all fields
               </div>
@@ -545,7 +545,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             }}
             style={{
               padding: fileCount > 0 ? '10px 12px' : '20px 12px',
-              background: isDragging ? '#dbeafe' : fileCount > 0 ? '#dcfce7' : 'white',
+              background: isDragging ? '#dbeafe' : fileCount > 0 ? '#dcfce7' : 'var(--bg-primary)',
               border: `${isDragging ? '2px dashed #3b82f6' : `1px dashed ${fileCount > 0 ? '#86efac' : '#93c5fd'}`}`,
               borderRadius: '6px', cursor: 'pointer', transition: 'all 0.15s', marginBottom: '10px',
               display: 'flex', alignItems: 'center', gap: '12px',
@@ -557,7 +557,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>
                   Drop licence images here, or click to browse
                 </div>
-                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                   Drop both sides at once — JPG, PNG, or PDF accepted
                 </div>
               </div>
@@ -570,7 +570,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                       <div style={{ fontSize: '11px', fontWeight: '600', color: file ? '#166534' : '#94a3b8' }}>
                         {side === 'front' ? 'Front' : 'Back'}{side === 'front' ? ' *' : ' (optional)'}
                       </div>
-                      {file && <div style={{ fontSize: '10px', color: '#6b7280', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>}
+                      {file && <div style={{ fontSize: '10px', color: 'var(--text-secondary)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>}
                       {!file && (
                         <button type="button" onClick={(e) => {
                           e.stopPropagation();
@@ -585,7 +585,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                     </div>
                     {file && (
                       <button type="button" onClick={(e) => { e.stopPropagation(); setDLFile(index, side, null); }}
-                        style={{ marginLeft: 'auto', fontSize: '14px', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', flexShrink: 0 }}>✕</button>
+                        style={{ marginLeft: 'auto', fontSize: '14px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', flexShrink: 0 }}>✕</button>
                     )}
                   </div>
                 ))}
@@ -595,9 +595,9 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
           {/* Extract button */}
           <button type="button" disabled={!isReady} onClick={() => handleDLExtract(index)}
-            style={{ width: '100%', padding: '8px', background: isReady ? '#0369a1' : '#93c5fd', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: isReady ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            style={{ width: '100%', padding: '8px', background: isReady ? '#0369a1' : '#93c5fd', color: 'var(--bg-primary)', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: isReady ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             {dlExtracting[index] ? (
-              <><span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Reading licence…</>
+              <><span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'var(--bg-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Reading licence…</>
             ) : !hasFront
               ? '📷 Upload licence to auto-fill'
               : `✨ Extract & Auto-fill${hasBack ? ' (Front + Back)' : ' (Front only)'}`}
@@ -605,12 +605,12 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         </div>
 
         {dlExtracted[index]?.success && (
-          <div style={{ marginTop: '6px', padding: '8px 12px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', fontSize: '12px', color: '#166534' }}>
+          <div style={{ marginTop: '6px', padding: '8px 12px', background: 'var(--bg-success-surface)', border: '1px solid var(--border-success)', borderRadius: '6px', fontSize: '12px', color: 'var(--text-success-emphasis)' }}>
             ✓ {dlExtracted[index].fields.length} field{dlExtracted[index].fields.length !== 1 ? 's' : ''} pre-filled from driver licence
           </div>
         )}
         {dlExtracted[index]?.error && (
-          <div style={{ marginTop: '6px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', color: '#991b1b' }}>
+          <div style={{ marginTop: '6px', padding: '8px 12px', background: 'var(--bg-danger-surface)', border: '1px solid var(--border-danger)', borderRadius: '6px', fontSize: '12px', color: 'var(--text-danger-emphasis)' }}>
             ⚠️ Could not extract data: {dlExtracted[index].error}
           </div>
         )}
@@ -910,15 +910,15 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                     <button type="button"
                       disabled={abnLookup[index]?.loading}
                       onClick={() => lookupCompanyABN(index, applicant.companyABN)}
-                      style={{ padding: '0 16px', background: '#0369a1', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', opacity: abnLookup[index]?.loading ? 0.6 : 1 }}>
+                      style={{ padding: '0 16px', background: 'var(--color-gold)', color: 'var(--bg-primary)', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', opacity: abnLookup[index]?.loading ? 0.6 : 1 }}>
                       {abnLookup[index]?.loading ? '…' : '🔍 Verify ABN'}
                     </button>
                   </div>
                   {abnLookup[index]?.error && (
-                    <div style={{ fontSize: '11px', color: '#dc2626', marginTop: '4px' }}>⚠ {abnLookup[index].error}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-danger-emphasis)', marginTop: '4px' }}>⚠ {abnLookup[index].error}</div>
                   )}
                   {abnLookup[index]?.result && (
-                    <div style={{ fontSize: '11px', color: '#166534', marginTop: '4px', padding: '6px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-success-emphasis)', marginTop: '4px', padding: '6px 10px', background: 'var(--bg-success-surface)', border: '1px solid var(--border-success)', borderRadius: '6px' }}>
                       ✓ Verified: <strong>{abnLookup[index].result.entityName}</strong>
                       {abnLookup[index].result.tradingNames?.[0] ? ` (${abnLookup[index].result.tradingNames[0]})` : ''}
                       {' — fields auto-filled below'}
@@ -952,8 +952,8 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                 </div>
 
                 {/* ── ABN & GST Registration ── */}
-                <div style={{ padding: '12px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', marginBottom: '16px' }}>
-                  <p style={{ margin: '0 0 10px', fontSize: '12px', fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>ABN &amp; GST Registration</p>
+                <div style={{ padding: '12px 14px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px', marginBottom: '16px' }}>
+                  <p style={{ margin: '0 0 10px', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>ABN &amp; GST Registration</p>
                   <div className="grid grid-cols-2" style={{ gap: '12px' }}>
                     <div>
                       <label style={{ fontSize: '12px' }}>ABN Status</label>
@@ -970,7 +970,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                       <label style={{ fontSize: '12px' }}>GST Status</label>
                       <input type="text" value={applicant.gstRegistered ? 'Registered' : (applicant.abnStatus ? 'Not Registered' : '')}
                         readOnly
-                        style={{ background: '#f1f5f9', color: applicant.gstRegistered ? '#16a34a' : '#6b7280', fontWeight: '600', cursor: 'default' }} />
+                        style={{ background: 'var(--bg-secondary)', color: applicant.gstRegistered ? '#16a34a' : '#6b7280', fontWeight: '600', cursor: 'default' }} />
                     </div>
                     <div>
                       <label style={{ fontSize: '12px' }}>GST Registered From</label>

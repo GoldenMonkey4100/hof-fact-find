@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import './styles.css';
 import { getBrokerEmail, formatCurrency, parseCurrency, calculateLVR, calculatePropertyValue, calculateLoanAmount, formatCurrencyDisplay } from './utils';
 import AddressAutocomplete from './AddressAutocomplete';
@@ -170,7 +170,7 @@ const ToggleButton = ({ label, active, onClick, color = 'success' }) => {
         padding: '8px 14px', fontSize: '13px', borderRadius: '6px', cursor: 'pointer',
         fontWeight: active ? '600' : '400',
         border: active ? `2px solid ${c.border}` : '1px solid var(--border-primary)',
-        background: active ? c.bg : 'white',
+        background: active ? c.bg : 'var(--bg-primary)',
         color: active ? c.text : 'var(--text-primary)',
         transition: 'all 0.15s'
       }}
@@ -229,8 +229,8 @@ const FundsToCompleteCard = ({ security, allSecurities }) => {
   );
 
   return (
-    <div style={{ marginTop: '12px', padding: '14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
-      <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: '700', color: '#166534' }}>Funds to Complete</p>
+    <div style={{ marginTop: '12px', padding: '14px', background: 'var(--bg-success-surface)', border: '1px solid var(--border-success)', borderRadius: '8px' }}>
+      <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-success-emphasis)' }}>Funds to Complete</p>
       <Row label={`Deposit (${((deposit/propVal)*100).toFixed(1)}%)`} value={fmt(deposit)} />
       {stampDuty > 0 && <Row label={`Stamp Duty${security.isFirstHomeBuyer ? ' (FHB rate)' : ''}${security.state ? ` — ${security.state}` : ''}`} value={fmt(stampDuty)} />}
       {stampDuty === 0 && security.state && <Row label={`Stamp Duty — ${security.state}`} value="Exempt ✓" green />}
@@ -242,7 +242,7 @@ const FundsToCompleteCard = ({ security, allSecurities }) => {
       <Row label="Total Funds Needed" value={fmt(totalNeeded)} bold />
       {hasFunds && (
         <>
-          <div style={{ margin: '8px 0 2px', fontSize: '11px', fontWeight: '600', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Confirmed Funds</div>
+          <div style={{ margin: '8px 0 2px', fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Confirmed Funds</div>
           {methods.map(m => {
             let amt = 0;
             if (m === 'Own Savings' || m === 'Gift from Family')
@@ -276,18 +276,18 @@ const FundsToCompleteCard = ({ security, allSecurities }) => {
             </span>
           </div>
           {surplus < 0 && (
-            <div style={{ fontSize: '11px', color: '#dc2626', marginTop: '4px', fontStyle: 'italic' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-danger-emphasis)', marginTop: '4px', fontStyle: 'italic' }}>
               Client needs an additional {fmt(Math.abs(surplus))} to complete this purchase. Review completion methods above.
             </div>
           )}
         </>
       )}
       {!hasFunds && (
-        <div style={{ marginTop: '8px', padding: '8px 12px', background: '#fefce8', border: '1px solid #fde68a', borderRadius: '6px', fontSize: '12px', color: '#92400e' }}>
+        <div style={{ marginTop: '8px', padding: '8px 12px', background: 'var(--bg-warning-surface)', border: '1px solid var(--border-warning)', borderRadius: '6px', fontSize: '12px', color: 'var(--text-warning-emphasis)' }}>
           ⚠ Select how the client intends to complete the purchase above to verify funds
         </div>
       )}
-      <div style={{ marginTop: '6px', fontSize: '11px', color: '#6b7280' }}>
+      <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-secondary)' }}>
         * Estimates only. Stamp duty and FHOG figures should be confirmed with a solicitor.
       </div>
     </div>
@@ -435,7 +435,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               style={{
                 padding: '12px', borderRadius: '6px', cursor: 'pointer', fontWeight: '500',
                 border: formData.applicantType === type ? '2px solid var(--color-primary)' : '1px solid var(--border-primary)',
-                background: formData.applicantType === type ? 'var(--color-primary)' : 'white',
+                background: formData.applicantType === type ? 'var(--color-primary)' : 'var(--bg-primary)',
                 color: formData.applicantType === type ? 'white' : 'var(--text-primary)'
               }}
             >{type}</button>
@@ -576,10 +576,10 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               const saveRows = (rows) => updateSecurity(index, 'ownershipRows', rows);
 
               return (
-                <div className="mb-4" style={{ padding: '16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                <div className="mb-4" style={{ padding: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px' }}>
                   {/* Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: '#374151' }}>🏠 Property Ownership</p>
+                    <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>🏠 Property Ownership</p>
                     {ownershipRows.length > 0 && (
                       <span style={{ fontSize: '12px', fontWeight: '600', color: totalOk ? '#16a34a' : '#dc2626' }}>
                         {totalOk ? '✓ 100%' : `⚠ ${totalPct.toFixed(1)}% — must equal 100%`}
@@ -588,7 +588,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                   </div>
 
                   {!(formData.applicants?.length > 0) ? (
-                    <div style={{ fontSize: '12px', color: '#9ca3af', padding: '6px 0' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', padding: '6px 0' }}>
                       Complete Step 1 (Applicants) first — ownership will be pre-allocated and names auto-filled as you add applicant details
                     </div>
                   ) : (
@@ -612,7 +612,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                           {/* Legend */}
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                             {ownershipRows.map((row, i) => (
-                              <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#6b7280' }}>
+                              <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-secondary)' }}>
                                 <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length], flexShrink: 0 }} />
                                 <span style={{ fontWeight: '500' }}>{row.name || 'New Owner'}</span>
                                 <span>({parseFloat(row.percentage) || 0}%)</span>
@@ -631,9 +631,9 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
 
                             {/* Name */}
                             {row.type === 'applicant' ? (
-                              <div style={{ fontSize: '13px', fontWeight: '500', color: '#374151', padding: '7px 10px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
+                              <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)', padding: '7px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px' }}>
                                 {row.name}
-                                <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '8px', fontWeight: '400' }}>applicant</span>
+                                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginLeft: '8px', fontWeight: '400' }}>applicant</span>
                               </div>
                             ) : (
                               <input type="text" value={row.name} placeholder="Owner / entity name"
@@ -654,14 +654,14 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                                   saveRows(rows);
                                 }}
                                 style={{ fontSize: '13px', textAlign: 'right', width: '72px' }} />
-                              <span style={{ fontSize: '12px', color: '#6b7280' }}>%</span>
+                              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>%</span>
                             </div>
 
                             {/* Remove (non-applicant only) */}
                             {row.type !== 'applicant' ? (
                               <button type="button"
                                 onClick={() => saveRows(ownershipRows.filter((_, j) => j !== i))}
-                                style={{ padding: '4px 8px', fontSize: '12px', color: '#dc2626', background: 'none', border: '1px solid #fca5a5', borderRadius: '5px', cursor: 'pointer' }}>✕</button>
+                                style={{ padding: '4px 8px', fontSize: '12px', color: 'var(--text-danger-emphasis)', background: 'none', border: '1px solid var(--border-danger)', borderRadius: '5px', cursor: 'pointer' }}>✕</button>
                             ) : <div />}
                           </div>
                         ))}
@@ -675,7 +675,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                       </button>
 
                       {/* ── Guarantors ── */}
-                      <div style={{ paddingTop: '12px', borderTop: '1px solid #e5e7eb', marginBottom: '12px' }}>
+                      <div style={{ paddingTop: '12px', borderTop: '1px solid var(--border-primary)', marginBottom: '12px' }}>
                         <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Guarantors (if any)</label>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                           {formData.applicants.map(a => {
@@ -684,7 +684,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                             return (
                               <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', margin: 0,
                                 padding: '6px 12px', borderRadius: '20px',
-                                background: isG ? '#fdf4ff' : 'white',
+                                background: isG ? '#fdf4ff' : 'var(--bg-primary)',
                                 border: `1px solid ${isG ? '#d8b4fe' : '#e5e7eb'}` }}>
                                 <input type="checkbox" checked={isG}
                                   onChange={(e) => {
@@ -701,7 +701,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                       {/* ── Cross-collateralise ── */}
                       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', margin: 0,
                         padding: '8px 12px', borderRadius: '6px',
-                        background: security.crossCollateralise ? '#fff7ed' : 'white',
+                        background: security.crossCollateralise ? '#fff7ed' : 'var(--bg-primary)',
                         border: `1px solid ${security.crossCollateralise ? '#fed7aa' : '#e5e7eb'}` }}>
                         <input type="checkbox" checked={!!security.crossCollateralise}
                           onChange={(e) => updateSecurity(index, 'crossCollateralise', e.target.checked)} />
@@ -710,7 +710,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                         </span>
                       </label>
                       {security.crossCollateralise && (
-                        <div style={{ fontSize: '11px', color: '#92400e', marginTop: '5px', marginLeft: '4px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-warning-emphasis)', marginTop: '5px', marginLeft: '4px' }}>
                           This property will be pledged as collateral across multiple loans in this application
                         </div>
                       )}
@@ -730,7 +730,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               const overEquity  = cashoutVal > availEquity && availEquity > 0;
 
               return (
-                <div className="mb-4" style={{ padding: '16px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
+                <div className="mb-4" style={{ padding: '16px', background: 'var(--bg-info-surface)', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
                   <p style={{ margin: '0 0 14px 0', fontSize: '13px', fontWeight: '700', color: '#1e40af' }}>
                     Refinance + Cashout — Equity Calculator
                   </p>
@@ -743,8 +743,8 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                         { label: 'Max at 80% LVR', value: `$${Math.round(maxLVR80).toLocaleString()}` },
                         { label: 'Available Equity', value: currBalance > 0 ? `$${Math.round(availEquity).toLocaleString()}` : '—', highlight: currBalance > 0 },
                       ].map(({ label, value, highlight }) => (
-                        <div key={label} style={{ padding: '10px 12px', background: highlight ? '#dbeafe' : 'white', borderRadius: '6px', border: `1px solid ${highlight ? '#93c5fd' : '#e2e8f0'}`, textAlign: 'center' }}>
-                          <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '3px' }}>{label}</div>
+                        <div key={label} style={{ padding: '10px 12px', background: highlight ? '#dbeafe' : 'var(--bg-primary)', borderRadius: '6px', border: `1px solid ${highlight ? '#93c5fd' : '#e2e8f0'}`, textAlign: 'center' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '3px' }}>{label}</div>
                           <div style={{ fontSize: '15px', fontWeight: '700', color: highlight ? '#1d4ed8' : '#1e293b' }}>{value}</div>
                         </div>
                       ))}
@@ -765,7 +765,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                         {availEquity > 0 && (
                           <button type="button"
                             onClick={() => handleRefinanceBreakdown(index, 'cashoutAmount', String(Math.round(availEquity)))}
-                            style={{ fontSize: '11px', color: '#1d4ed8', background: 'none', border: 'none', cursor: 'pointer', padding: '0', fontWeight: '600', textDecoration: 'underline' }}>
+                            style={{ fontSize: '11px', color: 'var(--text-info)', background: 'none', border: 'none', cursor: 'pointer', padding: '0', fontWeight: '600', textDecoration: 'underline' }}>
                             Use max equity →
                           </button>
                         )}
@@ -819,12 +819,12 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
 
             {/* Purchase section — state, stamp duty, completion methods */}
             {security.primaryTransactionTypes.includes('Purchase') && (
-              <div className="mb-4" style={{ padding: '14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
+              <div className="mb-4" style={{ padding: '14px', background: 'var(--bg-success-surface)', border: '1px solid var(--border-success)', borderRadius: '8px' }}>
 
                 {/* State + FHB */}
                 <div className="grid grid-cols-2 mb-3">
                   <div>
-                    <label style={{ fontSize: '13px', color: '#166534' }}>State / Territory</label>
+                    <label style={{ fontSize: '13px', color: 'var(--text-success-emphasis)' }}>State / Territory</label>
                     <select value={security.state || ''}
                       onChange={(e) => updateSecurity(index, 'state', e.target.value)}
                       style={{ fontSize: '13px' }}>
@@ -853,9 +853,9 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                   const duty = calcStampDuty(parseFloat(security.propertyValue), security.state, !!security.isFirstHomeBuyer);
                   if (duty === null) return null;
                   return (
-                    <div style={{ background: 'white', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '10px 12px', marginBottom: '12px' }}>
+                    <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-success)', borderRadius: '6px', padding: '10px 12px', marginBottom: '12px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '13px', color: '#166534' }}>
+                        <span style={{ fontSize: '13px', color: 'var(--text-success-emphasis)' }}>
                           Estimated Stamp Duty — {security.state}{security.isFirstHomeBuyer ? ' (FHB rate)' : ''}
                         </span>
                         <span style={{ fontSize: '15px', fontWeight: '700', color: duty === 0 ? '#16a34a' : '#166534' }}>
@@ -863,7 +863,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                         </span>
                       </div>
                       {security.isFirstHomeBuyer && FHB_CONCESSIONS[security.state]?.note && (
-                        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                           {FHB_CONCESSIONS[security.state].note}
                         </div>
                       )}
@@ -872,7 +872,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                 })()}
 
                 {/* How does the client intend to complete the purchase */}
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#166534' }}>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-success-emphasis)' }}>
                   How does the client intend to complete the purchase?
                 </label>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px', marginBottom: '12px' }}>
@@ -886,7 +886,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
 
                 {/* Per-method sub-fields */}
                 {(security.purchaseCompletionMethods || []).map(method => (
-                  <div key={method} style={{ marginBottom: '10px', padding: '10px 12px', background: 'white', borderRadius: '6px', border: '1px solid #d1fae5' }}>
+                  <div key={method} style={{ marginBottom: '10px', padding: '10px 12px', background: 'var(--bg-primary)', borderRadius: '6px', border: '1px solid #d1fae5' }}>
 
                     {/* Own Savings / Gift from Family → amount + gift relationship */}
                     {(method === 'Own Savings' || method === 'Gift from Family') && (
@@ -937,11 +937,11 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                             ) : null)}
                           </select>
                           {equityProp && (
-                            <div style={{ marginTop: '8px', padding: '8px 10px', background: '#f0fdf4', borderRadius: '4px', fontSize: '12px' }}>
+                            <div style={{ marginTop: '8px', padding: '8px 10px', background: 'var(--bg-success-surface)', borderRadius: '4px', fontSize: '12px' }}>
                               <div>Property Value: <strong>{formatCurrencyDisplay(equityProp.propertyValue)}</strong></div>
                               {epIsCashout ? (
                                 <>
-                                  <div>Transaction: <strong style={{ color: '#1d4ed8' }}>Refinance + Cashout</strong></div>
+                                  <div>Transaction: <strong style={{ color: 'var(--text-info)' }}>Refinance + Cashout</strong></div>
                                   <div style={{ marginTop: '4px', color: availEquity > 0 ? '#166534' : '#dc2626', fontWeight: '600' }}>
                                     Cashout Amount (funds to Security {index + 1}): <strong>${(availEquity || 0).toLocaleString()}</strong>
                                   </div>
@@ -971,17 +971,17 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                         <div>
                           <label style={{ fontSize: '13px' }}>First Home Owner Grant Eligibility</label>
                           {!st ? (
-                            <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
                               Select a state above to check FHOG eligibility
                             </div>
                           ) : !security.isFirstHomeBuyer ? (
-                            <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
                               Tick "First Home Buyer" above to check eligibility
                             </div>
                           ) : fhogData?.amount === 0 ? (
                             <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>{fhogData.note}</div>
                           ) : (
-                            <div style={{ padding: '8px 10px', background: '#f0fdf4', borderRadius: '4px', fontSize: '12px', marginTop: '4px' }}>
+                            <div style={{ padding: '8px 10px', background: 'var(--bg-success-surface)', borderRadius: '4px', fontSize: '12px', marginTop: '4px' }}>
                               <div style={{ fontWeight: '600', color: fhogAmt > 0 ? '#16a34a' : '#9ca3af' }}>
                                 {fhogAmt > 0
                                   ? `Grant: $${fhogAmt.toLocaleString()} ✓`
@@ -990,7 +990,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                                     : `Potential grant: $${fhogData?.amount?.toLocaleString()} — tick "New home" above to confirm`
                                 }
                               </div>
-                              <div style={{ color: '#4b5563', marginTop: '2px' }}>{fhogData?.note}</div>
+                              <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>{fhogData?.note}</div>
                             </div>
                           )}
                         </div>
@@ -1204,7 +1204,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
           <h3 style={{ fontSize: '16px', fontWeight: '600', margin: 0 }}>Lender Preference</h3>
           {(formData.lenderPreference?.length > 0) && (
             <button type="button" onClick={() => updateFormData('lenderPreference', [])}
-              style={{ fontSize: '12px', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+              style={{ fontSize: '12px', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
               Clear all
             </button>
           )}
@@ -1218,7 +1218,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
           },
           {
             label: 'Second-Tier Banks',
-            color: '#065f46', bg: '#f0fdf4', border: '#bbf7d0',
+            color: '#065f46', bg: 'var(--bg-success-surface)', border: '#bbf7d0',
             lenders: ['Macquarie', 'Bankwest', 'ING', 'Suncorp', 'BOQ', 'AMP', 'Bendigo', 'ME Bank', 'Newcastle Permanent'],
           },
           {
@@ -1228,7 +1228,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
           },
           {
             label: 'Other',
-            color: '#374151', bg: '#f9fafb', border: '#e5e7eb',
+            color: 'var(--text-primary)', bg: 'var(--bg-secondary)', border: '#e5e7eb',
             lenders: ['Others'],
           },
         ].map(({ label, color, bg, border, lenders }) => (
@@ -1245,7 +1245,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                       padding: '6px 14px', fontSize: '13px', borderRadius: '20px', cursor: 'pointer',
                       fontWeight: selected ? '600' : '400',
                       border: selected ? `2px solid ${color}` : `1px solid ${border}`,
-                      background: selected ? bg : 'white',
+                      background: selected ? bg : 'var(--bg-primary)',
                       color: selected ? color : '#374151',
                       transition: 'all 0.15s',
                     }}>
@@ -1258,7 +1258,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
         ))}
 
         {formData.lenderPreference?.length > 0 && (
-          <div style={{ marginTop: '10px', padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '12px', color: '#475569' }}>
+          <div style={{ marginTop: '10px', padding: '8px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '12px', color: '#475569' }}>
             Selected ({formData.lenderPreference.length}): <strong>{formData.lenderPreference.join(', ')}</strong>
           </div>
         )}

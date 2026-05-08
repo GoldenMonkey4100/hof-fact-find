@@ -5,6 +5,19 @@
 
 /* ── Light Theme (Option A — Premium Light) ─────────────────────────────── */
 :root {
+  /* Semantic surface colours (info / success / warning / danger boxes) */
+  --bg-info-surface:        #f0f9ff;
+  --bg-success-surface:     #f0fdf4;
+  --bg-danger-surface:      #fef2f2;
+  --bg-warning-surface:     #fefce8;
+  --border-info:            #bae6fd;
+  --border-success:         #86efac;
+  --border-danger:          #fca5a5;
+  --border-warning:         #fde68a;
+  --text-info:              #0369a1;
+  --text-success-emphasis:  #166534;
+  --text-danger-emphasis:   #991b1b;
+  --text-warning-emphasis:  #854d0e;
   /* Brand */
   --color-gold:                 #CBB26B;
   --color-gold-hover:           #b89e58;
@@ -152,6 +165,20 @@
   --shadow-lg:    0 10px 24px -3px rgba(0, 0, 0, 0.40);
   --shadow-focus: 0 0 0 3px rgba(203, 178, 107, 0.14);
   --shadow-card:  0 2px 20px rgba(0, 0, 0, 0.30);
+
+  /* Dark semantic surfaces */
+  --bg-info-surface:        rgba(147, 197, 253, 0.07);
+  --bg-success-surface:     rgba(52, 211, 153, 0.07);
+  --bg-danger-surface:      rgba(248, 113, 113, 0.07);
+  --bg-warning-surface:     rgba(251, 191, 36, 0.07);
+  --border-info:            rgba(147, 197, 253, 0.22);
+  --border-success:         rgba(52, 211, 153, 0.22);
+  --border-danger:          rgba(248, 113, 113, 0.22);
+  --border-warning:         rgba(251, 191, 36, 0.22);
+  --text-info:              #93c5fd;
+  --text-success-emphasis:  #34d399;
+  --text-danger-emphasis:   #f87171;
+  --text-warning-emphasis:  #fbbf24;
 }
 
 /* ── Global Reset ────────────────────────────────────────────────────────── */

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import './styles.css';
 import { formatCurrencyDisplay, parseCurrency } from './utils';
 
@@ -90,10 +90,10 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
   const status    = getVarianceStatus(m1Annual, m2Annual);
 
   const statusConfig = {
-    incomplete:  { bg: '#f8fafc', border: '#e2e8f0', color: '#64748b', icon: '📋', text: 'Enter amounts above to see comparison.' },
-    consistent:  { bg: '#f0fdf4', border: '#86efac', color: '#166534', icon: '✓',  text: 'YTD annualised income is consistent with base income. No issues.' },
-    ytd_higher:  { bg: '#f0f9ff', border: '#bae6fd', color: '#0369a1', icon: 'ℹ️', text: 'YTD is higher than base — likely overtime or allowances. Lenders will typically only accept the base income for servicing unless the higher income is proven consistent over 2 years.' },
-    ytd_lower:   { bg: '#fff7ed', border: '#fed7aa', color: '#9a3412', icon: '⚠️', text: 'YTD is lower than base. This is the income figure lenders will use. An explanation is required.' },
+    incomplete:  { bg: 'var(--bg-secondary)', border: 'var(--border-primary)', color: 'var(--text-secondary)', icon: '📋', text: 'Enter amounts above to see comparison.' },
+    consistent:  { bg: 'var(--bg-success-surface)', border: '#86efac', color: 'var(--text-success-emphasis)', icon: '✓',  text: 'YTD annualised income is consistent with base income. No issues.' },
+    ytd_higher:  { bg: 'var(--bg-info-surface)', border: '#bae6fd', color: 'var(--text-info)', icon: 'ℹ️', text: 'YTD is higher than base — likely overtime or allowances. Lenders will typically only accept the base income for servicing unless the higher income is proven consistent over 2 years.' },
+    ytd_lower:   { bg: 'var(--bg-warning-surface)', border: 'var(--border-warning)', color: 'var(--text-warning-emphasis)', icon: '⚠️', text: 'YTD is lower than base. This is the income figure lenders will use. An explanation is required.' },
   };
   const cfg = statusConfig[status];
 
@@ -112,11 +112,11 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
   const inputStyle = { fontSize: '13px', marginBottom: 0 };
 
   return (
-    <div style={{ marginTop: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+    <div style={{ marginTop: '12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '10px', overflow: 'hidden' }}>
       <div>
 
         {/* Header */}
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white' }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-primary)' }}>
           <div>
             <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
               💰 Income Verification Tool
@@ -132,7 +132,7 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
 
             {/* Method 1: Base Income */}
-            <div style={{ background: '#f8fafc', border: '1px solid var(--border-primary)', borderRadius: '10px', padding: '18px' }}>
+            <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '10px', padding: '18px' }}>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
                 Method 1 — Base Income
               </h3>
@@ -162,7 +162,7 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
                 </div>
               )}
 
-              <div style={{ marginTop: '16px', padding: '12px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', textAlign: 'center' }}>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Annualised Base Income</div>
                 <div style={{ fontSize: '22px', fontWeight: '700', color: m1Annual ? 'var(--color-success-dark)' : 'var(--text-tertiary)' }}>
                   {m1Annual ? fmt(m1Annual) : '—'}
@@ -171,7 +171,7 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
             </div>
 
             {/* Method 2: YTD Annualisation */}
-            <div style={{ background: '#f8fafc', border: '1px solid var(--border-primary)', borderRadius: '10px', padding: '18px' }}>
+            <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '10px', padding: '18px' }}>
               <h3 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
                 Method 2 — YTD Annualisation
               </h3>
@@ -197,7 +197,7 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
                   {[['period', 'Pay Period #'], ['date', 'Start Date']].map(([val, lbl]) => (
                     <button key={val} type="button" onClick={() => setM2InputMode(val)} style={{
                       flex: 1, padding: '6px', border: `1px solid ${m2InputMode === val ? 'var(--color-primary)' : 'var(--border-primary)'}`,
-                      background: m2InputMode === val ? 'var(--color-primary-light)' : 'white',
+                      background: m2InputMode === val ? 'var(--color-primary-light)' : 'var(--bg-primary)',
                       color: m2InputMode === val ? 'var(--color-primary)' : 'var(--text-secondary)',
                       borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer'
                     }}>{lbl}</button>
@@ -229,7 +229,7 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
                 </div>
               )}
 
-              <div style={{ marginTop: '16px', padding: '12px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', textAlign: 'center' }}>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Annualised YTD Income</div>
                 <div style={{ fontSize: '22px', fontWeight: '700', color: m2Annual ? 'var(--color-success-dark)' : 'var(--text-tertiary)' }}>
                   {m2Annual ? fmt(m2Annual) : '—'}
@@ -264,8 +264,8 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
 
           {/* Explanation section — only when YTD is significantly lower */}
           {status === 'ytd_lower' && (
-            <div style={{ padding: '16px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '10px', marginBottom: '0' }}>
-              <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: '#9a3412' }}>
+            <div style={{ padding: '16px', background: 'var(--bg-warning-surface)', border: '1px solid var(--border-warning)', borderRadius: '10px', marginBottom: '0' }}>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-warning-emphasis)' }}>
                 Explanation required — select all that apply:
               </h4>
               {EXPLANATIONS.map(exp => (
@@ -275,13 +275,13 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
                 </label>
               ))}
               <div style={{ marginTop: '8px' }}>
-                <label style={{ ...labelStyle, color: '#9a3412' }}>Additional notes</label>
+                <label style={{ ...labelStyle, color: 'var(--text-warning-emphasis)' }}>Additional notes</label>
                 <textarea
                   value={otherNotes}
                   onChange={(e) => setOtherNotes(e.target.value)}
                   placeholder="Any additional context the lender may need…"
                   rows={3}
-                  style={{ width: '100%', fontSize: '13px', padding: '8px', border: '1px solid #fed7aa', borderRadius: '6px', resize: 'vertical', boxSizing: 'border-box' }}
+                  style={{ width: '100%', fontSize: '13px', padding: '8px', border: '1px solid var(--border-warning)', borderRadius: '6px', resize: 'vertical', boxSizing: 'border-box' }}
                 />
               </div>
             </div>
@@ -289,7 +289,7 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'flex-end', gap: '12px', background: 'white' }}>
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'flex-end', gap: '12px', background: 'var(--bg-primary)' }}>
           <button onClick={onClose} className="btn-secondary">Cancel</button>
           <button
             onClick={handleSave}
@@ -407,9 +407,9 @@ const Step2Employment = ({ formData, updateFormData }) => {
           </button>
         </div>
         {lookup.result && (
-          <div style={{ fontSize: '11px', color: '#166534', marginTop: '3px', lineHeight: '1.6' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-success-emphasis)', marginTop: '3px', lineHeight: '1.6' }}>
             <div>{lookup.result.entityName}{lookup.result.tradingNames?.[0] ? ` (${lookup.result.tradingNames[0]})` : ''} · {lookup.result.entityType}</div>
-            <div style={{ color: '#374151' }}>
+            <div style={{ color: 'var(--text-primary)' }}>
               {lookup.result.abnFrom ? `ABN from: ${lookup.result.abnFrom}` : ''}
               {lookup.result.gstRegistered
                 ? ` · GST Registered${lookup.result.gstDate ? ` from ${lookup.result.gstDate}` : ''}`
@@ -417,7 +417,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
             </div>
           </div>
         )}
-        {lookup.error && <div style={{ fontSize: '11px', color: '#dc2626', marginTop: '3px' }}>⚠ {lookup.error}</div>}
+        {lookup.error && <div style={{ fontSize: '11px', color: 'var(--text-danger-emphasis)', marginTop: '3px' }}>⚠ {lookup.error}</div>}
       </div>
     );
   };
@@ -547,7 +547,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
       <button type="button" onClick={() => updateCurrentEmployment(idx, 'hecs', val)}
         style={{
           flex: 1, padding: '7px 0', border: `1px solid ${emp.hecs === val ? 'var(--color-primary)' : 'var(--border-primary)'}`,
-          background: emp.hecs === val ? 'var(--color-primary-light)' : 'white',
+          background: emp.hecs === val ? 'var(--color-primary-light)' : 'var(--bg-primary)',
           color: emp.hecs === val ? 'var(--color-primary)' : 'var(--text-secondary)',
           borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer'
         }}>{val}</button>
@@ -574,7 +574,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
           onDragLeave={(e) => { e.stopPropagation(); updatePayslip(idx, { dragging: false }); }}
           onDrop={(e) => { e.stopPropagation(); handlePayslipDrop(idx, e); }}
           style={{
-            border: `${isDragging ? '2px dashed #3b82f6' : hasFile ? '1px solid #86efac' : '1px dashed var(--border-primary)'}`,
+            border: `${isDragging ? '2px dashed #3b82f6' : hasFile ? '1px solid var(--border-success)' : '1px dashed var(--border-primary)'}`,
             borderRadius: '8px', padding: '12px 14px',
             background: isDragging ? '#dbeafe' : hasFile ? '#f0fdf4' : 'var(--bg-secondary)',
             transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap'
@@ -593,13 +593,13 @@ const Step2Employment = ({ formData, updateFormData }) => {
           </div>
           {!hasFile && (
             <button type="button" onClick={() => document.getElementById(fileInputId)?.click()}
-              style={{ padding: '6px 16px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}>
+              style={{ padding: '6px 16px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}>
               Browse
             </button>
           )}
           {hasFile && (
             <button type="button" onClick={() => handlePayslipExtract(idx)} disabled={ps.extracting}
-              style={{ padding: '6px 16px', background: ps.extracting ? '#93c5fd' : 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: ps.extracting ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
+              style={{ padding: '6px 16px', background: ps.extracting ? '#93c5fd' : 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: ps.extracting ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
               {ps.extracting ? '⏳ Reading…' : '✨ Extract'}
             </button>
           )}
@@ -607,13 +607,13 @@ const Step2Employment = ({ formData, updateFormData }) => {
 
         {/* ── File controls: preview toggle + remove ── */}
         {hasFile && ps.previewUrl && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', padding: '7px 12px', background: 'white', border: '1px solid #e2e8f0', borderRadius: '7px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', padding: '7px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '7px' }}>
             <button type="button" onClick={() => updatePayslip(idx, { previewOpen: !isPreviewOpen })}
               style={{ fontSize: '12px', fontWeight: '600', color: isPreviewOpen ? '#475569' : 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '5px' }}>
               {isPreviewOpen ? '▲ Hide payslip' : '👁 View payslip'}
             </button>
             <button type="button" onClick={() => setPayslipFile(idx, null)}
-              style={{ fontSize: '12px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              style={{ fontSize: '12px', color: 'var(--text-danger-emphasis)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
               ✕ Remove
             </button>
           </div>
@@ -621,25 +621,25 @@ const Step2Employment = ({ formData, updateFormData }) => {
 
         {/* ── Collapsible inline preview ── */}
         {hasFile && ps.previewUrl && isPreviewOpen && (
-          <div style={{ marginTop: '8px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <div style={{ marginTop: '8px', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-primary)', background: 'var(--bg-secondary)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
             {isPDF
               ? <embed src={ps.previewUrl} type="application/pdf" width="100%" style={{ height: '520px', display: 'block' }} />
-              : <img src={ps.previewUrl} alt="Payslip preview" style={{ width: '100%', display: 'block', objectFit: 'contain', background: '#f8fafc' }} />
+              : <img src={ps.previewUrl} alt="Payslip preview" style={{ width: '100%', display: 'block', objectFit: 'contain', background: 'var(--bg-secondary)' }} />
             }
           </div>
         )}
 
         {/* ── Extraction error ── */}
         {ps.error && (
-          <div style={{ marginTop: '8px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', color: '#991b1b' }}>
+          <div style={{ marginTop: '8px', padding: '8px 12px', background: 'var(--bg-danger-surface)', border: '1px solid var(--border-danger)', borderRadius: '6px', fontSize: '12px', color: 'var(--text-danger-emphasis)' }}>
             ⚠️ {ps.error}
           </div>
         )}
 
         {/* ── Extracted summary ── */}
         {ps.data && (
-          <div style={{ marginTop: '8px', padding: '12px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: '#166534', marginBottom: '8px' }}>✓ Payslip extracted — form fields pre-filled below</div>
+          <div style={{ marginTop: '8px', padding: '12px 14px', background: 'var(--bg-success-surface)', border: '1px solid var(--border-success)', borderRadius: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-success-emphasis)', marginBottom: '8px' }}>✓ Payslip extracted — form fields pre-filled below</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', marginBottom: ps.data.taxAnalysis ? '8px' : '0' }}>
               {[
                 ['Employer', ps.data.employerName],
@@ -653,7 +653,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
               ].filter(([, v]) => v).map(([label, val]) => (
                 <div key={label} style={{ fontSize: '11px' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>{label}: </span>
-                  <span style={{ fontWeight: '600', color: '#166534' }}>{val}</span>
+                  <span style={{ fontWeight: '600', color: 'var(--text-success-emphasis)' }}>{val}</span>
                 </div>
               ))}
             </div>
@@ -695,7 +695,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
                 onChange={(e) => updateCurrentEmployment(idx, 'baseIncome', parseCurrency(e.target.value))}
                 style={{ fontSize: '13px' }} />
               {fmtIncDisplay(emp.baseIncome) && (
-                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>{fmtIncDisplay(emp.baseIncome)}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>{fmtIncDisplay(emp.baseIncome)}</div>
               )}
             </div>
           </div>
@@ -706,7 +706,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
                 onChange={(e) => updateCurrentEmployment(idx, 'bonusIncome', parseCurrency(e.target.value))}
                 style={{ fontSize: '13px' }} />
               {fmtIncDisplay(emp.bonusIncome) && (
-                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>{fmtIncDisplay(emp.bonusIncome)}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>{fmtIncDisplay(emp.bonusIncome)}</div>
               )}
             </div>
             <div>
@@ -715,7 +715,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
                 onChange={(e) => updateCurrentEmployment(idx, 'commissions', parseCurrency(e.target.value))}
                 style={{ fontSize: '13px' }} />
               {fmtIncDisplay(emp.commissions) && (
-                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '3px' }}>{fmtIncDisplay(emp.commissions)}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>{fmtIncDisplay(emp.commissions)}</div>
               )}
             </div>
             <div>
@@ -733,7 +733,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
             const statusColors = { consistent: '#166534', ytd_higher: '#0369a1', ytd_lower: '#9a3412', incomplete: '#64748b' };
             const statusLabels = { consistent: '✓ Consistent', ytd_higher: 'ℹ️ YTD Higher', ytd_lower: '⚠️ YTD Lower — flagged', incomplete: '—' };
             return (
-              <div style={{ padding: '10px 12px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '12px', marginBottom: '8px' }}>
+              <div style={{ padding: '10px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '12px', marginBottom: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <span style={{ fontWeight: '600' }}>Income Verification</span>
                   <span style={{ color: statusColors[v.status] || '#64748b', fontWeight: '600' }}>{statusLabels[v.status] || v.status}</span>
@@ -761,7 +761,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
           ) : (
             <button type="button"
               onClick={() => setVerifierExpanded(p => ({ ...p, [idx]: true }))}
-              style={{ width: '100%', padding: '8px', background: 'white', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              style={{ width: '100%', padding: '8px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
               {record.currentEmployment.incomeVerification ? '✏️ Edit Income Verification' : '💰 Open Income Verification Tool'}
             </button>
           )}

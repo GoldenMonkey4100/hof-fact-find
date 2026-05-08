@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import './styles.css';
 import { formatCurrency, parseCurrency, formatCurrencyDisplay } from './utils';
 
@@ -476,10 +476,10 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
                   <div style={{ fontSize: '11px', color: 'var(--color-success-dark)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Total Assets</div>
                   <div style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-success-dark)' }}>{formatCurrencyDisplay(ta.toString())}</div>
                 </div>
-                <div style={{ padding: '14px 16px', background: '#fef2f2', borderRadius: '8px', border: '1px solid #fca5a5', textAlign: 'center' }}>
-                  <div style={{ fontSize: '11px', color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Total Liabilities</div>
-                  <div style={{ fontSize: '18px', fontWeight: '600', color: '#991b1b' }}>{formatCurrencyDisplay(tl.toString())}</div>
-                  {monthlyRepay > 0 && <div style={{ fontSize: '11px', color: '#991b1b', marginTop: '2px' }}>{formatCurrencyDisplay(monthlyRepay.toString())}/mo repayments</div>}
+                <div style={{ padding: '14px 16px', background: 'var(--bg-danger-surface)', borderRadius: '8px', border: '1px solid var(--border-danger)', textAlign: 'center' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-danger-emphasis)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Total Liabilities</div>
+                  <div style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-danger-emphasis)' }}>{formatCurrencyDisplay(tl.toString())}</div>
+                  {monthlyRepay > 0 && <div style={{ fontSize: '11px', color: 'var(--text-danger-emphasis)', marginTop: '2px' }}>{formatCurrencyDisplay(monthlyRepay.toString())}/mo repayments</div>}
                 </div>
                 <div style={{ padding: '14px 16px', background: net >= 0 ? 'var(--color-success-light)' : '#fef2f2', borderRadius: '8px', border: `1px solid ${net >= 0 ? 'var(--color-success)' : '#fca5a5'}`, textAlign: 'center' }}>
                   <div style={{ fontSize: '11px', color: net >= 0 ? 'var(--color-success-dark)' : '#991b1b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Net Position</div>

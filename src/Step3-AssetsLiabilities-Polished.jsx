@@ -1,6 +1,7 @@
 ﻿import React from 'react';
 import './styles.css';
 import { formatCurrency, parseCurrency, formatCurrencyDisplay } from './utils';
+import SmartCard from './SmartCard';
 
 const MANDATORY_ASSETS = [
   { type: 'Savings Account', description: 'Savings' },
@@ -157,13 +158,24 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
         </div>
       </div>
 
-      {allApplicants.map((applicant, applicantIndex) => (
-        <div key={applicant.id} className="card mb-6">
-          <div className="card-header">
-            <h3 className="card-title">
-              {applicant.firstName || applicant.role} {applicant.lastName || applicant.number}'s Assets & Liabilities
-            </h3>
-          </div>
+      {allApplicants.map((applicant, applicantIndex) => {
+        const alName = [applicant.firstName || applicant.role, applicant.lastName || applicant.number].filter(Boolean).join(' ');
+        const assetCount = (applicant.assets || []).filter(a => a.value).length;
+        const liabCount  = (applicant.liabilities || []).filter(l => l.amount).length;
+        const alSummary  = assetCount + liabCount > 0
+          ? `${assetCount} asset${assetCount !== 1 ? 's' : ''} · ${liabCount} liabilit${liabCount !== 1 ? 'ies' : 'y'}`
+          : null;
+        const alStatus   = assetCount + liabCount > 0 ? 'partial' : 'empty';
+
+        return (
+        <SmartCard
+          key={applicant.id}
+          icon="💰"
+          title={`${alName}'s Assets & Liabilities`}
+          summary={alSummary}
+          status={alStatus}
+          defaultOpen={assetCount + liabCount === 0}
+        >
 
           {/* Assets */}
           <div className="mb-6">
@@ -488,8 +500,9 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
               </div>
             );
           })()}
-        </div>
-      ))}
+        </SmartCard>
+        );
+      })}
 
       {allApplicants.length === 0 && (
         <div style={{ padding: '40px', textAlign: 'center', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '2px dashed var(--border-primary)' }}>

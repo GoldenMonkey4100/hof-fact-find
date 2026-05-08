@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import './styles.css';
 import { formatCurrencyDisplay, parseCurrency } from './utils';
+import SmartCard from './SmartCard';
 
 // ── Income calculation helpers ────────────────────────────────────────────────
 
@@ -793,26 +794,23 @@ const Step2Employment = ({ formData, updateFormData }) => {
         const appType         = getApplicantType(record.applicantId);
         const isCompanyBorrower = appType === 'Company Borrower';
 
+        const empSummary = [
+          isCompanyBorrower ? 'Company Borrower' : record.currentEmployments?.[0]?.employerName,
+          isCompanyBorrower ? null : record.currentEmployments?.[0]?.employmentType,
+          record.totalYears > 0 ? `${record.totalYears.toFixed(1)} yrs` : null,
+        ].filter(Boolean).join(' · ') || null;
+        const empStatus = record.meetsRequirement ? 'done'
+          : record.totalYears > 0 ? 'partial' : 'empty';
+
         return (
-          <div key={record.applicantId} className="card mb-6">
-            <div className="card-header">
-              <div>
-                <h3 className="card-title" style={{ margin: 0 }}>
-                  {record.applicantName}
-                  {isCompanyBorrower && <span style={{ fontSize: '12px', fontWeight: '400', color: 'var(--text-secondary)', marginLeft: '8px' }}>Company Borrower</span>}
-                </h3>
-                <p className="card-subtitle">Employment & Income History</p>
-              </div>
-              <div>
-                {isCompanyBorrower ? (
-                  <span className="badge badge-info">Self-Employed</span>
-                ) : record.meetsRequirement ? (
-                  <span className="badge badge-success">✓ {record.totalYears.toFixed(1)} years</span>
-                ) : (
-                  <span className="badge badge-warning">⚠️ {record.totalYears.toFixed(1)} / 3 years</span>
-                )}
-              </div>
-            </div>
+          <SmartCard
+            key={record.applicantId}
+            icon={isCompanyBorrower ? '🏢' : '💼'}
+            title={record.applicantName}
+            summary={empSummary}
+            status={empStatus}
+            defaultOpen={record.totalYears === 0}
+          >
 
             {/* ── Company Borrower ── */}
             {isCompanyBorrower && (
@@ -1023,7 +1021,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
                 )}
               </>
             )}
-          </div>
+          </SmartCard>
         );
       })}
 

@@ -279,65 +279,37 @@ const FactFindApp = () => {
       </div>
 
       {/* ── Main Content ─────────────────────────────────────────────────── */}
-      <div className="container" style={{ padding: '32px 16px 60px' }}>
-
-        {/* Step Content Card */}
-        <div className="card slide-in-right" style={{ marginBottom: '24px', minHeight: '500px' }}>
-          <div style={{ marginBottom: '28px' }}>
-            <h2 style={{
-              fontSize: 'var(--text-2xl)',
-              fontWeight: 'var(--font-bold)',
-              margin: 0,
-              color: 'var(--text-primary)',
-              letterSpacing: '-0.02em'
-            }}>
-              {steps[currentStep].name}
-            </h2>
-            <div className="step-accent-bar" />
-          </div>
-          {renderStepContent()}
+      <div style={{ maxWidth: '860px', margin: '0 auto', padding: '24px 16px 88px' }}>
+        {/* Step page header */}
+        <div className="sc-page-header">
+          <h2 className="sc-page-title">{steps[currentStep].name}</h2>
+          <div className="step-accent-bar" />
         </div>
+        {renderStepContent()}
+      </div>
 
-        {/* Navigation Buttons */}
-        <div className="card" style={{
-          padding: '20px 24px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '16px',
-          flexWrap: 'wrap'
-        }}>
+      {/* ── Sticky Bottom Nav ────────────────────────────────────────────── */}
+      <div className="sc-nav">
+        <div className="sc-nav-inner">
           <button
             onClick={goToPreviousStep}
             disabled={currentStep === 0}
             className="btn-secondary"
-            style={{ minWidth: '140px' }}
+            style={{ minWidth: '120px' }}
           >
             ← Previous
           </button>
-
-          <span style={{
-            fontSize: 'var(--text-xs)',
-            color: 'var(--text-tertiary)',
-            fontWeight: 600,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            fontFamily: 'var(--font-heading)'
-          }}>
-            {currentStep + 1} / {steps.length}
-          </span>
-
+          <span className="sc-nav-count">{currentStep + 1} / {steps.length}</span>
           {currentStep < steps.length - 1 ? (
-            <button onClick={goToNextStep} className="btn-primary" style={{ minWidth: '140px' }}>
+            <button onClick={goToNextStep} className="btn-primary" style={{ minWidth: '120px' }}>
               Continue →
             </button>
           ) : (
             <button onClick={handleSubmit} className="btn-success">
-              Submit to Processing →
+              Submit →
             </button>
           )}
         </div>
-
       </div>
 
       {/* ── Submission Overlays ───────────────────────────────────────────── */}

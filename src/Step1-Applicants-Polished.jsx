@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import './styles.css';
 import AddressAutocomplete from './AddressAutocomplete';
+import SmartCard from './SmartCard';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -865,26 +866,27 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         </p>
       </div>
 
-      {applicants.map((applicant, index) => (
-        <div key={applicant.id} className="card mb-6">
+      {applicants.map((applicant, index) => {
+        const appName = applicant.type === 'Company Borrower'
+          ? applicant.companyName
+          : [applicant.firstName, applicant.lastName].filter(Boolean).join(' ');
+        const appSummary = [
+          appName,
+          applicant.type === 'Company Borrower' ? applicant.entityType : applicant.dob,
+          applicant.email || applicant.mobile,
+        ].filter(Boolean).join(' · ') || null;
+        const appStatus = appName && (applicant.email || applicant.mobile)
+          ? 'done' : appName || applicant.email ? 'partial' : 'empty';
 
-          {/* Card Header */}
-          <div className="card-header">
-            <div>
-              <h3 className="card-title" style={{ margin: 0 }}>
-                {applicant.role} {applicant.number}
-                {applicant.type === 'Company Borrower' && applicant.companyName && (
-                  <span style={{ fontWeight: '400', color: 'var(--text-secondary)', marginLeft: '8px' }}>— {applicant.companyName}</span>
-                )}
-                {(applicant.type === 'Natural Person' || applicant.type === 'Director Guarantor') && (applicant.firstName || applicant.lastName) && (
-                  <span style={{ fontWeight: '400', color: 'var(--text-secondary)', marginLeft: '8px' }}>
-                    — {[applicant.firstName, applicant.lastName].filter(Boolean).join(' ')}
-                  </span>
-                )}
-              </h3>
-              <p className="card-subtitle">{getCardSubtitle(applicant.type)}</p>
-            </div>
-          </div>
+        return (
+        <SmartCard
+          key={applicant.id}
+          icon={applicant.type === 'Company Borrower' ? '🏢' : '👤'}
+          title={`${applicant.role} ${applicant.number}${appName ? ` — ${appName}` : ''}`}
+          summary={appSummary}
+          status={appStatus}
+          defaultOpen={!appName}
+        >
 
           {/* ── Company Borrower ── */}
           {applicant.type === 'Company Borrower' && (
@@ -1220,8 +1222,9 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             </>
           )}
 
-        </div>
-      ))}
+        </SmartCard>
+        );
+      })}
 
       {applicants.length === 0 && (
         <div style={{ padding: '40px', textAlign: 'center', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)', border: '2px dashed var(--border-primary)' }}>

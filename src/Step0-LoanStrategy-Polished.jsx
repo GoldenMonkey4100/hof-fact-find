@@ -2,6 +2,7 @@
 import './styles.css';
 import { getBrokerEmail, formatCurrency, parseCurrency, calculateLVR, calculatePropertyValue, calculateLoanAmount, formatCurrencyDisplay } from './utils';
 import AddressAutocomplete from './AddressAutocomplete';
+import SmartCard from './SmartCard';
 
 const LEAD_SOURCES = [
   'Arrow Lawyers','Aus Realty','Barrak Accountants','Blaze Real Estate','Bright Realty',
@@ -422,30 +423,54 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
     security.primaryTransactionTypes.includes('Refinance') &&
     security.secondaryTransactionTypes.includes('Cashout');
 
+  // ── Summary helpers ────────────────────────────────────────────────────────
+  const brokerSummary = [
+    formData.brokerName,
+    formData.clientType,
+    formData.priority,
+  ].filter(Boolean).join(' · ') || null;
+
+  const brokerStatus = formData.brokerName && formData.clientType && formData.priority
+    ? 'done' : formData.brokerName || formData.clientType ? 'partial' : 'empty';
+
+  const lenderSummary = formData.lenderPreference?.length
+    ? formData.lenderPreference.join(', ')
+    : null;
+
+  const lenderStatus = (formData.lenderPreference?.length > 0 && formData.brokerNotes)
+    ? 'done'
+    : (formData.lenderPreference?.length > 0 || formData.brokerNotes)
+    ? 'partial'
+    : 'empty';
+
   return (
     <div className="fade-in">
 
-      {/* Applicant Type */}
-      <div className="mb-8">
-        <label>Applicant Type</label>
-        <div className="grid grid-cols-2">
-          {['Natural Person', 'Company'].map(type => (
-            <button key={type} type="button"
-              onClick={() => updateFormData('applicantType', type)}
-              style={{
-                padding: '12px', borderRadius: '6px', cursor: 'pointer', fontWeight: '500',
-                border: formData.applicantType === type ? '2px solid var(--color-primary)' : '1px solid var(--border-primary)',
-                background: formData.applicantType === type ? 'var(--color-primary)' : 'var(--bg-primary)',
-                color: formData.applicantType === type ? 'white' : 'var(--text-primary)'
-              }}
-            >{type}</button>
-          ))}
+      {/* ── Broker & Application Setup ── */}
+      <SmartCard
+        icon="🏢"
+        title="Broker & Application Setup"
+        summary={brokerSummary}
+        status={brokerStatus}
+        defaultOpen={true}
+      >
+        {/* Applicant Type */}
+        <div className="mb-4">
+          <label>Applicant Type</label>
+          <div className="pill-group">
+            {['Natural Person', 'Company'].map(type => (
+              <button key={type} type="button"
+                className={`pill-btn${formData.applicantType === type ? ' pill-btn--active' : ''}`}
+                onClick={() => updateFormData('applicantType', formData.applicantType === type ? '' : type)}>
+                {type}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Broker Details */}
-      <div className="card mb-8">
-        <h3 className="card-title">Broker Details</h3>
+        <div className="grid grid-cols-3 mb-4">
+          <div>
+            <label>Broker Name</label>
 
         <div className="grid grid-cols-3 mb-4">
           <div>
@@ -489,7 +514,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
         </div>
 
         {formData.clientType === 'New' && (
-          <div>
+          <div className="mt-4">
             <label>Lead Source</label>
             <select value={formData.leadSource} onChange={(e) => updateFormData('leadSource', e.target.value)}>
               <option value="">Select...</option>
@@ -497,42 +522,52 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
             </select>
           </div>
         )}
+
+        <div className="grid grid-cols-2 mt-4">
+          <div>
+            <label>Number of Applicants</label>
+            <select value={formData.numApplicants} onChange={(e) => updateFormData('numApplicants', parseInt(e.target.value))}>
+              {[1,2,3,4].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div>
+            <label>Number of Guarantors</label>
+            <select value={formData.numGuarantors} onChange={(e) => updateFormData('numGuarantors', parseInt(e.target.value))}>
+              {[0,1,2,3,4].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        </div>
+      </SmartCard>
+
+      {/* ── Security Properties ── */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+        <button type="button" onClick={addSecurity} className="btn-secondary" style={{ fontSize: '12px', padding: '7px 14px' }}>+ Add Security</button>
       </div>
 
-      {/* Number of Applicants & Guarantors */}
-      <div className="grid grid-cols-2 mb-8">
-        <div>
-          <label>Number of Applicants</label>
-          <select value={formData.numApplicants} onChange={(e) => updateFormData('numApplicants', parseInt(e.target.value))}>
-            {[1,2,3,4].map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </div>
-        <div>
-          <label>Number of Guarantors</label>
-          <select value={formData.numGuarantors} onChange={(e) => updateFormData('numGuarantors', parseInt(e.target.value))}>
-            {[0,1,2,3,4].map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </div>
-      </div>
+      {formData.securities.map((security, index) => {
+        const secSummary = [
+          security.address,
+          security.propertyValue ? `$${Number(security.propertyValue).toLocaleString()}` : null,
+          security.intendedOccupancy === 'Owner Occupied' ? 'OO' : security.intendedOccupancy === 'Investment' ? 'INV' : null,
+          security.loanType,
+        ].filter(Boolean).join(' · ') || null;
+        const secStatus = security.address && security.propertyValue && security.loanAmount ? 'done'
+          : security.address || security.propertyValue ? 'partial' : 'empty';
 
-      {/* Security Properties */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h3 style={{ fontSize: '18px', fontWeight: '600', margin: 0 }}>Security Properties</h3>
-          <button type="button" onClick={addSecurity} className="btn-secondary">+ Add Security</button>
-        </div>
-
-        {formData.securities.map((security, index) => (
-          <div key={security.id} className="card mb-6">
-            <div className="card-header">
-              <div>
-                <h4 className="card-title" style={{ margin: 0 }}>Security {index + 1}</h4>
-                {security.address && <p className="card-subtitle">{security.address}</p>}
+        return (
+          <SmartCard
+            key={security.id}
+            icon="🏠"
+            title={`Security ${index + 1}${security.address ? ` — ${security.address.split(',')[0]}` : ''}`}
+            summary={secSummary}
+            status={secStatus}
+            defaultOpen={index === 0 && !security.address}
+          >
+            {formData.securities.length > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                <button type="button" onClick={() => removeSecurity(index)} className="btn-danger" style={{ fontSize: '12px' }}>Remove Security</button>
               </div>
-              {formData.securities.length > 1 && (
-                <button type="button" onClick={() => removeSecurity(index)} className="btn-danger">Remove</button>
-              )}
-            </div>
+            )}
 
             {/* Property Address — Google Places autocomplete */}
             <div className="mb-4">
@@ -1206,15 +1241,19 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                   <span>Redraw Facility</span>
                 </label>
               </div>
-            </div>
-          </div>
-        ))}
-      </div>
+          </SmartCard>
+        );
+      })}
 
-      {/* Lender Preference */}
-      <div className="mb-8">
+      {/* Lender Preference & Broker Notes */}
+      <SmartCard
+        icon="🏦"
+        title="Lender Preference & Notes"
+        summary={lenderSummary || (formData.brokerNotes ? 'Notes added' : null)}
+        status={lenderStatus}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '14px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: '600', margin: 0 }}>Lender Preference</h3>
+          <h3 style={{ fontSize: '15px', fontWeight: '600', margin: 0 }}>Lender Preference</h3>
           {(formData.lenderPreference?.length > 0) && (
             <button type="button" onClick={() => updateFormData('lenderPreference', [])}
               style={{ fontSize: '12px', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
@@ -1271,19 +1310,18 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
         ))}
 
         {formData.lenderPreference?.length > 0 && (
-          <div style={{ marginTop: '10px', padding: '8px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '12px', color: '#475569' }}>
+          <div style={{ marginTop: '10px', marginBottom: '20px', padding: '8px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '12px', color: '#475569' }}>
             Selected ({formData.lenderPreference.length}): <strong>{formData.lenderPreference.join(', ')}</strong>
           </div>
         )}
-      </div>
 
-      {/* Broker Strategy Notes */}
-      <div>
-        <label>Broker Strategy Notes</label>
-        <textarea value={formData.brokerNotes} onChange={(e) => updateFormData('brokerNotes', e.target.value)}
-          placeholder="Enter any additional notes about the loan strategy, client preferences, or special circumstances..."
-          rows="5" />
-      </div>
+        <div style={{ marginTop: '20px' }}>
+          <label>Broker Strategy Notes</label>
+          <textarea value={formData.brokerNotes} onChange={(e) => updateFormData('brokerNotes', e.target.value)}
+            placeholder="Enter any additional notes about the loan strategy, client preferences, or special circumstances..."
+            rows="5" />
+        </div>
+      </SmartCard>
     </div>
   );
 };

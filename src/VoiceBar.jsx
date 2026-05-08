@@ -36,20 +36,20 @@ export default function VoiceBar({ currentStep, onFieldsExtracted }) {
       const wav = await recRef.current.stop();
       recRef.current = null;
 
-      const tRes = await fetch('/api/wispr-transcribe', {
+      const tRes = await fetch('/api/voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audio: wav.base64 }),
+        body: JSON.stringify({ action: 'transcribe', audio: wav.base64 }),
       });
       const tData = await tRes.json();
       if (!tRes.ok) throw new Error(tData.error || 'Transcription failed');
 
       const text = tData.transcript || '';
 
-      const eRes = await fetch('/api/voice-extract', {
+      const eRes = await fetch('/api/voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: text, step: currentStep }),
+        body: JSON.stringify({ action: 'extract', transcript: text, step: currentStep }),
       });
       const eData = await eRes.json();
 

@@ -682,12 +682,16 @@ const Step2Employment = ({ formData, updateFormData }) => {
           <div className="grid grid-cols-2 mb-3">
             <div>
               <label style={{ fontSize: '12px' }}>Pay Frequency</label>
-              <select value={emp.payFrequency || ''} onChange={(e) => updateCurrentEmployment(idx, 'payFrequency', e.target.value)} style={{ fontSize: '13px' }}>
-                <option value="">Select…</option>
-                <option value="weekly">Weekly</option>
-                <option value="fortnightly">Fortnightly</option>
-                <option value="monthly">Monthly</option>
-              </select>
+              <div className="pill-group" style={{ marginTop: '6px' }}>
+                {[['weekly', 'Weekly'], ['fortnightly', 'Fortnightly'], ['monthly', 'Monthly']].map(([val, lbl]) => (
+                  <button key={val} type="button"
+                    className={`pill-btn${emp.payFrequency === val ? ' pill-btn--active' : ''}`}
+                    style={{ fontSize: '12px', padding: '6px 11px' }}
+                    onClick={() => updateCurrentEmployment(idx, 'payFrequency', emp.payFrequency === val ? '' : val)}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
             </div>
             <div>
               <label style={{ fontSize: '12px' }}>Base Income (annual)</label>
@@ -861,16 +865,15 @@ const Step2Employment = ({ formData, updateFormData }) => {
 
                   <div className="mb-4">
                     <label>Employment Type</label>
-                    <select value={record.currentEmployment.employmentType} onChange={(e) => updateCurrentEmployment(index, 'employmentType', e.target.value)}>
-                      <option value="">Select...</option>
-                      <option value="Full-Time">Full-Time</option>
-                      <option value="Part-Time">Part-Time</option>
-                      <option value="Casual">Casual</option>
-                      <option value="Self-Employed">Self-Employed</option>
-                      <option value="Contract">Contract</option>
-                      <option value="Unemployed">Unemployed</option>
-                      <option value="Retired">Retired</option>
-                    </select>
+                    <div className="pill-group">
+                      {['Full-Time', 'Part-Time', 'Casual', 'Self-Employed', 'Contract', 'Unemployed', 'Retired'].map(t => (
+                        <button key={t} type="button"
+                          className={`pill-btn${record.currentEmployment.employmentType === t ? ' pill-btn--active' : ''}`}
+                          onClick={() => updateCurrentEmployment(index, 'employmentType', record.currentEmployment.employmentType === t ? '' : t)}>
+                          {t}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {record.currentEmployment.employmentType === 'Self-Employed' && (
@@ -953,14 +956,15 @@ const Step2Employment = ({ formData, updateFormData }) => {
 
                       <div className="mb-4">
                         <label>Employment Type</label>
-                        <select value={prevEmp.employmentType} onChange={(e) => updatePreviousEmployment(index, empIdx, 'employmentType', e.target.value)}>
-                          <option value="">Select...</option>
-                          <option value="Full-Time">Full-Time</option>
-                          <option value="Part-Time">Part-Time</option>
-                          <option value="Casual">Casual</option>
-                          <option value="Self-Employed">Self-Employed</option>
-                          <option value="Contract">Contract</option>
-                        </select>
+                        <div className="pill-group">
+                          {['Full-Time', 'Part-Time', 'Casual', 'Self-Employed', 'Contract'].map(t => (
+                            <button key={t} type="button"
+                              className={`pill-btn${prevEmp.employmentType === t ? ' pill-btn--active' : ''}`}
+                              onClick={() => updatePreviousEmployment(index, empIdx, 'employmentType', prevEmp.employmentType === t ? '' : t)}>
+                              {t}
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 mb-4">

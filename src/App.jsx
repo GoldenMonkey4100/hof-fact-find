@@ -6,6 +6,22 @@ import Step1Applicants from './Step1-Applicants-Polished';
 import Step2Employment from './Step2-Employment-Polished';
 import Step3AssetsLiabilities from './Step3-AssetsLiabilities-Polished';
 import Step4Review from './Step4-Review-Polished';
+import VoiceBar from './VoiceBar';
+
+// Safely sets a value at a nested path like "applicants[0].firstName"
+function deepSet(obj, [key, ...rest], value) {
+  if (key === undefined) return value;
+  const idx = parseInt(key, 10);
+  if (!isNaN(idx) && isFinite(idx)) {
+    if (!Array.isArray(obj)) return obj;
+    if (idx >= obj.length) return obj;  // don't create new array items
+    const arr = [...obj];
+    arr[idx] = deepSet(arr[idx], rest, value);
+    return arr;
+  }
+  if (typeof obj !== 'object' || obj === null) return obj;
+  return { ...obj, [key]: deepSet(obj[key] ?? {}, rest, value) };
+}
 
 const FactFindApp = () => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -102,6 +118,18 @@ const FactFindApp = () => {
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  const handleFieldsExtracted = useCallback((fields) => {
+    setFormData(prev => {
+      let next = { ...prev };
+      for (const [path, value] of Object.entries(fields)) {
+        if (value === null || value === undefined || value === '') continue;
+        const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.');
+        next = deepSet(next, parts, value);
+      }
+      return next;
+    });
+  }, []);
 
   // ── Submission state ──────────────────────────────────────────────────────
   // status: 'idle' | 'checking' | 'duplicate' | 'submitting' | 'success' | 'error'
@@ -375,6 +403,9 @@ const FactFindApp = () => {
           </div>
         </div>
       )}
+
+      {/* Voice Bar */}
+      <VoiceBar currentStep={currentStep} onFieldsExtracted={handleFieldsExtracted} />
 
       {/* Error */}
       {submission.status === 'error' && (

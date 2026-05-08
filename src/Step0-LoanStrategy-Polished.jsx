@@ -459,22 +459,32 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
           </div>
           <div>
             <label>Client Type</label>
-            <select value={formData.clientType} onChange={(e) => updateFormData('clientType', e.target.value)}>
-              <option value="">Select...</option>
-              <option value="New">New</option>
-              <option value="Existing">Existing</option>
-            </select>
+            <div className="pill-group">
+              {['New', 'Existing', 'Family & Friends'].map(t => (
+                <button key={t} type="button"
+                  className={`pill-btn${formData.clientType === t ? ' pill-btn--active' : ''}`}
+                  onClick={() => updateFormData('clientType', formData.clientType === t ? '' : t)}>
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
           <div>
             <label>Priority</label>
-            <select value={formData.priority || ''} onChange={(e) => updateFormData('priority', e.target.value)}
-              style={{ borderColor: formData.priority === 'Urgent' ? '#ef4444' : formData.priority === 'High' ? '#f97316' : undefined }}>
-              <option value="">Select...</option>
-              <option value="Urgent">🔴 Urgent</option>
-              <option value="High">🟠 High</option>
-              <option value="Medium">🟡 Medium</option>
-              <option value="Low">🟢 Low</option>
-            </select>
+            <div className="pill-group">
+              {[
+                { label: 'Urgent', cls: 'urgent' },
+                { label: 'High',   cls: 'high'   },
+                { label: 'Medium', cls: 'medium' },
+                { label: 'Low',    cls: 'low'    },
+              ].map(({ label, cls }) => (
+                <button key={label} type="button"
+                  className={`pill-btn${formData.priority === label ? ` pill-btn--${cls}` : ''}`}
+                  onClick={() => updateFormData('priority', formData.priority === label ? '' : label)}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -1079,12 +1089,15 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               {security.repaymentType !== 'Split' && (
                 <div className="mb-4">
                   <label>Loan Type</label>
-                  <select value={security.loanType}
-                    onChange={(e) => updateSecurity(index, 'loanType', e.target.value)}>
-                    <option value="">Select...</option>
-                    <option value="Principal & Interest">Principal & Interest</option>
-                    <option value="Interest Only">Interest Only</option>
-                  </select>
+                  <div className="pill-group">
+                    {['Principal & Interest', 'Interest Only'].map(t => (
+                      <button key={t} type="button"
+                        className={`pill-btn${security.loanType === t ? ' pill-btn--active' : ''}`}
+                        onClick={() => updateSecurity(index, 'loanType', security.loanType === t ? '' : t)}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 

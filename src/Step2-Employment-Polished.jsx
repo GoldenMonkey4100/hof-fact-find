@@ -41,6 +41,11 @@ const getVarianceStatus = (m1Annual, m2Annual) => {
 };
 
 const fmt = (n) => n ? formatCurrencyDisplay(Math.round(n).toString()) : '—';
+const getAusFYStart = () => {
+  const now = new Date();
+  const year = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${year}-07-01`;
+};
 const fileToBase64 = (file) => new Promise((res, rej) => {
   const r = new FileReader();
   r.onloadend = () => res(r.result.split(',')[1]);
@@ -88,15 +93,15 @@ const EXPLANATIONS = [
 ];
 
 const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) => {
-  const [m1Freq,          setM1Freq]          = useState('annual');
+  const [m1Freq,          setM1Freq]          = useState(initialData?.payFrequency || 'annual');
   const [m1Amount,        setM1Amount]        = useState(initialData?.grossPay || '');
   const [m1Hours,         setM1Hours]         = useState(initialData?.hoursWorked || '38');
   const [m2YTDGross,      setM2YTDGross]      = useState(initialData?.ytdGross || '');
   const [m2Freq,          setM2Freq]          = useState(initialData?.payFrequency || 'fortnightly');
-  const [m2InputMode,     setM2InputMode]     = useState('period');
+  const [m2InputMode,     setM2InputMode]     = useState('date');
   const [m2CurrentPeriod, setM2CurrentPeriod] = useState(initialData?.payPeriodNumber || '');
   const [m2TotalPeriods,  setM2TotalPeriods]  = useState(String(PERIODS[initialData?.payFrequency] || 26));
-  const [m2StartDate,     setM2StartDate]     = useState('');
+  const [m2StartDate,     setM2StartDate]     = useState(getAusFYStart);
   const [m2PayDate,       setM2PayDate]       = useState(initialData?.payDate || '');
   const [checkedExps,     setCheckedExps]     = useState([]);
   const [otherNotes,      setOtherNotes]      = useState('');
@@ -214,11 +219,11 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
               ) : (
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ marginBottom: '8px' }}>
-                    <label style={labelStyle}>Employment Start Date</label>
+                    <label style={labelStyle}>YTD Start Date</label>
                     <input type="date" value={m2StartDate} onChange={(e) => setM2StartDate(e.target.value)} style={inputStyle} />
                   </div>
                   <div>
-                    <label style={labelStyle}>Payslip Pay Date</label>
+                    <label style={labelStyle}>End Pay Period Date</label>
                     <input type="date" value={m2PayDate} onChange={(e) => setM2PayDate(e.target.value)} style={inputStyle} />
                   </div>
                 </div>
@@ -843,34 +848,28 @@ const Step2Employment = ({ formData, updateFormData }) => {
                       </div>
                     )}
 
-                    {record.currentEmployment.employmentType &&
-                     record.currentEmployment.employmentType !== 'Unemployed' &&
-                     record.currentEmployment.employmentType !== 'Retired' && (
-                      <>
-                        <div className="grid grid-cols-2 mb-4">
-                          <div>
-                            <label>Employer Name</label>
-                            <input type="text" value={record.currentEmployment.employer} onChange={(e) => updateCurrentEmployment(index, 'employer', e.target.value)} placeholder="Company name" />
-                          </div>
-                          <div>
-                            <label>Job Title / Role</label>
-                            <input type="text" value={record.currentEmployment.role} onChange={(e) => updateCurrentEmployment(index, 'role', e.target.value)} placeholder="e.g., Senior Developer" />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 mb-4">
-                          <div>
-                            <label>Start Date</label>
-                            <input type="date" value={record.currentEmployment.startDate} onChange={(e) => updateCurrentEmployment(index, 'startDate', e.target.value)} />
-                            {record.currentEmployment.startDate && <div className="hint-text">{calculateTenure(record.currentEmployment.startDate).toFixed(1)} years</div>}
-                          </div>
-                          <div>
-                            <ABNField idx={index} empKey="paye-current" value={record.currentEmployment.abn}
-                              onChange={(v) => updateCurrentEmployment(index, 'abn', v)}
-                              onABNResult={(r) => { if (!record.currentEmployment.employer && r.entityName) updateCurrentEmployment(index, 'employer', r.tradingNames?.[0] || r.entityName); }} />
-                          </div>
-                        </div>
-                      </>
-                    )}
+                    <div className="grid grid-cols-2 mb-4">
+                      <div>
+                        <label>Employer Name</label>
+                        <input type="text" value={record.currentEmployment.employer} onChange={(e) => updateCurrentEmployment(index, 'employer', e.target.value)} placeholder="Company name" />
+                      </div>
+                      <div>
+                        <label>Job Title / Role</label>
+                        <input type="text" value={record.currentEmployment.role} onChange={(e) => updateCurrentEmployment(index, 'role', e.target.value)} placeholder="e.g., Senior Developer" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 mb-4">
+                      <div>
+                        <label>Start Date</label>
+                        <input type="date" value={record.currentEmployment.startDate} onChange={(e) => updateCurrentEmployment(index, 'startDate', e.target.value)} />
+                        {record.currentEmployment.startDate && <div className="hint-text">{calculateTenure(record.currentEmployment.startDate).toFixed(1)} years</div>}
+                      </div>
+                      <div>
+                        <ABNField idx={index} empKey="paye-current" value={record.currentEmployment.abn}
+                          onChange={(v) => updateCurrentEmployment(index, 'abn', v)}
+                          onABNResult={(r) => { if (!record.currentEmployment.employer && r.entityName) updateCurrentEmployment(index, 'employer', r.tradingNames?.[0] || r.entityName); }} />
+                      </div>
+                    </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                       <button type="button" className="btn-primary"

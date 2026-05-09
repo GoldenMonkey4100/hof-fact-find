@@ -457,7 +457,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
       updateFormData('securities', formData.securities.filter((_, i) => i !== index));
   };
 
-  const newSplitRow = () => ({ id: Date.now() + Math.random(), percentage: '', type: '', rateType: '', fixedYears: '', ioYears: '' });
+  const newSplitRow = () => ({ id: Date.now() + Math.random(), inputMode: 'pct', percentage: '', amount: '', type: '', rateType: '', fixedYears: '', ioYears: '' });
 
   const addSplit = (secIndex) => {
     const sec = formData.securities[secIndex];
@@ -1024,18 +1024,31 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
             {security.repaymentType === 'Split' && (() => {
               const splits = security.splits || [];
               const loanAmt = parseFloat(security.loanAmount) || 0;
-              const totalPct = splits.reduce((sum, s) => sum + (parseFloat(s.percentage) || 0), 0);
-              const pctOk = Math.abs(totalPct - 100) < 0.01;
               const splitColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
+
+              // Normalise each split to a dollar amount for total validation
+              const splitDollarAmts = splits.map(s => {
+                if ((s.inputMode || 'pct') === 'amt') return parseFloat(parseCurrency(s.amount || '')) || 0;
+                return loanAmt > 0 && parseFloat(s.percentage) > 0 ? Math.round(loanAmt * parseFloat(s.percentage) / 100) : 0;
+              });
+              const totalAmt = splitDollarAmts.reduce((a, b) => a + b, 0);
+              const allFilled = splits.every(s => (s.inputMode === 'amt' ? !!parseCurrency(s.amount || '') : !!s.percentage));
+              const amtOk = loanAmt > 0 && allFilled && Math.abs(totalAmt - loanAmt) < 1;
+              const amtOver = loanAmt > 0 && allFilled && totalAmt > loanAmt;
+
               return (
                 <div style={{ marginBottom: '20px' }}>
                   <label style={{ marginBottom: '12px', display: 'block' }}>Split Details</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
                     {splits.map((sp, si) => {
                       const col = splitColors[si % splitColors.length];
-                      const computedAmt = loanAmt && parseFloat(sp.percentage) > 0
-                        ? Math.round(loanAmt * parseFloat(sp.percentage) / 100)
-                        : null;
+                      const mode = sp.inputMode || 'pct';
+                      const spAmt = parseFloat(parseCurrency(sp.amount || '')) || 0;
+                      const computedAmt = mode === 'pct' && loanAmt > 0 && parseFloat(sp.percentage) > 0
+                        ? Math.round(loanAmt * parseFloat(sp.percentage) / 100) : null;
+                      const computedPct = mode === 'amt' && loanAmt > 0 && spAmt > 0
+                        ? (spAmt / loanAmt * 100).toFixed(1) : null;
+
                       return (
                         <div key={sp.id} style={{
                           padding: '16px 14px 16px 18px',
@@ -1046,40 +1059,68 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '14px',
-                          position: 'relative',
                         }}>
-                          {/* Header + remove */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          {/* Header: label + % / $ toggle + remove */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
                             <span style={{ fontSize: '12px', fontWeight: '700', color: col, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                               Split {si + 1}
                             </span>
-                            {splits.length > 2 && (
-                              <button type="button" onClick={() => removeSplit(index, sp.id)}
-                                style={{ fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px', opacity: 0.75 }}>
-                                ✕
-                              </button>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {['pct', 'amt'].map(m => (
+                                <button key={m} type="button"
+                                  onClick={() => updateSplit(index, sp.id, 'inputMode', m)}
+                                  style={{
+                                    padding: '2px 8px', fontSize: '11px', fontWeight: '700',
+                                    borderRadius: '4px', cursor: 'pointer',
+                                    border: mode === m ? `1px solid ${col}` : '1px solid var(--border-primary)',
+                                    background: mode === m ? col + '22' : 'var(--bg-primary)',
+                                    color: mode === m ? col : 'var(--text-tertiary)',
+                                  }}>
+                                  {m === 'pct' ? '%' : '$'}
+                                </button>
+                              ))}
+                              {splits.length > 2 && (
+                                <button type="button" onClick={() => removeSplit(index, sp.id)}
+                                  style={{ fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px', opacity: 0.75, marginLeft: '2px' }}>
+                                  ✕
+                                </button>
+                              )}
+                            </div>
                           </div>
 
-                          {/* Percentage + computed amount */}
-                          <div>
-                            <label style={{ fontSize: '12px', marginBottom: '4px', display: 'block' }}>Allocation (%)</label>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <input type="number" className="no-spin" min="0" max="100"
-                                value={sp.percentage}
-                                onChange={(e) => updateSplit(index, sp.id, 'percentage', e.target.value)}
-                                placeholder="e.g. 60"
-                                style={{ fontSize: '20px', fontWeight: '700', width: '80px', textAlign: 'center', padding: '8px 10px' }} />
-                              <span style={{ fontSize: '18px', color: 'var(--text-tertiary)', fontWeight: '300' }}>%</span>
-                            </div>
-                            {computedAmt !== null ? (
-                              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '5px', fontWeight: '500' }}>
-                                = ${computedAmt.toLocaleString()}
+                          {/* Allocation input — % or $ depending on mode */}
+                          {mode === 'pct' ? (
+                            <div>
+                              <label style={{ fontSize: '12px', marginBottom: '4px', display: 'block' }}>Allocation (%)</label>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <input type="number" className="no-spin" min="0" max="100"
+                                  value={sp.percentage}
+                                  onChange={(e) => updateSplit(index, sp.id, 'percentage', e.target.value)}
+                                  placeholder="e.g. 60"
+                                  style={{ fontSize: '20px', fontWeight: '700', width: '80px', textAlign: 'center', padding: '8px 10px' }} />
+                                <span style={{ fontSize: '18px', color: 'var(--text-tertiary)', fontWeight: '300' }}>%</span>
                               </div>
-                            ) : loanAmt === 0 ? (
-                              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>Enter loan amount above to see $</div>
-                            ) : null}
-                          </div>
+                              {computedAmt !== null ? (
+                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '5px', fontWeight: '500' }}>= ${computedAmt.toLocaleString()}</div>
+                              ) : loanAmt === 0 && sp.percentage ? (
+                                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>Enter loan amount above to see $</div>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <div>
+                              <label style={{ fontSize: '12px', marginBottom: '4px', display: 'block' }}>Loan Amount ($)</label>
+                              <input type="text"
+                                value={formatCurrency(sp.amount || '')}
+                                onChange={(e) => updateSplit(index, sp.id, 'amount', parseCurrency(e.target.value))}
+                                placeholder="e.g. 420,000"
+                                style={{ fontSize: '16px', fontWeight: '700', padding: '8px 12px' }} />
+                              {computedPct !== null ? (
+                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '5px', fontWeight: '500' }}>= {computedPct}%</div>
+                              ) : loanAmt === 0 && spAmt > 0 ? (
+                                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>Enter loan amount above to see %</div>
+                              ) : null}
+                            </div>
+                          )}
 
                           {/* Loan Type */}
                           <div>
@@ -1149,14 +1190,18 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                     })}
                   </div>
 
-                  {/* Total % tracker + add button */}
+                  {/* Total tracker + add button */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', gap: '12px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: '600', color: pctOk ? '#16a34a' : totalPct > 100 ? '#ef4444' : '#f59e0b' }}>
-                      {pctOk
-                        ? `✓ ${totalPct}% allocated — splits balanced`
-                        : totalPct > 100
-                          ? `⚠ ${totalPct}% — over by ${(totalPct - 100).toFixed(1)}%`
-                          : splits.some(s => s.percentage !== '') ? `${totalPct}% of 100% allocated` : ''}
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: amtOk ? '#16a34a' : amtOver ? '#ef4444' : '#f59e0b' }}>
+                      {loanAmt > 0 && allFilled
+                        ? amtOk
+                          ? `✓ Splits balance — total $${totalAmt.toLocaleString()}`
+                          : amtOver
+                            ? `⚠ Over by $${(totalAmt - loanAmt).toLocaleString()}`
+                            : `$${totalAmt.toLocaleString()} of $${loanAmt.toLocaleString()} allocated`
+                        : loanAmt > 0 && splits.some(s => s.percentage || s.amount)
+                          ? `$${totalAmt.toLocaleString()} of $${loanAmt.toLocaleString()} allocated`
+                          : ''}
                     </div>
                     <button type="button" onClick={() => addSplit(index)}
                       style={{

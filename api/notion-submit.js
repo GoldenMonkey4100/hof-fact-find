@@ -273,12 +273,21 @@ const buildPageBody = (formData) => {
     if (sec.repaymentType === 'Split') {
       const loanAmt = parseFloat(sec.loanAmount) || 0;
       const splitLines = (sec.splits || []).map((sp, i) => {
-        if (!sp.percentage && !sp.type) return '';
-        const dollarAmt = loanAmt && parseFloat(sp.percentage) > 0
-          ? Math.round(loanAmt * parseFloat(sp.percentage) / 100)
-          : null;
+        const mode = sp.inputMode || 'pct';
+        const hasValue = mode === 'amt' ? !!sp.amount : !!sp.percentage;
+        if (!hasValue && !sp.type) return '';
+        let allocationStr;
+        if (mode === 'amt') {
+          const rawAmt = parseFloat(sp.amount) || 0;
+          const pct = loanAmt > 0 && rawAmt > 0 ? (rawAmt / loanAmt * 100).toFixed(1) + '%' : '';
+          allocationStr = `${fmtCurrency(sp.amount)}${pct ? ` (${pct})` : ''}`;
+        } else {
+          const dollarAmt = loanAmt > 0 && parseFloat(sp.percentage) > 0
+            ? Math.round(loanAmt * parseFloat(sp.percentage) / 100) : null;
+          allocationStr = `${sp.percentage ? sp.percentage + '%' : '—'}${dollarAmt ? ` (${fmtCurrency(String(dollarAmt))})` : ''}`;
+        }
         return [
-          `Split ${i + 1}: ${sp.percentage ? sp.percentage + '%' : '—'}${dollarAmt ? ` (${fmtCurrency(String(dollarAmt))})` : ''}`,
+          `Split ${i + 1}: ${allocationStr}`,
           sp.type     ? `  └ ${sp.type}` : '',
           sp.rateType ? `  └ ${sp.rateType}${sp.fixedYears ? ' (' + sp.fixedYears + 'yr fixed)' : ''}` : '',
           sp.type === 'Interest Only' && sp.ioYears ? `  └ IO: ${sp.ioYears} yrs` : '',

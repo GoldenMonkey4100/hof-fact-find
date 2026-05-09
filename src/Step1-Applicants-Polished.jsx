@@ -24,6 +24,29 @@ const normalizeMediaType = (file) => {
   return MIME_MAP[(file.type || '').toLowerCase()] || 'image/jpeg';
 };
 
+// ── Sub-step bar (mirrors Step 0) ─────────────────────────────────────────────
+const SubStepBar = ({ step, labels, onGoTo }) => (
+  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
+    {labels.map((label, i) => {
+      const n = i + 1; const done = n < step; const active = n === step;
+      return (
+        <React.Fragment key={n}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', cursor: done ? 'pointer' : 'default' }}
+            onClick={() => done && onGoTo(n)}>
+            <div style={{ width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', transition: 'all 0.2s', background: done ? '#10b981' : active ? 'var(--color-primary)' : 'var(--bg-secondary)', color: done || active ? 'white' : 'var(--text-tertiary)', border: done ? '2px solid #10b981' : active ? '2px solid var(--color-primary)' : '1px solid var(--border-primary)' }}>
+              {done ? '✓' : n}
+            </div>
+            <span style={{ fontSize: '11px', fontWeight: active ? '600' : '400', color: active ? 'var(--color-primary)' : done ? '#10b981' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{label}</span>
+          </div>
+          {i < labels.length - 1 && (
+            <div style={{ flex: 1, height: '2px', background: done ? '#10b981' : 'var(--border-primary)', margin: '0 8px', marginBottom: '14px', transition: 'background 0.2s' }} />
+          )}
+        </React.Fragment>
+      );
+    })}
+  </div>
+);
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const Step1Applicants = ({ formData, updateFormData }) => {
@@ -39,6 +62,11 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
   // Increments when AI pre-fills the address → forces AddressAutocomplete remount
   const [addrResetKey, setAddrResetKey]  = useState({});
+
+  // Sub-step tracking per applicant id
+  const [applicantStep, setApplicantStep] = useState({});
+  const getStep   = (id) => applicantStep[id] || 1;
+  const goToStep  = (id, n) => setApplicantStep(p => ({ ...p, [id]: n }));
 
   // ── Mercury lookup ──────────────────────────────────────────────────────────
   const lookupMercury = async (applicantIndex, email, phone) => {
@@ -832,9 +860,19 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Dependants</h4>
         <div className="mb-4">
           <label>Number of Dependants</label>
-          <select value={applicant.numDependants} onChange={(e) => updateApplicant(index, 'numDependants', e.target.value)}>
-            {[0,1,2,3,4,5,6,7,8].map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {[0, 1, 2, 3, 4, '5+'].map(n => {
+              const current = parseInt(applicant.numDependants) || 0;
+              const isActive = n === '5+' ? current >= 5 : current === n;
+              return (
+                <button key={n} type="button"
+                  className={`pill-btn${isActive ? ' pill-btn--active' : ''}`}
+                  onClick={() => updateApplicant(index, 'numDependants', n === '5+' ? 5 : n)}>
+                  {n}
+                </button>
+              );
+            })}
+          </div>
         </div>
         {(applicant.dependants || []).map((dep, depIndex) => (
           <div key={depIndex} style={{ background: 'var(--bg-primary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '8px', border: '1px solid var(--border-primary)' }}>
@@ -856,10 +894,123 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     </div>
   );
 
+  // ── Quick Actions strip ─────────────────────────────────────────────────────
+  const renderQuickActions = (applicant, index) => {
+    const files     = dlFiles[index] || {};
+    const hasFront  = !!files.front;
+    const hasBack   = !!files.back;
+    const extracting = !!dlExtracting[index];
+    const extracted  = !!dlExtracted[index]?.success;
+    const sig        = applicant.eSignature || {};
+    const isSigned   = sig.status === 'signed';
+    const isPending  = sig.status === 'pending';
+    const isDeclined = sig.status === 'declined';
+    const signerName = applicant.type === 'Company Borrower'
+      ? applicant.companyName || ''
+      : [applicant.firstName, applicant.lastName].filter(Boolean).join(' ');
+    const canSend = signerName && applicant.email && formData.brokerName;
+    const inputId = `qa-dl-${index}`;
+
+    const tile = (extra = {}) => ({
+      padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--border-primary)',
+      background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column', gap: '10px',
+      ...extra,
+    });
+
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+
+        {/* 1 — Driver Licence */}
+        <div style={tile(extracted ? { background: 'var(--bg-success-surface)', borderColor: 'var(--border-success)' } : {})}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '16px' }}>🪪</span>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>Driver Licence</span>
+            {extracted && <span style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a', background: '#dcfce7', padding: '1px 7px', borderRadius: '10px' }}>✓ DONE</span>}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            {hasFront
+              ? <>{`✅ ${files.front.name.length > 20 ? files.front.name.slice(0,20)+'…' : files.front.name}`}<br />{hasBack ? `✅ ${files.back.name.length > 20 ? files.back.name.slice(0,20)+'…' : files.back.name}` : '⬜ Back (optional)'}</>
+              : 'No files selected'}
+          </div>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input id={inputId} type="file" accept="image/*,.pdf,application/pdf" multiple style={{ display: 'none' }}
+              onChange={(e) => { const arr = Array.from(e.target.files); if (arr[0]) setDLFile(index,'front',arr[0]); if (arr[1]) setDLFile(index,'back',arr[1]); }} />
+            <label htmlFor={inputId} style={{ flex: 1, padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px', cursor: 'pointer', textAlign: 'center', color: 'var(--text-primary)' }}>
+              📷 {hasFront ? 'Replace' : 'Upload'}
+            </label>
+            <button type="button" disabled={!hasFront || extracting} onClick={() => handleDLExtract(index)}
+              style={{ flex: 1, padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: hasFront && !extracting ? '#0369a1' : '#e2e8f0', color: hasFront && !extracting ? 'white' : '#9ca3af', border: 'none', borderRadius: '6px', cursor: hasFront && !extracting ? 'pointer' : 'not-allowed' }}>
+              {extracting ? '…' : '✨ Extract'}
+            </button>
+          </div>
+          {dlExtracted[index]?.error && <div style={{ fontSize: '10px', color: 'var(--text-danger-emphasis)' }}>⚠ {dlExtracted[index].error}</div>}
+        </div>
+
+        {/* 2 — E-Signature */}
+        <div style={tile(isSigned ? { background: '#f0fdf4', borderColor: '#86efac' } : isPending ? { background: 'var(--bg-info-surface)', borderColor: 'var(--border-info)' } : isDeclined ? { background: 'var(--bg-danger-surface)', borderColor: 'var(--border-danger)' } : {})}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '16px' }}>{isSigned ? '✅' : isPending ? '🕐' : isDeclined ? '❌' : '✍️'}</span>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>Credit Guide</span>
+            {isSigned && <span style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a', background: '#dcfce7', padding: '1px 7px', borderRadius: '10px' }}>SIGNED</span>}
+            {isPending && <span style={{ fontSize: '10px', fontWeight: '700', color: '#0369a1', background: '#dbeafe', padding: '1px 7px', borderRadius: '10px' }}>PENDING</span>}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            {isSigned   ? `Signed by ${sig.name}`
+              : isPending  ? `Sent to ${sig.email}`
+              : isDeclined ? `Declined by ${sig.name}`
+              : canSend    ? `${signerName} · ${applicant.email}`
+              : 'Complete Identity details first'}
+          </div>
+          {!isSigned && (
+            <button type="button" disabled={(!canSend && !isPending) || !!eSignSending[index]}
+              onClick={() => handleSendESign(applicant, index)}
+              style={{ padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: (!canSend && !isPending) ? '#e2e8f0' : isPending ? 'var(--bg-primary)' : 'var(--color-primary)', color: (!canSend && !isPending) ? '#9ca3af' : isPending ? 'var(--text-primary)' : 'white', border: isPending ? '1px solid var(--border-primary)' : 'none', borderRadius: '6px', cursor: (canSend || isPending) ? 'pointer' : 'not-allowed' }}>
+              {eSignSending[index] ? 'Sending…' : isPending ? '↺ Resend' : '✉ Send for Signature'}
+            </button>
+          )}
+          {isSigned && sig.submissionId && (
+            <a href={`/api/docuseal-download?submissionId=${sig.submissionId}&type=signed`} target="_blank" rel="noopener noreferrer"
+              style={{ padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: '#16a34a', color: 'white', borderRadius: '6px', textDecoration: 'none', textAlign: 'center' }}>
+              ⬇ Download Signed
+            </a>
+          )}
+          {eSignError[index] && <div style={{ fontSize: '10px', color: 'var(--text-danger-emphasis)' }}>⚠ {eSignError[index]}</div>}
+        </div>
+
+        {/* 3 — Equifax */}
+        <div style={tile()}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '16px' }}>📋</span>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Equifax</span>
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>Credit file check — opens Equifax portal</div>
+          <button type="button" onClick={() => window.open('https://www.equifax.com.au/business/credit-risk-management', '_blank')}
+            style={{ padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: '#e8041b', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+            Open Equifax ↗
+          </button>
+        </div>
+
+        {/* 4 — illion */}
+        <div style={tile()}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '16px' }}>📋</span>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>illion</span>
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>Credit file check — opens illion portal</div>
+          <button type="button" onClick={() => window.open('https://www.illion.com.au/bureau-services', '_blank')}
+            style={{ padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: '#0f5c32', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+            Open illion ↗
+          </button>
+        </div>
+
+      </div>
+    );
+  };
+
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="fade-in">
-      <div className="mb-6">
+      <div style={{ marginBottom: '20px' }}>
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
           Complete details for {formData.numApplicants} applicant{formData.numApplicants > 1 ? 's' : ''}
           {formData.numGuarantors > 0 && ` and ${formData.numGuarantors} guarantor${formData.numGuarantors > 1 ? 's' : ''}`}
@@ -867,16 +1018,19 @@ const Step1Applicants = ({ formData, updateFormData }) => {
       </div>
 
       {applicants.map((applicant, index) => {
-        const appName = applicant.type === 'Company Borrower'
+        const step    = getStep(applicant.id);
+        const isNP    = applicant.type === 'Natural Person';
+        const isDG    = applicant.type === 'Director Guarantor';
+        const isCo    = applicant.type === 'Company Borrower';
+        const appName = isCo
           ? applicant.companyName
           : [applicant.firstName, applicant.lastName].filter(Boolean).join(' ');
         const appSummary = [
           appName,
-          applicant.type === 'Company Borrower' ? applicant.entityType : applicant.dob,
-          applicant.email || applicant.mobile,
+          isCo ? applicant.entityType : applicant.dob,
+          applicant.email,
         ].filter(Boolean).join(' · ') || null;
-        const appStatus = appName && (applicant.email || applicant.mobile)
-          ? 'done' : appName || applicant.email ? 'partial' : 'empty';
+        const appStatus = appName && applicant.email ? 'done' : appName || applicant.email ? 'partial' : 'empty';
 
         return (
         <SmartCard
@@ -887,9 +1041,23 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           status={appStatus}
           defaultOpen={!appName}
         >
+          {/* Mercury banner — always visible */}
+          {renderMercuryBanner(index)}
+
+          {/* Quick Actions strip — always visible */}
+          {!isCo && renderQuickActions(applicant, index)}
+
+          {/* Sub-step bar — Natural Person & Director Guarantor only */}
+          {!isCo && (
+            <SubStepBar
+              step={step}
+              labels={['Identity', 'Residency']}
+              onGoTo={(n) => goToStep(applicant.id, n)}
+            />
+          )}
 
           {/* ── Company Borrower ── */}
-          {applicant.type === 'Company Borrower' && (
+          {isCo && (
             <>
               <div className="mb-6">
                 <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Company Details</h4>
@@ -1018,204 +1186,172 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             </>
           )}
 
-          {/* ── Director Guarantor ── */}
-          {applicant.type === 'Director Guarantor' && (
+          {/* ── Natural Person & Director Guarantor — sub-steps ── */}
+          {(isNP || isDG) && (
             <>
-              {renderMercuryBanner(index)}
-              {renderDLUpload(applicant, index)}
-              {renderESignatureSection(applicant, index)}
+              {/* Sub-step 1: Identity */}
+              {step === 1 && (
+                <div>
+                  <div className="grid grid-cols-3 mb-4">
+                    <div>
+                      <label>First Name *</label>
+                      <input type="text" value={applicant.firstName || ''} placeholder="John"
+                        onChange={(e) => updateApplicant(index, 'firstName', e.target.value)} />
+                    </div>
+                    <div>
+                      <label>Middle Name</label>
+                      <input type="text" value={applicant.middleName || ''} placeholder="Optional"
+                        onChange={(e) => updateApplicant(index, 'middleName', e.target.value)} />
+                    </div>
+                    <div>
+                      <label>Last Name *</label>
+                      <input type="text" value={applicant.lastName || ''} placeholder="Smith"
+                        onChange={(e) => updateApplicant(index, 'lastName', e.target.value)} />
+                    </div>
+                  </div>
 
-              <div className="mb-6">
-                <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Director / Guarantor Details</h4>
+                  <div className="grid grid-cols-3 mb-4">
+                    <div>
+                      <label>Date of Birth</label>
+                      <input type="date" value={applicant.dob || ''}
+                        onChange={(e) => updateApplicant(index, 'dob', e.target.value)} />
+                    </div>
+                    <div>
+                      <label>Phone</label>
+                      <input type="tel" value={applicant.phone || ''} placeholder="0400 000 000"
+                        onChange={(e) => updateApplicant(index, 'phone', e.target.value)}
+                        onBlur={(e) => lookupMercury(index, applicant.email, e.target.value)} />
+                    </div>
+                    <div>
+                      <label>Licence Number</label>
+                      <input type="text" value={applicant.licenceNumber || ''} placeholder="e.g. 12345678"
+                        onChange={(e) => updateApplicant(index, 'licenceNumber', e.target.value)} />
+                    </div>
+                  </div>
 
-                <div className="grid grid-cols-3 mb-4">
-                  <div>
-                    <label>First Name</label>
-                    <input type="text" value={applicant.firstName || ''} placeholder="John"
-                      onChange={(e) => updateApplicant(index, 'firstName', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Middle Name</label>
-                    <input type="text" value={applicant.middleName || ''} placeholder="Optional"
-                      onChange={(e) => updateApplicant(index, 'middleName', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Last Name</label>
-                    <input type="text" value={applicant.lastName || ''} placeholder="Smith"
-                      onChange={(e) => updateApplicant(index, 'lastName', e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 mb-4">
-                  <div>
-                    <label>Date of Birth</label>
-                    <input type="date" value={applicant.dob || ''}
-                      onChange={(e) => updateApplicant(index, 'dob', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Phone</label>
-                    <input type="tel" value={applicant.phone || ''} placeholder="0400 000 000"
-                      onChange={(e) => updateApplicant(index, 'phone', e.target.value)}
-                      onBlur={(e) => lookupMercury(index, applicant.email, e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Licence Number</label>
-                    <input type="text" value={applicant.licenceNumber || ''} placeholder="e.g. 12345678"
-                      onChange={(e) => updateApplicant(index, 'licenceNumber', e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 mb-4">
-                  <div>
-                    <label>Email</label>
-                    <input type="email" value={applicant.email || ''} placeholder="john.smith@company.com.au"
-                      onChange={(e) => updateApplicant(index, 'email', e.target.value)}
-                      onBlur={(e) => lookupMercury(index, e.target.value, applicant.phone)} />
-                  </div>
-                  <div>
-                    <label>Relationship to Company</label>
-                    <select value={applicant.relationshipToCompany || ''} onChange={(e) => updateApplicant(index, 'relationshipToCompany', e.target.value)}>
-                      <option value="">Select...</option>
-                      <option value="Director">Director</option>
-                      <option value="Shareholder">Shareholder</option>
-                      <option value="Beneficial Owner">Beneficial Owner</option>
-                      <option value="Trustee">Trustee</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                </div>
-
-                {renderAddressHistory(applicant, index)}
-              </div>
-
-              {renderDependants(applicant, index)}
-            </>
-          )}
-
-          {/* ── Natural Person ── */}
-          {applicant.type === 'Natural Person' && (
-            <>
-              {renderMercuryBanner(index)}
-              {renderDLUpload(applicant, index)}
-              {renderESignatureSection(applicant, index)}
-
-              <div className="mb-6">
-                <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Personal Details</h4>
-
-                <div className="grid grid-cols-3 mb-4">
-                  <div>
-                    <label>First Name</label>
-                    <input type="text" value={applicant.firstName} placeholder="John"
-                      onChange={(e) => updateApplicant(index, 'firstName', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Middle Name</label>
-                    <input type="text" value={applicant.middleName || ''} placeholder="Optional"
-                      onChange={(e) => updateApplicant(index, 'middleName', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Last Name</label>
-                    <input type="text" value={applicant.lastName} placeholder="Smith"
-                      onChange={(e) => updateApplicant(index, 'lastName', e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 mb-4">
-                  <div>
-                    <label>Date of Birth</label>
-                    <input type="date" value={applicant.dob}
-                      onChange={(e) => updateApplicant(index, 'dob', e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Phone</label>
-                    <input type="tel" value={applicant.phone} placeholder="0400 000 000"
-                      onChange={(e) => updateApplicant(index, 'phone', e.target.value)}
-                      onBlur={(e) => lookupMercury(index, applicant.email, e.target.value)} />
-                  </div>
-                  <div>
-                    <label>Gender</label>
-                    <select value={applicant.gender} onChange={(e) => updateApplicant(index, 'gender', e.target.value)}>
-                      <option value="">Select...</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 mb-4">
-                  <div>
-                    <label>Email</label>
-                    <input type="email" value={applicant.email} placeholder="john.smith@example.com"
-                      onChange={(e) => updateApplicant(index, 'email', e.target.value)}
-                      onBlur={(e) => lookupMercury(index, e.target.value, applicant.phone)} />
-                  </div>
-                  <div>
-                    <label>Licence Number</label>
-                    <input type="text" value={applicant.licenceNumber || ''} placeholder="e.g. 12345678"
-                      onChange={(e) => updateApplicant(index, 'licenceNumber', e.target.value)} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 mb-4">
-                  <div>
-                    <label>Marital Status</label>
-                    <select value={applicant.maritalStatus} onChange={(e) => updateApplicant(index, 'maritalStatus', e.target.value)}>
-                      <option value="">Select...</option>
-                      <option value="Single">Single</option>
-                      <option value="Married">Married</option>
-                      <option value="De Facto">De Facto</option>
-                      <option value="Divorced">Divorced</option>
-                      <option value="Widowed">Widowed</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label>Residency Status</label>
-                    <select value={applicant.residencyStatus} onChange={(e) => updateApplicant(index, 'residencyStatus', e.target.value)}>
-                      <option value="">Select...</option>
-                      <option value="Australian Citizen">Australian Citizen</option>
-                      <option value="Permanent Resident">Permanent Resident</option>
-                      <option value="Temporary Visa">Temporary Visa</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                </div>
-
-                {applicant.residencyStatus === 'Temporary Visa' && (
                   <div className="mb-4">
-                    <label>Visa Number</label>
-                    <input type="text" value={applicant.visaNumber} placeholder="Enter visa number"
-                      onChange={(e) => updateApplicant(index, 'visaNumber', e.target.value)} />
+                    <label>Email *</label>
+                    <input type="email" value={applicant.email || ''} placeholder="john.smith@example.com"
+                      onChange={(e) => updateApplicant(index, 'email', e.target.value)}
+                      onBlur={(e) => lookupMercury(index, e.target.value, applicant.phone)} />
                   </div>
-                )}
 
-                {renderAddressHistory(applicant, index)}
-              </div>
+                  {isDG && (
+                    <div className="mb-4">
+                      <label>Relationship to Company</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {['Director', 'Shareholder', 'Beneficial Owner', 'Trustee', 'Other'].map(opt => (
+                          <button key={opt} type="button"
+                            className={`pill-btn${applicant.relationshipToCompany === opt ? ' pill-btn--active' : ''}`}
+                            onClick={() => updateApplicant(index, 'relationshipToCompany', applicant.relationshipToCompany === opt ? '' : opt)}>
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-              {index > 0 && (
-                <div className="mb-6">
-                  <label>Relationship to Applicant 1</label>
-                  <select value={applicant.relationshipToApplicant1} onChange={(e) => updateApplicant(index, 'relationshipToApplicant1', e.target.value)}>
-                    <option value="">Select...</option>
-                    <option value="Spouse">Spouse</option>
-                    <option value="De Facto Partner">De Facto Partner</option>
-                    <option value="Parent">Parent</option>
-                    <option value="Sibling">Sibling</option>
-                    <option value="Child">Child</option>
-                    <option value="Business Partner">Business Partner</option>
-                    <option value="Other">Other</option>
-                  </select>
+                  {isNP && (
+                    <div className="mb-4">
+                      <label>Gender</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {['Male', 'Female', 'Other'].map(opt => (
+                          <button key={opt} type="button"
+                            className={`pill-btn${applicant.gender === opt ? ' pill-btn--active' : ''}`}
+                            onClick={() => updateApplicant(index, 'gender', applicant.gender === opt ? '' : opt)}>
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                    <button type="button" className="btn-primary"
+                      onClick={() => goToStep(applicant.id, 2)}
+                      style={{ padding: '9px 24px', fontSize: '13px' }}>
+                      Next: Residency →
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {!shouldShareDependants(index) && renderDependants(applicant, index)}
+              {/* Sub-step 2: Residency */}
+              {step === 2 && (
+                <div>
+                  {isNP && (
+                    <div className="mb-4">
+                      <label>Marital Status</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {['Single', 'Married', 'De Facto', 'Divorced', 'Widowed'].map(opt => (
+                          <button key={opt} type="button"
+                            className={`pill-btn${applicant.maritalStatus === opt ? ' pill-btn--active' : ''}`}
+                            onClick={() => updateApplicant(index, 'maritalStatus', applicant.maritalStatus === opt ? '' : opt)}>
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-              {shouldShareDependants(index) && (
-                <div className="mb-6">
-                  <div style={{ padding: '16px', background: 'var(--color-info-light)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-info)' }}>
-                    <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-info-dark)' }}>
-                      ℹ️ <strong>Shared Dependants:</strong> As the spouse of Applicant 1, dependants are automatically shared and managed in Applicant 1's section.
-                    </p>
+                  {isNP && (
+                    <div className="mb-4">
+                      <label>Residency Status</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {['Australian Citizen', 'Permanent Resident', 'Temporary Visa', 'Other'].map(opt => (
+                          <button key={opt} type="button"
+                            className={`pill-btn${applicant.residencyStatus === opt ? ' pill-btn--active' : ''}`}
+                            onClick={() => updateApplicant(index, 'residencyStatus', applicant.residencyStatus === opt ? '' : opt)}>
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {isNP && applicant.residencyStatus === 'Temporary Visa' && (
+                    <div className="mb-4">
+                      <label>Visa Number</label>
+                      <input type="text" value={applicant.visaNumber || ''} placeholder="Enter visa number"
+                        onChange={(e) => updateApplicant(index, 'visaNumber', e.target.value)} />
+                    </div>
+                  )}
+
+                  {renderAddressHistory(applicant, index)}
+
+                  {isNP && index > 0 && (
+                    <div className="mb-4">
+                      <label>Relationship to Applicant 1</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {['Spouse', 'De Facto Partner', 'Parent', 'Sibling', 'Child', 'Business Partner', 'Other'].map(opt => (
+                          <button key={opt} type="button"
+                            className={`pill-btn${applicant.relationshipToApplicant1 === opt ? ' pill-btn--active' : ''}`}
+                            onClick={() => updateApplicant(index, 'relationshipToApplicant1', applicant.relationshipToApplicant1 === opt ? '' : opt)}>
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {isNP && !shouldShareDependants(index) && renderDependants(applicant, index)}
+
+                  {isNP && shouldShareDependants(index) && (
+                    <div className="mb-6">
+                      <div style={{ padding: '16px', background: 'var(--color-info-light)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-info)' }}>
+                        <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-info-dark)' }}>
+                          ℹ️ <strong>Shared Dependants:</strong> As the spouse of Applicant 1, dependants are automatically shared and managed in Applicant 1's section.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '8px' }}>
+                    <button type="button"
+                      onClick={() => goToStep(applicant.id, 1)}
+                      style={{ padding: '9px 24px', fontSize: '13px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
+                      ← Back: Identity
+                    </button>
                   </div>
                 </div>
               )}

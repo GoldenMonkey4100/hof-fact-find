@@ -12,14 +12,16 @@
 |---|---|---|---|
 | Broker Name | `brokerName` | text | Auto-filled from Mercury or manual |
 | Broker Email | `brokerEmail` | text | Used as `submittedBy` |
-| Client Type | `clientType` | select | New / Existing / Family & Friends — pill toggle |
+| Client Type | `clientType` | select | **New / Existing** — pill toggle |
 | Lead Source | `leadSource` | text | Shown only when `clientType === 'New'` |
 | Number of Applicants | `numApplicants` | number | 1–4 |
 | Number of Guarantors | `numGuarantors` | number | 0–2 |
 | Applicant Type | `applicantType` | select | Natural Person / Company |
-| Priority | `priority` | select | Low / Medium / High / Urgent — colour-coded pill toggle |
+| Priority | `priority` | select | **Medium / High / Urgent** — colour-coded pill toggle |
 | Lender Preference | `lenderPreference` | string[] | Multi-select by tier; flows directly to Notion `Lender` property |
 | Broker Notes | `brokerNotes` | textarea | |
+
+> **Note:** "Family & Friends" was removed from Client Type. "Low" was removed from Priority.
 
 ---
 
@@ -35,15 +37,15 @@
 | Secondary Transaction Types | `secondaryTransactionTypes` | string[] | Cashout / Construction / Off the Plan / Pre-approval / Vacant Land |
 | Intended Occupancy | `intendedOccupancy` | select | Owner Occupied / Investment |
 | Application Type | `applicationType` | select | Full Doc / Low Doc |
-| State | `state` | select | AU state/territory — for stamp duty calculation |
-| First Home Buyer | `isFirstHomeBuyer` | boolean | |
-| New Home | `isNewHome` | boolean | Shown when `isFirstHomeBuyer` is true |
-| Purchase Completion Methods | `purchaseCompletionMethods` | string[] | Own Savings / Gift from Family / Equity from Existing Property / First Home Owner Grant / Other |
+| State | `state` | select | AU state/territory — inside calculator panel (Purchase) |
+| First Home Buyer | `isFirstHomeBuyer` | boolean | Inside calculator panel (Purchase) |
+| New Home | `isNewHome` | boolean | Inside calculator panel; shown when `isFirstHomeBuyer` is true |
+| Purchase Completion Methods | `purchaseCompletionMethods` | string[] | Inside calculator panel; Own Savings / Gift from Family / Equity from Existing Property / First Home Owner Grant / Other |
 | Purchase Completion Amounts | `purchaseCompletionAmounts` | object | Keyed by method name |
-| Gift Relationship | `giftRelationship` | text | Shown when 'Gift from Family' selected |
+| Gift Relationship | `giftRelationship` | text | Inside calculator panel; shown when 'Gift from Family' selected |
 | Equity Property Index | `equityPropertyIndex` | integer | Index into `securities[]` for equity source property |
-| Current Loan Balance | `currentLoanBalance` | currency | Refinance + Cashout only |
-| Cashout Amount | `cashoutAmount` | currency | Refinance + Cashout only |
+| Current Loan Balance | `currentLoanBalance` | currency | Inside calculator panel (Refinance + Cashout) |
+| Cashout Amount | `cashoutAmount` | currency | Inside calculator panel (Refinance + Cashout) |
 | Loan Term | `loanTerm` | number (years) | Sub-step 2 |
 | Loan Type | `loanType` | select | Principal & Interest / Interest Only / Split — Sub-step 2 |
 | Repayment Type | `repaymentType` | select | Sub-step 2 |
@@ -58,8 +60,8 @@
 | Has Offset | `hasOffset` | boolean | Sub-step 2 |
 | Has Redraw | `hasRedraw` | boolean | Sub-step 2 |
 | Ownership Rows | `ownershipRows` | OwnerRow[] | Sub-step 2 |
-| Guarantors | `guarantors` | integer[] | Applicant IDs — Sub-step 2 |
-| Cross-Collateralise | `crossCollateralise` | boolean | Sub-step 2; HOF preference: avoid where possible |
+
+> **Note:** Guarantors and Cross-Collateralise fields exist in the data shape but UI sections are temporarily hidden (removed from Sub-step 2 view pending redesign).
 
 ### OwnerRow shape
 ```js
@@ -103,8 +105,8 @@
   hasRedraw: false,
   // Ownership:
   ownershipRows: [{ id, type: 'applicant'|'other', applicantId, name, percentage }],
-  guarantors: [],
-  crossCollateralise: false,
+  guarantors: [],           // data kept; UI hidden
+  crossCollateralise: false, // data kept; UI hidden
 }
 ```
 
@@ -142,16 +144,16 @@ Each security card has a `SubStepBar` with **2 sub-steps**:
 Field order (top to bottom):
 1. **Property Address** — Google Places autocomplete
 2. **Transaction Type** — Purchase / Refinance (large card buttons)
-3. **Additional Features** — conditional on transaction type selected; pill toggles: Cashout, Construction, Off the Plan, Pre-approval, Vacant Land *(SMSF and Bridging excluded)*
-4. **Occupancy + Application Type** — two-column row (Owner Occupied/Investment | Full Doc/Low Doc)
+3. **Intended Occupancy + Application Type** — two-column row (Owner Occupied/Investment | Full Doc/Low Doc)
+4. **Additional Features** — conditional on transaction type selected; pill toggles: Cashout, Construction, Off the Plan, Pre-approval, Vacant Land *(SMSF and Bridging excluded)*
 5. **Numbers Trio** — shaded box: `Property Value ($)` | `LVR (%)` | `Loan Amount ($)` — tri-directional, any two auto-fills third
-6. **Purchase Details** — conditional on Purchase selected: State/Territory, First Home Buyer checkbox, New Home checkbox, purchase completion methods + amounts
-7. **Cashout Breakdown** — conditional on Refinance + Cashout: Current Loan Balance, Cashout Amount (with "Use max →" shortcut)
-8. **Next: Structure →** button
+6. **Next: Structure →** button
+
+> **Purchase Details and Refinance+Cashout fields are inside the Calculator Panel** (see below), not in the main form.
 
 ### Sub-step 2 — "Structure"
 
-Loan Type matrix → Fixed/IO periods → Split details → Loan Term → Offset/Redraw → Ownership rows → Guarantors → Cross-collateralise → ← Back button
+Loan Type matrix → Fixed/IO periods → Split details → Loan Term → Offset/Redraw → Ownership tiles → ← Back button
 
 ---
 
@@ -183,33 +185,59 @@ LVR is **read-only** when `isRefinanceCashout(security)` is true — auto-calcul
 
 ---
 
-## Inline Calculator Panel
+## Calculator Panel
 
-Each security card has an **inline right-side calculator panel**, toggled via the `📊 ◀/▶` button in the card header (`headerActions` prop on SmartCard).
+Each security card has an inline **below-form calculator panel**, toggled via the `📊 ◀/▶` button in the card header (`headerActions` prop on SmartCard).
+
+**The panel only renders when open** — no empty container is shown before the user clicks the button.
+
+**Auto-triggers:** Selecting Purchase or Cashout automatically opens the calculator panel for that security.
 
 **State:**
 ```js
 const [secCalcOpen, setSecCalcOpen] = useState({});           // keyed by security.id
 const toggleSecCalc = (id) => setSecCalcOpen(prev => ({ ...prev, [id]: !prev[id] }));
 const calcOpen = secCalcOpen[security.id] || false;
+
+// Auto-open on Purchase or Cashout selection:
+if (isAdding && (type === 'Purchase' || type === 'Cashout')) {
+  const secId = securities[securityIndex].id;
+  setSecCalcOpen(prev => ({ ...prev, [secId]: true }));
+}
 ```
 
 **Layout when open:**
 
+The panel extends **downward** below the form using negative margins that cancel the card body's own padding, keeping content within `.sc` bounds so `overflow: hidden` never clips it:
+
 ```jsx
-<div style={{ display: 'flex', alignItems: 'flex-start' }}>
-  <div style={{ flex: 1, minWidth: 0, paddingRight: calcOpen ? '20px' : '0' }}>
-    {/* main form content */}
+{calcOpen && (
+  <div style={{
+    margin: '20px -18px 0',      // cancels sc-body padding: 20px 18px 0
+    borderTop: '2px solid var(--border-primary)',
+    background: 'var(--bg-secondary)',
+    padding: '20px 18px 24px',
+  }}>
+    {/* Header row with ✕ Close button */}
+
+    {isPurchase && (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' }}>
+        {/* Left column: State, First Home Buyer, purchase completion methods + amounts */}
+        {/* Right column: <FundsToCompleteCard /> — live stamp duty + funds breakdown */}
+      </div>
+    )}
+
+    {isRefCashout && (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' }}>
+        {/* Left column: Current Loan Balance, Cashout Amount */}
+        {/* Right column: <EquityCalcContent /> — available equity at 80% LVR */}
+      </div>
+    )}
   </div>
-  {calcOpen && (
-    <div style={{ width: '260px', flexShrink: 0, borderLeft: '1px solid var(--border-primary)', paddingLeft: '20px' }}>
-      {isPurchase    && <FundsToCompleteCard security={security} allSecurities={formData.securities} />}
-      {isRefCashout  && <EquityCalcContent security={security} />}
-      {!isPurchase && !isRefCashout && <p>Select a transaction type to see calculations.</p>}
-    </div>
-  )}
-</div>
+)}
 ```
+
+> **Why negative margins?** `.sc` has `overflow: hidden`. A side-panel approach clips at the card edge. Extending downward within the card's own bounds with `margin: '20px -18px 0'` (which exactly cancels `.sc-body`'s `padding: 20px 18px 0`) fills the full card width without triggering the overflow clip.
 
 **`EquityCalcContent`** — shows property value, max 80% LVR, current balance, available equity, over-equity warning.
 
@@ -225,13 +253,42 @@ All stamp duty brackets, FHB concessions, and FHOG data are hardcoded constants 
 
 ---
 
+## Property Ownership Tiles (Sub-step 2)
+
+Ownership is displayed as a grid of color-coded tiles, one per owner.
+
+**Color palette:** `OWNERSHIP_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#06b6d4']`
+
+**Grid:** `repeat(auto-fill, minmax(175px, 1fr))` with `gap: 10px`
+
+**Each tile contains:**
+- 4px left color accent bar (absolute positioned)
+- Owner name (read-only for applicants, editable input for "other" type)
+- Role badge — "Applicant N" for applicants
+- Percentage stepper: `[−]` · `[64px input]` · `[+]` — steps in increments of 5
+- ✕ remove button (top-right, only shown for non-applicant owners)
+
+**Controls below tiles:**
+- Progress bar showing total ownership %
+- Remaining/over label (e.g. "+15.0% remaining" or "−5.0% over")
+- **= Equal Split** button — divides 100% equally across all owners
+- **+ Add owner** dashed button — appends a new "other" type row
+
+**`computeOwnershipRows()` helper** — merges stored ownership rows with the live applicant list. Called on render; result passed to tile grid.
+
+**Critical field names:** `row.name`, `row.percentage` (NOT `row.pct`), `sec.ownershipRows` (NOT `sec.owners`).
+
+---
+
 ## Conditional Rendering Rules
 
 | Condition | What shows |
 |---|---|
 | `primaryTransactionTypes.length > 0` | Additional Features pills |
-| `primaryTransactionTypes.includes('Purchase')` | Purchase Details section |
-| `isRefinanceCashout(security)` | Cashout Breakdown section; LVR read-only; Total Loan label |
+| `primaryTransactionTypes.includes('Purchase')` | Purchase column inside calculator panel |
+| `isRefinanceCashout(security)` | Cashout column inside calculator panel; LVR read-only; Total Loan label |
+| `calcOpen === true` | Calculator panel (below form) |
+| `type === 'Purchase' \|\| type === 'Cashout'` selected | Calculator auto-opens |
 | `loanType === 'Split'` | Split 1 and Split 2 sub-fields (sub-step 2) |
 | `loanType === 'Interest Only'` | IO period selector (sub-step 2) |
 | `repaymentType === 'Fixed'` | Fixed rate period selector (sub-step 2) |

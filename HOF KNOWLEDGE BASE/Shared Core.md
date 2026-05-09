@@ -173,7 +173,7 @@ const status = sec.address && sec.loanAmount ? 'done' : sec.address ? 'partial' 
 </div>
 ```
 
-Priority pills use colour-coded active classes: `pill-btn--urgent` | `pill-btn--high` | `pill-btn--medium` | `pill-btn--low`
+Priority pills use colour-coded active classes: `pill-btn--urgent` | `pill-btn--high` | `pill-btn--medium`
 
 ### Voice Input (VoiceBar)
 

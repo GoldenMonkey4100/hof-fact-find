@@ -604,7 +604,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
             background: calcOpen ? '#eef2ff' : 'var(--bg-secondary)',
             color: calcOpen ? '#4338ca' : 'var(--text-secondary)',
           }}>
-            📊 {calcOpen ? '◀' : '▶'}
+            📊 {calcOpen ? '▼' : '▲'}
           </button>
         }
       >
@@ -712,7 +712,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                 <div>
                   <label style={{ fontSize: '12px', marginBottom: '4px', display: 'block' }}>LVR (%)</label>
                   <input type="text"
-                    value={security.lvr ? parseFloat(security.lvr).toFixed(1) : ''}
+                    value={security.lvr ?? ''}
                     onChange={(e) => handleLvrChange(index, e.target.value)}
                     placeholder="80.0"
                     readOnly={isRefinanceCashout(security)}
@@ -791,13 +791,6 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                               onChange={(e) => updateSecurity(index, 'isFirstHomeBuyer', e.target.checked)} />
                             First Home Buyer
                           </label>
-                          {security.isFirstHomeBuyer && (
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontSize: '13px' }}>
-                              <input type="checkbox" checked={!!security.isNewHome}
-                                onChange={(e) => updateSecurity(index, 'isNewHome', e.target.checked)} />
-                              New / off-the-plan home
-                            </label>
-                          )}
                         </div>
                       </div>
                       <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-success-emphasis)' }}>
@@ -868,7 +861,8 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                           {method === 'First Home Owner Grant' && (() => {
                             const st = security.state;
                             const fhogData = st ? FHOG_DATA[st] : null;
-                            const fhogAmt = (fhogData && security.isFirstHomeBuyer) ? calcFHOG(st, security.propertyValue, !!security.isNewHome) : null;
+                            const isNewHome = (security.secondaryTransactionTypes || []).includes('Off the Plan');
+                            const fhogAmt = (fhogData && security.isFirstHomeBuyer) ? calcFHOG(st, security.propertyValue, isNewHome) : null;
                             return (
                               <div>
                                 <label style={{ fontSize: '13px' }}>First Home Owner Grant Eligibility</label>
@@ -882,8 +876,8 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                                   <div style={{ padding: '8px 10px', background: 'var(--bg-success-surface)', borderRadius: '4px', fontSize: '12px', marginTop: '4px' }}>
                                     <div style={{ fontWeight: '600', color: fhogAmt > 0 ? '#16a34a' : '#9ca3af' }}>
                                       {fhogAmt > 0 ? `Grant: $${fhogAmt.toLocaleString()} ✓`
-                                        : fhogAmt === 0 && security.isNewHome ? `Not eligible — property value exceeds ${st} cap`
-                                        : `Potential grant: $${fhogData?.amount?.toLocaleString()} — tick "New home" to confirm`}
+                                        : fhogAmt === 0 && isNewHome ? `Not eligible — property value exceeds ${st} cap`
+                                        : `Potential grant: $${fhogData?.amount?.toLocaleString()} — select "Off the Plan" in Additional Features to confirm`}
                                     </div>
                                     <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>{fhogData?.note}</div>
                                   </div>
@@ -1006,78 +1000,107 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
             )}
 
             {security.repaymentType === 'Split' && (
-              <div className="mb-4" style={{ background: 'var(--bg-primary)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-primary)' }}>
-                <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', marginTop: 0 }}>Split Details</h4>
-                {[1, 2].map(splitNum => {
-                  const amtKey   = `split${splitNum}Amount`;
-                  const typeKey  = `split${splitNum}Type`;
-                  const rateKey  = `split${splitNum}RateType`;
-                  const fixedKey = `split${splitNum}FixedYears`;
-                  const ioKey    = `split${splitNum}IOYears`;
-                  return (
-                    <div key={splitNum} className="mb-4" style={{ padding: '12px', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
-                      <p style={{ fontWeight: '600', fontSize: '13px', margin: '0 0 10px 0' }}>Split {splitNum}</p>
-                      <div className="grid grid-cols-2 mb-3">
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ marginBottom: '12px', display: 'block' }}>Split Details</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  {[1, 2].map(splitNum => {
+                    const amtKey   = `split${splitNum}Amount`;
+                    const typeKey  = `split${splitNum}Type`;
+                    const rateKey  = `split${splitNum}RateType`;
+                    const fixedKey = `split${splitNum}FixedYears`;
+                    const ioKey    = `split${splitNum}IOYears`;
+                    const accentCol = splitNum === 1 ? '#3b82f6' : '#10b981';
+                    return (
+                      <div key={splitNum} style={{
+                        padding: '16px 14px 16px 18px',
+                        background: 'var(--bg-secondary)',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border-primary)',
+                        borderLeft: `4px solid ${accentCol}`,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '14px',
+                      }}>
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: accentCol, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Split {splitNum}
+                        </div>
                         <div>
-                          <label style={{ fontSize: '13px' }}>Loan Amount</label>
+                          <label style={{ fontSize: '12px', marginBottom: '4px', display: 'block' }}>Amount</label>
                           <input type="text" value={formatCurrency(security[amtKey] || '')}
                             onChange={(e) => updateSecurity(index, amtKey, parseCurrency(e.target.value))}
-                            placeholder="300,000" style={{ fontSize: '13px' }} />
+                            placeholder="e.g. 300,000" style={{ fontSize: '13px' }} />
                         </div>
                         <div>
-                          <label style={{ fontSize: '13px' }}>Loan Type</label>
-                          <select value={security[typeKey] || ''} style={{ fontSize: '13px' }}
-                            onChange={(e) => updateSecurity(index, typeKey, e.target.value)}>
-                            <option value="">Select...</option>
-                            <option value="Principal & Interest">Principal & Interest</option>
-                            <option value="Interest Only">Interest Only</option>
-                          </select>
+                          <label style={{ fontSize: '12px', marginBottom: '8px', display: 'block' }}>Loan Type</label>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {['Principal & Interest', 'Interest Only'].map(opt => (
+                              <button key={opt} type="button"
+                                onClick={() => updateSecurity(index, typeKey, security[typeKey] === opt ? '' : opt)}
+                                className={`pill-btn${security[typeKey] === opt ? ' pill-btn--active' : ''}`}
+                                style={{ fontSize: '12px' }}>
+                                {security[typeKey] === opt && '✓ '}{opt}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-2">
                         <div>
-                          <label style={{ fontSize: '13px' }}>Rate Type</label>
-                          <select value={security[rateKey] || ''} style={{ fontSize: '13px' }}
-                            onChange={(e) => updateSecurity(index, rateKey, e.target.value)}>
-                            <option value="">Select...</option>
-                            <option value="Fixed">Fixed</option>
-                            <option value="Variable">Variable</option>
-                          </select>
+                          <label style={{ fontSize: '12px', marginBottom: '8px', display: 'block' }}>Rate Type</label>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {['Fixed', 'Variable'].map(opt => (
+                              <button key={opt} type="button"
+                                onClick={() => updateSecurity(index, rateKey, security[rateKey] === opt ? '' : opt)}
+                                className={`pill-btn${security[rateKey] === opt ? ' pill-btn--active' : ''}`}
+                                style={{ fontSize: '12px' }}>
+                                {security[rateKey] === opt && '✓ '}{opt}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                         {security[rateKey] === 'Fixed' && (
                           <div>
-                            <label style={{ fontSize: '13px' }}>Fixed Years</label>
-                            <select value={security[fixedKey] || ''} style={{ fontSize: '13px' }}
-                              onChange={(e) => updateSecurity(index, fixedKey, e.target.value)}>
-                              <option value="">Select...</option>
-                              {[1,2,3,4,5].map(y => <option key={y} value={y}>{y} yr{y > 1 ? 's' : ''}</option>)}
-                            </select>
+                            <label style={{ fontSize: '12px', marginBottom: '8px', display: 'block' }}>Fixed Period</label>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {[1,2,3,4,5].map(y => (
+                                <button key={y} type="button"
+                                  onClick={() => updateSecurity(index, fixedKey, security[fixedKey] === String(y) ? '' : String(y))}
+                                  className={`pill-btn${security[fixedKey] === String(y) ? ' pill-btn--active' : ''}`}
+                                  style={{ fontSize: '12px' }}>
+                                  {y}yr
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         )}
                         {security[typeKey] === 'Interest Only' && (
                           <div>
-                            <label style={{ fontSize: '13px' }}>IO Period (years)</label>
-                            <select value={security[ioKey] || ''} style={{ fontSize: '13px' }}
-                              onChange={(e) => updateSecurity(index, ioKey, e.target.value)}>
-                              <option value="">Select...</option>
-                              {[1,2,3,4,5].map(y => <option key={y} value={y}>{y} yr{y > 1 ? 's' : ''}</option>)}
-                            </select>
+                            <label style={{ fontSize: '12px', marginBottom: '8px', display: 'block' }}>IO Period</label>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {[1,2,3,4,5].map(y => (
+                                <button key={y} type="button"
+                                  onClick={() => updateSecurity(index, ioKey, security[ioKey] === String(y) ? '' : String(y))}
+                                  className={`pill-btn${security[ioKey] === String(y) ? ' pill-btn--active' : ''}`}
+                                  style={{ fontSize: '12px' }}>
+                                  {y}yr
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
                 {security.split1Amount && security.split2Amount && (() => {
                   const s1 = parseFloat(parseCurrency(security.split1Amount)) || 0;
                   const s2 = parseFloat(parseCurrency(security.split2Amount)) || 0;
                   const total = s1 + s2;
                   const loan  = parseFloat(parseCurrency(security.loanAmount)) || 0;
+                  const matched = Math.abs(total - loan) < 1;
                   return (
-                    <div className="hint-text" style={{ marginTop: '8px' }}>
-                      {Math.abs(total - loan) < 1
+                    <div style={{ marginTop: '10px', fontSize: '12px', fontWeight: '600', color: matched ? '#16a34a' : '#f59e0b' }}>
+                      {matched
                         ? `✓ Total: ${formatCurrencyDisplay(total.toString())} — matches loan amount`
-                        : `⚠️ Total: ${formatCurrencyDisplay(total.toString())} — loan amount is ${formatCurrencyDisplay(security.loanAmount)}`}
+                        : `⚠ Total: ${formatCurrencyDisplay(total.toString())} — loan amount is ${formatCurrencyDisplay(security.loanAmount)}`}
                     </div>
                   );
                 })()}
@@ -1241,7 +1264,8 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                                 rows[i] = { ...rows[i], percentage: Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)) };
                                 saveOwnershipRows(rows);
                               }}
-                              style={{ width: '64px', height: '32px', border: '1px solid var(--border-primary)', borderLeft: 'none', borderRight: 'none', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', background: 'var(--bg-primary)' }}
+                              className="no-spin"
+                              style={{ width: '76px', height: '32px', border: '1px solid var(--border-primary)', borderLeft: 'none', borderRight: 'none', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', background: 'var(--bg-primary)' }}
                             />
                             <button type="button"
                               onClick={() => {

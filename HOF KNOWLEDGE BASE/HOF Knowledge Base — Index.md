@@ -80,3 +80,4 @@
 - [ ] **Rita Khaya Notion user ID** — verify via `notion-get-users` MCP. Code uses `263d872b-594c-81bf-8c33-00024f1c5613`; template showed `221d872b-594c-811c-95bf-0002f22fb09c`
 - [ ] **Full end-to-end test** — split loan + equity source + all documents → verify Notion page correct
 - [ ] **Wispr Flow** — add `WISPR_FLOW_API_KEY` to Vercel env vars; confirm base URL `https://api.wisprflow.ai` is correct
+- [ ] **Guarantors & Cross-Collateralise (Step 0)** — UI sections removed from Sub-step 2; data fields remain on security object. Redesign pending.

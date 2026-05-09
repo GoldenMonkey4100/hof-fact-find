@@ -462,6 +462,11 @@ textarea::placeholder {
   color: var(--text-tertiary);
 }
 
+/* Hide native spinners on number inputs used inside custom steppers */
+input[type=number].no-spin::-webkit-inner-spin-button,
+input[type=number].no-spin::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number].no-spin { -moz-appearance: textfield; }
+
 input:disabled,
 select:disabled,
 textarea:disabled {

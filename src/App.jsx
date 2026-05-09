@@ -105,6 +105,53 @@ const FactFindApp = () => {
     localStorage.setItem('hof-theme', theme);
   }, [theme]);
 
+  // Seed applicants immediately when count/type changes so Step 0 ownership is live
+  useEffect(() => {
+    setFormData(prev => {
+      const { numApplicants, numGuarantors, applicantType, applicants } = prev;
+      const total = numApplicants + numGuarantors;
+      const next = [];
+      for (let i = 0; i < total; i++) {
+        const isApp = i < numApplicants;
+        const num   = isApp ? i + 1 : i - numApplicants + 1;
+        const role  = isApp ? 'Applicant' : 'Guarantor';
+        const exist = (applicants || []).find(a => a.id === i + 1);
+        if (applicantType === 'Company') {
+          if (isApp) {
+            next.push(exist?.type === 'Company Borrower' ? exist : {
+              id: i + 1, type: 'Company Borrower', role, number: num,
+              companyName: '', tradingName: '', companyABN: '', companyACN: '',
+              entityType: '', registeredAddress: '', phone: '', email: '',
+              abnStatus: '', abnFrom: '', gstRegistered: false, gstDate: '',
+              mainBusinessLocation: '', assets: [], liabilities: [], eSignature: null, abnVerification: null,
+            });
+          } else {
+            next.push(exist?.type === 'Director Guarantor' ? exist : {
+              id: i + 1, type: 'Director Guarantor', role, number: num,
+              firstName: '', middleName: '', lastName: '', dob: '',
+              phone: '', email: '', licenceNumber: '',
+              address: '', yearsAtCurrentAddress: '', monthsAtCurrentAddress: '',
+              addressHistory: [], relationshipToCompany: '',
+              numDependants: 0, dependants: [], assets: [], liabilities: [], eSignature: null,
+            });
+          }
+        } else {
+          next.push(exist?.type === 'Natural Person' ? exist : {
+            id: i + 1, type: 'Natural Person', role, number: num,
+            firstName: '', middleName: '', lastName: '', dob: '',
+            phone: '', email: '', licenceNumber: '',
+            address: '', yearsAtCurrentAddress: '', monthsAtCurrentAddress: '',
+            addressHistory: [], gender: '', maritalStatus: '',
+            residencyStatus: '', visaNumber: '',
+            relationshipToApplicant1: i === 0 ? 'Primary' : '',
+            numDependants: 0, dependants: [], assets: [], liabilities: [], eSignature: null,
+          });
+        }
+      }
+      return { ...prev, applicants: next };
+    });
+  }, [formData.numApplicants, formData.numGuarantors, formData.applicantType]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
 
   const steps = [

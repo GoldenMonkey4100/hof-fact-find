@@ -749,148 +749,153 @@ const Step1Applicants = ({ formData, updateFormData }) => {
   // ── Address history (with Google Places autocomplete) ──────────────────────
   // Key includes addrResetKey[index] so the current-address field remounts after
   // AI pre-fill, giving a fresh Google Places instance that works correctly.
-  const renderAddressHistory = (applicant, index) => (
-    <div className="mb-4" style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '8px' }}>
-      <div className="flex justify-between items-center mb-3">
-        <h4 style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>3-Year Residential Address History</h4>
-        <button
-          type="button"
-          onClick={() => {
-            const current = applicant.addressHistory || [];
-            updateApplicant(index, 'addressHistory', [
-              ...current,
-              { id: Date.now(), address: '', yearsAtAddress: '', monthsAtAddress: '' }
-            ]);
-          }}
-          className="btn-secondary"
-          style={{ fontSize: '13px', padding: '6px 12px' }}
-        >
-          + Add Previous Address
-        </button>
-      </div>
+  const renderAddressHistory = (applicant, index) => {
+    const cy = parseInt(applicant.yearsAtCurrentAddress) || 0;
+    const cm = parseInt(applicant.monthsAtCurrentAddress) || 0;
+    const hy = (applicant.addressHistory || []).reduce((s, a) => s + (parseInt(a.yearsAtAddress) || 0), 0);
+    const hm = (applicant.addressHistory || []).reduce((s, a) => s + (parseInt(a.monthsAtAddress) || 0), 0);
+    const totalMonths = cy * 12 + cm + hy * 12 + hm;
+    const ty = Math.floor(totalMonths / 12), tm = totalMonths % 12;
+    const met = totalMonths >= 36;
 
-      {/* Current address — key changes when AI pre-fills to force remount */}
-      <div className="mb-3" style={{ paddingBottom: '12px', borderBottom: '1px solid var(--border-primary)' }}>
-        <label style={{ fontSize: '13px', fontWeight: '500' }}>Current Address</label>
-        <AddressAutocomplete
-          key={`current-addr-${index}-${addrResetKey[index] || 0}`}
-          value={applicant.address || ''}
-          onChange={(val) => updateApplicant(index, 'address', val)}
-          placeholder="Start typing current address…"
-          style={{ fontSize: '13px' }}
-        />
-        <div className="grid grid-cols-2" style={{ marginTop: '8px' }}>
-          <div>
-            <label style={{ fontSize: '12px' }}>Years</label>
-            <input type="number" value={applicant.yearsAtCurrentAddress || ''} placeholder="0" min="0" style={{ fontSize: '13px' }}
-              onChange={(e) => updateApplicant(index, 'yearsAtCurrentAddress', e.target.value)} />
+    return (
+      <div className="mb-4" style={{ border: '1px solid var(--border-primary)', borderRadius: '10px', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-primary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '15px' }}>🏠</span>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>3-Year Address History</span>
+            <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 9px', borderRadius: '10px',
+              background: met ? '#dcfce7' : '#fef9c3',
+              color: met ? '#15803d' : '#92400e' }}>
+              {met ? `✓ ${ty}y ${tm}m` : `⚠ ${ty}y ${tm}m / 3y needed`}
+            </span>
           </div>
-          <div>
-            <label style={{ fontSize: '12px' }}>Months</label>
-            <input type="number" value={applicant.monthsAtCurrentAddress || ''} placeholder="0" min="0" max="11" style={{ fontSize: '13px' }}
-              onChange={(e) => updateApplicant(index, 'monthsAtCurrentAddress', e.target.value)} />
-          </div>
+          <button type="button" onClick={() => {
+              const current = applicant.addressHistory || [];
+              updateApplicant(index, 'addressHistory', [
+                ...current,
+                { id: Date.now(), address: '', yearsAtAddress: '', monthsAtAddress: '' }
+              ]);
+            }}
+            style={{ fontSize: '12px', fontWeight: '600', padding: '5px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-primary)' }}>
+            + Add Previous
+          </button>
         </div>
-      </div>
 
-      {/* Previous addresses */}
-      {(applicant.addressHistory || []).map((addr, addrIndex) => (
-        <div key={addr.id} className="mb-3" style={{ paddingTop: '12px' }}>
-          <div className="flex justify-between items-center mb-2">
-            <label style={{ fontSize: '13px', fontWeight: '500' }}>Previous Address {addrIndex + 1}</label>
-            <button type="button" className="btn-danger" style={{ fontSize: '12px', padding: '4px 8px' }}
-              onClick={() => updateApplicant(index, 'addressHistory', applicant.addressHistory.filter((_, i) => i !== addrIndex))}>
-              Remove
-            </button>
+        {/* Current address */}
+        <div style={{ padding: '14px 16px', borderBottom: (applicant.addressHistory || []).length > 0 ? '1px solid var(--border-primary)' : 'none' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: '#0369a1', background: '#dbeafe', padding: '2px 8px', borderRadius: '10px', letterSpacing: '0.3px' }}>CURRENT</span>
           </div>
           <AddressAutocomplete
-            value={addr.address}
-            onChange={(val) => {
-              const updated = [...applicant.addressHistory];
-              updated[addrIndex] = { ...updated[addrIndex], address: val };
-              updateApplicant(index, 'addressHistory', updated);
-            }}
-            placeholder="Start typing previous address…"
+            key={`current-addr-${index}-${addrResetKey[index] || 0}`}
+            value={applicant.address || ''}
+            onChange={(val) => updateApplicant(index, 'address', val)}
+            placeholder="Start typing current address…"
             style={{ fontSize: '13px' }}
           />
-          <div className="grid grid-cols-2" style={{ marginTop: '8px' }}>
-            <div>
-              <label style={{ fontSize: '12px' }}>Years</label>
-              <input type="number" value={addr.yearsAtAddress} placeholder="0" min="0" style={{ fontSize: '13px' }}
-                onChange={(e) => {
-                  const updated = [...applicant.addressHistory];
-                  updated[addrIndex] = { ...updated[addrIndex], yearsAtAddress: e.target.value };
-                  updateApplicant(index, 'addressHistory', updated);
-                }} />
+          <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Years</label>
+              <input type="number" value={applicant.yearsAtCurrentAddress || ''} placeholder="0" min="0" style={{ fontSize: '13px' }}
+                onChange={(e) => updateApplicant(index, 'yearsAtCurrentAddress', e.target.value)} />
             </div>
-            <div>
-              <label style={{ fontSize: '12px' }}>Months</label>
-              <input type="number" value={addr.monthsAtAddress} placeholder="0" min="0" max="11" style={{ fontSize: '13px' }}
-                onChange={(e) => {
-                  const updated = [...applicant.addressHistory];
-                  updated[addrIndex] = { ...updated[addrIndex], monthsAtAddress: e.target.value };
-                  updateApplicant(index, 'addressHistory', updated);
-                }} />
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Months</label>
+              <input type="number" value={applicant.monthsAtCurrentAddress || ''} placeholder="0" min="0" max="11" style={{ fontSize: '13px' }}
+                onChange={(e) => updateApplicant(index, 'monthsAtCurrentAddress', e.target.value)} />
             </div>
           </div>
         </div>
-      ))}
 
-      {/* Running total */}
-      <div className="hint-text" style={{ marginTop: '12px', fontSize: '12px' }}>
-        {(() => {
-          const cy = parseInt(applicant.yearsAtCurrentAddress) || 0;
-          const cm = parseInt(applicant.monthsAtCurrentAddress) || 0;
-          const hy = (applicant.addressHistory || []).reduce((s, a) => s + (parseInt(a.yearsAtAddress) || 0), 0);
-          const hm = (applicant.addressHistory || []).reduce((s, a) => s + (parseInt(a.monthsAtAddress) || 0), 0);
-          const total = cy * 12 + cm + hy * 12 + hm;
-          const ty = Math.floor(total / 12), tm = total % 12;
-          return total < 36
-            ? `⚠️ Total: ${ty} years ${tm} months (need 3 years minimum)`
-            : `✓ Total: ${ty} years ${tm} months`;
-        })()}
-      </div>
-    </div>
-  );
-
-  // ── Dependants ──────────────────────────────────────────────────────────────
-  const renderDependants = (applicant, index) => (
-    <div className="mb-6">
-      <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: 'var(--radius-lg)' }}>
-        <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Dependants</h4>
-        <div className="mb-4">
-          <label>Number of Dependants</label>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {[0, 1, 2, 3, 4, '5+'].map(n => {
-              const current = parseInt(applicant.numDependants) || 0;
-              const isActive = n === '5+' ? current >= 5 : current === n;
-              return (
-                <button key={n} type="button"
-                  className={`pill-btn${isActive ? ' pill-btn--active' : ''}`}
-                  onClick={() => updateApplicant(index, 'numDependants', n === '5+' ? 5 : n)}>
-                  {n}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        {(applicant.dependants || []).map((dep, depIndex) => (
-          <div key={depIndex} style={{ background: 'var(--bg-primary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '8px', border: '1px solid var(--border-primary)' }}>
-            <div className="grid grid-cols-2">
-              <div>
-                <label>Name</label>
-                <input type="text" value={dep.name} placeholder="Dependant name"
-                  onChange={(e) => updateDependant(index, depIndex, 'name', e.target.value)} />
+        {/* Previous addresses */}
+        {(applicant.addressHistory || []).map((addr, addrIndex) => (
+          <div key={addr.id} style={{ padding: '14px 16px', borderBottom: addrIndex < (applicant.addressHistory.length - 1) ? '1px solid var(--border-primary)' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: '10px', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
+                Previous {addrIndex + 1}
+              </span>
+              <button type="button"
+                onClick={() => updateApplicant(index, 'addressHistory', applicant.addressHistory.filter((_, i) => i !== addrIndex))}
+                style={{ fontSize: '11px', fontWeight: '600', color: '#dc2626', background: '#fee2e2', border: 'none', borderRadius: '6px', padding: '3px 8px', cursor: 'pointer' }}>
+                Remove
+              </button>
+            </div>
+            <AddressAutocomplete
+              value={addr.address}
+              onChange={(val) => {
+                const updated = [...applicant.addressHistory];
+                updated[addrIndex] = { ...updated[addrIndex], address: val };
+                updateApplicant(index, 'addressHistory', updated);
+              }}
+              placeholder="Start typing previous address…"
+              style={{ fontSize: '13px' }}
+            />
+            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Years</label>
+                <input type="number" value={addr.yearsAtAddress} placeholder="0" min="0" style={{ fontSize: '13px' }}
+                  onChange={(e) => {
+                    const updated = [...applicant.addressHistory];
+                    updated[addrIndex] = { ...updated[addrIndex], yearsAtAddress: e.target.value };
+                    updateApplicant(index, 'addressHistory', updated);
+                  }} />
               </div>
-              <div>
-                <label>Age</label>
-                <input type="number" value={dep.age} placeholder="Age"
-                  onChange={(e) => updateDependant(index, depIndex, 'age', e.target.value)} />
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Months</label>
+                <input type="number" value={addr.monthsAtAddress} placeholder="0" min="0" max="11" style={{ fontSize: '13px' }}
+                  onChange={(e) => {
+                    const updated = [...applicant.addressHistory];
+                    updated[addrIndex] = { ...updated[addrIndex], monthsAtAddress: e.target.value };
+                    updateApplicant(index, 'addressHistory', updated);
+                  }} />
               </div>
             </div>
           </div>
         ))}
       </div>
+    );
+  };
+
+  // ── Dependants ──────────────────────────────────────────────────────────────
+  const renderDependants = (applicant, index) => (
+    <div className="mb-4" style={{ border: '1px solid var(--border-primary)', borderRadius: '10px', overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', background: 'var(--bg-secondary)', borderBottom: (parseInt(applicant.numDependants) || 0) > 0 ? '1px solid var(--border-primary)' : 'none' }}>
+        <span style={{ fontSize: '15px' }}>👨‍👩‍👧‍👦</span>
+        <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>Dependants</span>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {[0, 1, 2, 3, 4, '5+'].map(n => {
+            const current = parseInt(applicant.numDependants) || 0;
+            const isActive = n === '5+' ? current >= 5 : current === n;
+            return (
+              <button key={n} type="button"
+                className={`pill-btn${isActive ? ' pill-btn--active' : ''}`}
+                style={{ padding: '3px 10px', fontSize: '12px' }}
+                onClick={() => updateApplicant(index, 'numDependants', n === '5+' ? 5 : n)}>
+                {n}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {/* Dependant rows */}
+      {(applicant.dependants || []).map((dep, depIndex) => (
+        <div key={depIndex} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', borderBottom: depIndex < (applicant.dependants.length - 1) ? '1px solid var(--border-primary)' : 'none', background: 'var(--bg-primary)' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', minWidth: '20px' }}>#{depIndex + 1}</span>
+          <div style={{ flex: 2 }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Name</label>
+            <input type="text" value={dep.name} placeholder="Dependant name" style={{ fontSize: '13px' }}
+              onChange={(e) => updateDependant(index, depIndex, 'name', e.target.value)} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Age</label>
+            <input type="number" value={dep.age} placeholder="0" min="0" max="25" style={{ fontSize: '13px' }}
+              onChange={(e) => updateDependant(index, depIndex, 'age', e.target.value)} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 
@@ -908,7 +913,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     const signerName = applicant.type === 'Company Borrower'
       ? applicant.companyName || ''
       : [applicant.firstName, applicant.lastName].filter(Boolean).join(' ');
-    const canSend = signerName && applicant.email && formData.brokerName;
+    const canSend = applicant.firstName && applicant.lastName && applicant.email && applicant.phone;
     const inputId = `qa-dl-${index}`;
 
     const tile = (extra = {}) => ({
@@ -959,7 +964,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               : isPending  ? `Sent to ${sig.email}`
               : isDeclined ? `Declined by ${sig.name}`
               : canSend    ? `${signerName} · ${applicant.email}`
-              : 'Complete Identity details first'}
+              : 'Needs: full name, email & mobile'}
           </div>
           {!isSigned && (
             <button type="button" disabled={(!canSend && !isPending) || !!eSignSending[index]}

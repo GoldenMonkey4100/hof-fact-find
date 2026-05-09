@@ -992,7 +992,9 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     const signerName = applicant.type === 'Company Borrower'
       ? applicant.companyName || ''
       : [applicant.firstName, applicant.lastName].filter(Boolean).join(' ');
-    const canSend = applicant.firstName && applicant.lastName && applicant.email && applicant.phone;
+    const canSend = applicant.type === 'Company Borrower'
+      ? !!(applicant.companyName && applicant.email)
+      : !!(applicant.firstName && applicant.lastName && applicant.email && applicant.phone);
     const inputId = `qa-dl-${index}`;
 
     const tile = (extra = {}) => ({
@@ -1004,8 +1006,8 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', marginBottom: '20px' }}>
 
-        {/* 1 — Driver Licence */}
-        <div style={tile(extracted ? { background: 'var(--bg-success-surface)', borderColor: 'var(--border-success)' } : {})}>
+        {/* 1 — Driver Licence (Natural Person / Director Guarantor only) */}
+        {applicant.type !== 'Company Borrower' && <div style={tile(extracted ? { background: 'var(--bg-success-surface)', borderColor: 'var(--border-success)' } : {})}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '16px' }}>🪪</span>
             <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>Driver Licence</span>
@@ -1028,7 +1030,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             </button>
           </div>
           {dlExtracted[index]?.error && <div style={{ fontSize: '10px', color: 'var(--text-danger-emphasis)' }}>⚠ {dlExtracted[index].error}</div>}
-        </div>
+        </div>}
 
         {/* 2 — E-Signature */}
         <div style={tile(isSigned ? { background: '#f0fdf4', borderColor: '#86efac' } : isPending ? { background: 'var(--bg-info-surface)', borderColor: 'var(--border-info)' } : isDeclined ? { background: 'var(--bg-danger-surface)', borderColor: 'var(--border-danger)' } : {})}>
@@ -1128,146 +1130,156 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {/* Mercury banner — always visible */}
           {renderMercuryBanner(index)}
 
-          {/* Quick Actions strip — always visible */}
-          {!isCo && renderQuickActions(applicant, index)}
+          {/* Quick Actions strip */}
+          {renderQuickActions(applicant, index)}
 
-          {/* Sub-step bar — Natural Person & Director Guarantor only */}
-          {!isCo && (
-            <SubStepBar
-              step={step}
-              labels={['Identity', 'Residency']}
-              onGoTo={(n) => goToStep(applicant.id, n)}
-            />
+          {/* Sub-step bar */}
+          <SubStepBar
+            step={step}
+            labels={isCo ? ['ABN & Identity', 'Contact & Reg'] : ['Identity', 'Residency']}
+            onGoTo={(n) => goToStep(applicant.id, n)}
+          />
+
+          {/* ── Company Borrower — Step 1: ABN & Identity ── */}
+          {isCo && step === 1 && (
+            <div>
+              <div className="mb-4">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ABN
+                  {abnLookup[index]?.result && (
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: abnLookup[index].result.status === 'Active' ? '#16a34a' : '#dc2626', padding: '1px 8px', borderRadius: '10px', background: abnLookup[index].result.status === 'Active' ? '#dcfce7' : '#fee2e2' }}>
+                      {abnLookup[index].result.status === 'Active' ? '✓ Active' : '✗ ' + abnLookup[index].result.status}
+                    </span>
+                  )}
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input type="text" value={applicant.companyABN || ''} placeholder="12 345 678 901"
+                    style={{ flex: 1 }}
+                    onChange={(e) => updateApplicant(index, 'companyABN', e.target.value)}
+                    onBlur={(e) => (e.target.value.replace(/\D/g,'').length === 11) && lookupCompanyABN(index, e.target.value)} />
+                  <button type="button"
+                    disabled={abnLookup[index]?.loading}
+                    onClick={() => lookupCompanyABN(index, applicant.companyABN)}
+                    style={{ padding: '0 16px', background: 'var(--color-gold)', color: 'var(--bg-primary)', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', opacity: abnLookup[index]?.loading ? 0.6 : 1 }}>
+                    {abnLookup[index]?.loading ? '…' : '🔍 Verify ABN'}
+                  </button>
+                </div>
+                {abnLookup[index]?.error && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-danger-emphasis)', marginTop: '4px' }}>⚠ {abnLookup[index].error}</div>
+                )}
+                {abnLookup[index]?.result && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-success-emphasis)', marginTop: '4px', padding: '6px 10px', background: 'var(--bg-success-surface)', border: '1px solid var(--border-success)', borderRadius: '6px' }}>
+                    ✓ Verified: <strong>{abnLookup[index].result.entityName}</strong>
+                    {abnLookup[index].result.tradingNames?.[0] ? ` (${abnLookup[index].result.tradingNames[0]})` : ''}
+                    {' — fields auto-filled below'}
+                  </div>
+                )}
+              </div>
+
+              <div className="mb-4">
+                <label>Company / Entity Name *</label>
+                <input type="text" value={applicant.companyName || ''} placeholder="XYZ Pty Ltd"
+                  onChange={(e) => updateApplicant(index, 'companyName', e.target.value)} />
+              </div>
+
+              <div className="mb-4">
+                <label>Trading Name <span style={{ fontWeight: '400', color: 'var(--text-tertiary)' }}>(if different)</span></label>
+                <input type="text" value={applicant.tradingName || ''} placeholder="Trading name (optional)"
+                  onChange={(e) => updateApplicant(index, 'tradingName', e.target.value)} />
+              </div>
+
+              <div className="grid grid-cols-3 mb-4">
+                <div>
+                  <label>ACN <span style={{ fontWeight: '400', color: 'var(--text-tertiary)', fontSize: '11px' }}>(auto-filled)</span></label>
+                  <input type="text" value={applicant.companyACN || ''} placeholder="123 456 789"
+                    onChange={(e) => updateApplicant(index, 'companyACN', e.target.value)} />
+                </div>
+                <div>
+                  <label>Entity Type <span style={{ fontWeight: '400', color: 'var(--text-tertiary)', fontSize: '11px' }}>(auto-filled)</span></label>
+                  <select value={applicant.entityType || ''} onChange={(e) => updateApplicant(index, 'entityType', e.target.value)}>
+                    <option value="">Select...</option>
+                    <option value="Company">Company</option>
+                    <option value="Trust">Trust</option>
+                    <option value="Sole Trader">Sole Trader</option>
+                    <option value="Partnership">Partnership</option>
+                    <option value="SMSF">SMSF</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Main Business Location <span style={{ fontWeight: '400', color: 'var(--text-tertiary)', fontSize: '11px' }}>(auto-filled)</span></label>
+                  <input type="text" value={applicant.mainBusinessLocation || ''} placeholder="NSW 2000"
+                    onChange={(e) => updateApplicant(index, 'mainBusinessLocation', e.target.value)} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                <button type="button" className="btn-primary"
+                  onClick={() => goToStep(applicant.id, 2)}
+                  style={{ padding: '9px 24px', fontSize: '13px' }}>
+                  Next: Contact &amp; Reg →
+                </button>
+              </div>
+            </div>
           )}
 
-          {/* ── Company Borrower ── */}
-          {isCo && (
-            <>
-              <div className="mb-6">
-                <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Company Details</h4>
+          {/* ── Company Borrower — Step 2: Contact & Registration ── */}
+          {isCo && step === 2 && (
+            <div>
+              <div className="mb-4">
+                <label>Registered Address</label>
+                <input type="text" value={applicant.registeredAddress || ''} placeholder="Registered business address"
+                  onChange={(e) => updateApplicant(index, 'registeredAddress', e.target.value)} />
+              </div>
 
-                {/* ── ABN with Verify ── */}
-                <div className="mb-4">
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    ABN
-                    {abnLookup[index]?.result && (
-                      <span style={{ fontSize: '11px', fontWeight: '700', color: abnLookup[index].result.status === 'Active' ? '#16a34a' : '#dc2626', padding: '1px 8px', borderRadius: '10px', background: abnLookup[index].result.status === 'Active' ? '#dcfce7' : '#fee2e2' }}>
-                        {abnLookup[index].result.status === 'Active' ? '✓ Active' : '✗ ' + abnLookup[index].result.status}
-                      </span>
-                    )}
-                  </label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input type="text" value={applicant.companyABN || ''} placeholder="12 345 678 901"
-                      style={{ flex: 1 }}
-                      onChange={(e) => updateApplicant(index, 'companyABN', e.target.value)}
-                      onBlur={(e) => (e.target.value.replace(/\D/g,'').length === 11) && lookupCompanyABN(index, e.target.value)} />
-                    <button type="button"
-                      disabled={abnLookup[index]?.loading}
-                      onClick={() => lookupCompanyABN(index, applicant.companyABN)}
-                      style={{ padding: '0 16px', background: 'var(--color-gold)', color: 'var(--bg-primary)', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', opacity: abnLookup[index]?.loading ? 0.6 : 1 }}>
-                      {abnLookup[index]?.loading ? '…' : '🔍 Verify ABN'}
-                    </button>
-                  </div>
-                  {abnLookup[index]?.error && (
-                    <div style={{ fontSize: '11px', color: 'var(--text-danger-emphasis)', marginTop: '4px' }}>⚠ {abnLookup[index].error}</div>
-                  )}
-                  {abnLookup[index]?.result && (
-                    <div style={{ fontSize: '11px', color: 'var(--text-success-emphasis)', marginTop: '4px', padding: '6px 10px', background: 'var(--bg-success-surface)', border: '1px solid var(--border-success)', borderRadius: '6px' }}>
-                      ✓ Verified: <strong>{abnLookup[index].result.entityName}</strong>
-                      {abnLookup[index].result.tradingNames?.[0] ? ` (${abnLookup[index].result.tradingNames[0]})` : ''}
-                      {' — fields auto-filled below'}
-                    </div>
-                  )}
+              <div className="grid grid-cols-2 mb-4">
+                <div>
+                  <label>Phone</label>
+                  <input type="tel" value={applicant.phone || ''} placeholder="02 9000 0000"
+                    onChange={(e) => updateApplicant(index, 'phone', e.target.value)} />
                 </div>
+                <div>
+                  <label>Email</label>
+                  <input type="email" value={applicant.email || ''} placeholder="info@company.com.au"
+                    onChange={(e) => updateApplicant(index, 'email', e.target.value)} />
+                </div>
+              </div>
 
-                {/* ── ACN + Entity Type + Main Business Location ── */}
-                <div className="grid grid-cols-3 mb-4">
+              <div style={{ padding: '12px 14px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px', marginBottom: '16px' }}>
+                <p style={{ margin: '0 0 10px', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>ABN &amp; GST Registration</p>
+                <div className="grid grid-cols-2" style={{ gap: '12px' }}>
                   <div>
-                    <label>ACN <span style={{ fontWeight: '400', color: 'var(--text-tertiary)', fontSize: '11px' }}>(auto-filled)</span></label>
-                    <input type="text" value={applicant.companyACN || ''} placeholder="123 456 789"
-                      onChange={(e) => updateApplicant(index, 'companyACN', e.target.value)} />
+                    <label style={{ fontSize: '12px' }}>ABN Status</label>
+                    <input type="text" value={applicant.abnStatus || ''} placeholder="Active / Cancelled"
+                      onChange={(e) => updateApplicant(index, 'abnStatus', e.target.value)}
+                      style={{ background: applicant.abnStatus ? '#f0fdf4' : undefined, color: applicant.abnStatus === 'Active' ? '#16a34a' : undefined, fontWeight: applicant.abnStatus ? '600' : undefined }} />
                   </div>
                   <div>
-                    <label>Entity Type <span style={{ fontWeight: '400', color: 'var(--text-tertiary)', fontSize: '11px' }}>(auto-filled)</span></label>
-                    <select value={applicant.entityType || ''} onChange={(e) => updateApplicant(index, 'entityType', e.target.value)}>
-                      <option value="">Select...</option>
-                      <option value="Company">Company</option>
-                      <option value="Trust">Trust</option>
-                      <option value="Sole Trader">Sole Trader</option>
-                      <option value="Partnership">Partnership</option>
-                      <option value="SMSF">SMSF</option>
-                    </select>
+                    <label style={{ fontSize: '12px' }}>ABN Registered From</label>
+                    <input type="text" value={applicant.abnFrom || ''} placeholder="YYYY-MM-DD"
+                      onChange={(e) => updateApplicant(index, 'abnFrom', e.target.value)} />
                   </div>
                   <div>
-                    <label>Main Business Location <span style={{ fontWeight: '400', color: 'var(--text-tertiary)', fontSize: '11px' }}>(auto-filled)</span></label>
-                    <input type="text" value={applicant.mainBusinessLocation || ''} placeholder="NSW 2000"
-                      onChange={(e) => updateApplicant(index, 'mainBusinessLocation', e.target.value)} />
-                  </div>
-                </div>
-
-                {/* ── ABN & GST Registration ── */}
-                <div style={{ padding: '12px 14px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px', marginBottom: '16px' }}>
-                  <p style={{ margin: '0 0 10px', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>ABN &amp; GST Registration</p>
-                  <div className="grid grid-cols-2" style={{ gap: '12px' }}>
-                    <div>
-                      <label style={{ fontSize: '12px' }}>ABN Status</label>
-                      <input type="text" value={applicant.abnStatus || ''} placeholder="Active / Cancelled"
-                        onChange={(e) => updateApplicant(index, 'abnStatus', e.target.value)}
-                        style={{ background: applicant.abnStatus ? '#f0fdf4' : undefined, color: applicant.abnStatus === 'Active' ? '#16a34a' : undefined, fontWeight: applicant.abnStatus ? '600' : undefined }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '12px' }}>ABN Registered From</label>
-                      <input type="text" value={applicant.abnFrom || ''} placeholder="YYYY-MM-DD"
-                        onChange={(e) => updateApplicant(index, 'abnFrom', e.target.value)} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '12px' }}>GST Status</label>
-                      <input type="text" value={applicant.gstRegistered ? 'Registered' : (applicant.abnStatus ? 'Not Registered' : '')}
-                        readOnly
-                        style={{ background: 'var(--bg-secondary)', color: applicant.gstRegistered ? '#16a34a' : '#6b7280', fontWeight: '600', cursor: 'default' }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '12px' }}>GST Registered From</label>
-                      <input type="text" value={applicant.gstDate || ''} placeholder="YYYY-MM-DD (if applicable)"
-                        onChange={(e) => updateApplicant(index, 'gstDate', e.target.value)} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Company Name + Trading Name ── */}
-                <div className="mb-4">
-                  <label>Company / Entity Name *</label>
-                  <input type="text" value={applicant.companyName || ''} placeholder="XYZ Pty Ltd"
-                    onChange={(e) => updateApplicant(index, 'companyName', e.target.value)} />
-                </div>
-                <div className="mb-4">
-                  <label>Trading Name <span style={{ fontWeight: '400', color: 'var(--text-tertiary)' }}>(if different)</span></label>
-                  <input type="text" value={applicant.tradingName || ''} placeholder="Trading name (optional)"
-                    onChange={(e) => updateApplicant(index, 'tradingName', e.target.value)} />
-                </div>
-
-                {/* ── Registered Address ── */}
-                <div className="mb-4">
-                  <label>Registered Address</label>
-                  <input type="text" value={applicant.registeredAddress || ''} placeholder="Registered business address"
-                    onChange={(e) => updateApplicant(index, 'registeredAddress', e.target.value)} />
-                </div>
-
-                {/* ── Contact ── */}
-                <div className="grid grid-cols-2 mb-4">
-                  <div>
-                    <label>Phone</label>
-                    <input type="tel" value={applicant.phone || ''} placeholder="02 9000 0000"
-                      onChange={(e) => updateApplicant(index, 'phone', e.target.value)} />
+                    <label style={{ fontSize: '12px' }}>GST Status</label>
+                    <input type="text" value={applicant.gstRegistered ? 'Registered' : (applicant.abnStatus ? 'Not Registered' : '')}
+                      readOnly
+                      style={{ background: 'var(--bg-secondary)', color: applicant.gstRegistered ? '#16a34a' : '#6b7280', fontWeight: '600', cursor: 'default' }} />
                   </div>
                   <div>
-                    <label>Email</label>
-                    <input type="email" value={applicant.email || ''} placeholder="info@company.com.au"
-                      onChange={(e) => updateApplicant(index, 'email', e.target.value)} />
+                    <label style={{ fontSize: '12px' }}>GST Registered From</label>
+                    <input type="text" value={applicant.gstDate || ''} placeholder="YYYY-MM-DD (if applicable)"
+                      onChange={(e) => updateApplicant(index, 'gstDate', e.target.value)} />
                   </div>
                 </div>
               </div>
-            </>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '8px' }}>
+                <button type="button"
+                  onClick={() => goToStep(applicant.id, 1)}
+                  style={{ padding: '9px 24px', fontSize: '13px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
+                  ← Back: ABN &amp; Identity
+                </button>
+              </div>
+            </div>
           )}
 
           {/* ── Natural Person & Director Guarantor — sub-steps ── */}

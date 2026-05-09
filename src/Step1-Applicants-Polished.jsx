@@ -758,24 +758,33 @@ const Step1Applicants = ({ formData, updateFormData }) => {
     const ty = Math.floor(totalMonths / 12), tm = totalMonths % 12;
     const met = totalMonths >= 36;
 
+    const livingSituationOpts = ['Boarding', 'Own Home – Mortgage', 'Own Home – Unencumbered', 'Renting', 'Other'];
+
+    const updatePrevAddr = (addrIndex, field, val) => {
+      const updated = [...applicant.addressHistory];
+      updated[addrIndex] = { ...updated[addrIndex], [field]: val };
+      updateApplicant(index, 'addressHistory', updated);
+    };
+
+    const subLabel = { fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' };
+
     return (
       <div className="mb-4" style={{ border: '1px solid var(--border-primary)', borderRadius: '10px', overflow: 'hidden' }}>
+
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-primary)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '15px' }}>🏠</span>
             <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>3-Year Address History</span>
             <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 9px', borderRadius: '10px',
-              background: met ? '#dcfce7' : '#fef9c3',
-              color: met ? '#15803d' : '#92400e' }}>
+              background: met ? '#dcfce7' : '#fef9c3', color: met ? '#15803d' : '#92400e' }}>
               {met ? `✓ ${ty}y ${tm}m` : `⚠ ${ty}y ${tm}m / 3y needed`}
             </span>
           </div>
           <button type="button" onClick={() => {
-              const current = applicant.addressHistory || [];
               updateApplicant(index, 'addressHistory', [
-                ...current,
-                { id: Date.now(), address: '', yearsAtAddress: '', monthsAtAddress: '' }
+                ...(applicant.addressHistory || []),
+                { id: Date.now(), address: '', yearsAtAddress: '', monthsAtAddress: '', livingSituation: '', livingSituationOther: '' }
               ]);
             }}
             style={{ fontSize: '12px', fontWeight: '600', padding: '5px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-primary)' }}>
@@ -785,9 +794,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
         {/* Current address */}
         <div style={{ padding: '14px 16px', borderBottom: (applicant.addressHistory || []).length > 0 ? '1px solid var(--border-primary)' : 'none' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-            <span style={{ fontSize: '10px', fontWeight: '700', color: '#0369a1', background: '#dbeafe', padding: '2px 8px', borderRadius: '10px', letterSpacing: '0.3px' }}>CURRENT</span>
-          </div>
+          <span style={{ fontSize: '10px', fontWeight: '700', color: '#0369a1', background: '#dbeafe', padding: '2px 8px', borderRadius: '10px', letterSpacing: '0.3px', display: 'inline-block', marginBottom: '8px' }}>CURRENT</span>
           <AddressAutocomplete
             key={`current-addr-${index}-${addrResetKey[index] || 0}`}
             value={applicant.address || ''}
@@ -795,14 +802,73 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             placeholder="Start typing current address…"
             style={{ fontSize: '13px' }}
           />
-          <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+
+          {/* Living Situation */}
+          <div style={{ marginTop: '10px' }}>
+            <label style={subLabel}>Living Situation</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+              {livingSituationOpts.map(opt => (
+                <button key={opt} type="button"
+                  className={`pill-btn${applicant.livingSituation === opt ? ' pill-btn--active' : ''}`}
+                  onClick={() => updateApplicant(index, 'livingSituation', applicant.livingSituation === opt ? '' : opt)}>
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Renting expansion — current address only */}
+          {applicant.livingSituation === 'Renting' && (
+            <div style={{ marginTop: '10px', padding: '12px 14px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                <span style={{ fontSize: '13px' }}>🏘</span>
+                <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Rent Share</span>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={subLabel}>Applicant's Share (%)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                    <input type="number" value={applicant.rentShare || ''} placeholder="50" min="1" max="100" style={{ fontSize: '13px' }}
+                      onChange={(e) => updateApplicant(index, 'rentShare', e.target.value)} />
+                    <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600' }}>%</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>e.g. 2 people on lease → 50%</div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={subLabel}>Monthly Rent (Total)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                    <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600' }}>$</span>
+                    <input type="number" value={applicant.rentTotal || ''} placeholder="2400" min="0" style={{ fontSize: '13px' }}
+                      onChange={(e) => updateApplicant(index, 'rentTotal', e.target.value)} />
+                  </div>
+                  {applicant.rentShare && applicant.rentTotal && (
+                    <div style={{ fontSize: '11px', color: '#15803d', marginTop: '3px', fontWeight: '600' }}>
+                      Applicant pays ${Math.round(parseFloat(applicant.rentTotal) * parseFloat(applicant.rentShare) / 100).toLocaleString()}/mo
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Other expansion */}
+          {applicant.livingSituation === 'Other' && (
+            <div style={{ marginTop: '8px' }}>
+              <label style={subLabel}>Please describe</label>
+              <input type="text" value={applicant.livingSituationOther || ''} placeholder="e.g. Living with parents…"
+                style={{ fontSize: '13px', marginTop: '4px' }}
+                onChange={(e) => updateApplicant(index, 'livingSituationOther', e.target.value)} />
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Years</label>
+              <label style={subLabel}>Years</label>
               <input type="number" value={applicant.yearsAtCurrentAddress || ''} placeholder="0" min="0" style={{ fontSize: '13px' }}
                 onChange={(e) => updateApplicant(index, 'yearsAtCurrentAddress', e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Months</label>
+              <label style={subLabel}>Months</label>
               <input type="number" value={applicant.monthsAtCurrentAddress || ''} placeholder="0" min="0" max="11" style={{ fontSize: '13px' }}
                 onChange={(e) => updateApplicant(index, 'monthsAtCurrentAddress', e.target.value)} />
             </div>
@@ -824,32 +890,45 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             </div>
             <AddressAutocomplete
               value={addr.address}
-              onChange={(val) => {
-                const updated = [...applicant.addressHistory];
-                updated[addrIndex] = { ...updated[addrIndex], address: val };
-                updateApplicant(index, 'addressHistory', updated);
-              }}
+              onChange={(val) => updatePrevAddr(addrIndex, 'address', val)}
               placeholder="Start typing previous address…"
               style={{ fontSize: '13px' }}
             />
-            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+
+            {/* Living Situation — previous (no rent fields) */}
+            <div style={{ marginTop: '10px' }}>
+              <label style={subLabel}>Living Situation</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                {livingSituationOpts.map(opt => (
+                  <button key={opt} type="button"
+                    className={`pill-btn${addr.livingSituation === opt ? ' pill-btn--active' : ''}`}
+                    onClick={() => updatePrevAddr(addrIndex, 'livingSituation', addr.livingSituation === opt ? '' : opt)}>
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Other expansion */}
+            {addr.livingSituation === 'Other' && (
+              <div style={{ marginTop: '8px' }}>
+                <label style={subLabel}>Please describe</label>
+                <input type="text" value={addr.livingSituationOther || ''} placeholder="e.g. Living with parents…"
+                  style={{ fontSize: '13px', marginTop: '4px' }}
+                  onChange={(e) => updatePrevAddr(addrIndex, 'livingSituationOther', e.target.value)} />
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Years</label>
+                <label style={subLabel}>Years</label>
                 <input type="number" value={addr.yearsAtAddress} placeholder="0" min="0" style={{ fontSize: '13px' }}
-                  onChange={(e) => {
-                    const updated = [...applicant.addressHistory];
-                    updated[addrIndex] = { ...updated[addrIndex], yearsAtAddress: e.target.value };
-                    updateApplicant(index, 'addressHistory', updated);
-                  }} />
+                  onChange={(e) => updatePrevAddr(addrIndex, 'yearsAtAddress', e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Months</label>
+                <label style={subLabel}>Months</label>
                 <input type="number" value={addr.monthsAtAddress} placeholder="0" min="0" max="11" style={{ fontSize: '13px' }}
-                  onChange={(e) => {
-                    const updated = [...applicant.addressHistory];
-                    updated[addrIndex] = { ...updated[addrIndex], monthsAtAddress: e.target.value };
-                    updateApplicant(index, 'addressHistory', updated);
-                  }} />
+                  onChange={(e) => updatePrevAddr(addrIndex, 'monthsAtAddress', e.target.value)} />
               </div>
             </div>
           </div>
@@ -1260,7 +1339,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                     <div className="mb-4">
                       <label>Gender</label>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        {['Male', 'Female', 'Other'].map(opt => (
+                        {['Male', 'Female'].map(opt => (
                           <button key={opt} type="button"
                             className={`pill-btn${applicant.gender === opt ? ' pill-btn--active' : ''}`}
                             onClick={() => updateApplicant(index, 'gender', applicant.gender === opt ? '' : opt)}>

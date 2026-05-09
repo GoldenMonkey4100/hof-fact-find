@@ -1103,6 +1103,7 @@ label {
 .sc--open {
   border-color: var(--color-gold-border);
   box-shadow: 0 2px 16px rgba(18, 17, 13, 0.08);
+  overflow: visible;
 }
 
 [data-theme="dark"] .sc--open {

@@ -326,7 +326,7 @@ const FactFindApp = () => {
       </div>
 
       {/* ── Main Content ─────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: '860px', margin: '0 auto', padding: '24px 16px 88px' }}>
+      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 16px 88px' }}>
         {/* Step page header */}
         <div className="sc-page-header">
           <h2 className="sc-page-title">{steps[currentStep].name}</h2>

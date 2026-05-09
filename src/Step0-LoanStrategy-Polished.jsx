@@ -448,7 +448,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
       purchaseCompletionAmounts: {}, purchaseCompletionOther: '',
       equityPropertyIndex: '', giftRelationship: '',
       hasOffset: false, hasRedraw: false,
-      ownershipRows: [], guarantors: [], crossCollateralise: false,
+      ownershipRows: [],
     }];
     updateFormData('securities', securities);
   };
@@ -462,8 +462,15 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
     const securities = [...formData.securities];
     const field = isPrimary ? 'primaryTransactionTypes' : 'secondaryTransactionTypes';
     const current = securities[securityIndex][field];
-    securities[securityIndex][field] = current.includes(type) ? current.filter(t => t !== type) : [...current, type];
+    const isAdding = !current.includes(type);
+    securities[securityIndex][field] = isAdding ? [...current, type] : current.filter(t => t !== type);
     updateFormData('securities', securities);
+
+    // Auto-open calculator when a relevant transaction type is selected
+    if (isAdding && (type === 'Purchase' || type === 'Cashout')) {
+      const secId = securities[securityIndex].id;
+      setSecCalcOpen(prev => ({ ...prev, [secId]: true }));
+    }
   };
 
   const togglePurchaseCompletion = (securityIndex, method) => {
@@ -619,8 +626,8 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
         {step === 1 && (
           <div style={{ display: 'flex', alignItems: 'flex-start' }}>
 
-            {/* Main form column */}
-            <div style={{ flex: 1, minWidth: 0, paddingRight: calcOpen ? '20px' : '0' }}>
+            {/* Main form column — fixed width so it never shrinks when calc opens */}
+            <div style={{ flexShrink: 0, minWidth: '490px', paddingRight: calcOpen ? '24px' : '0' }}>
 
               <div className="mb-4">
                 <label>Property Address</label>
@@ -658,19 +665,6 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                 </div>
               </div>
 
-              {security.primaryTransactionTypes.length > 0 && (
-                <div className="mb-4">
-                  <label>Additional Features</label>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
-                    {SECONDARY_TYPES.map(type => (
-                      <ToggleButton key={type} label={type} color="info"
-                        active={security.secondaryTransactionTypes.includes(type)}
-                        onClick={() => toggleTransactionType(index, type, false)} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <div className="grid grid-cols-2 mb-4" style={{ gap: '20px' }}>
                 <div>
                   <label>Intended Occupancy</label>
@@ -693,6 +687,19 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                   </div>
                 </div>
               </div>
+
+              {security.primaryTransactionTypes.length > 0 && (
+                <div className="mb-4">
+                  <label>Additional Features</label>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                    {SECONDARY_TYPES.map(type => (
+                      <ToggleButton key={type} label={type} color="info"
+                        active={security.secondaryTransactionTypes.includes(type)}
+                        onClick={() => toggleTransactionType(index, type, false)} />
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* ── Numbers trio (tri-directional) ────────────────────────── */}
               <div className="mb-4" style={{ padding: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '10px' }}>
@@ -742,183 +749,6 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                 </div>
               </div>
 
-            {/* Purchase details */}
-            {security.primaryTransactionTypes.includes('Purchase') && (
-              <div className="mb-4" style={{ padding: '14px', background: 'var(--bg-success-surface)', border: '1px solid var(--border-success)', borderRadius: '8px' }}>
-                <div className="grid grid-cols-2 mb-3">
-                  <div>
-                    <label style={{ fontSize: '13px', color: 'var(--text-success-emphasis)' }}>State / Territory</label>
-                    <select value={security.state || ''} onChange={(e) => updateSecurity(index, 'state', e.target.value)} style={{ fontSize: '13px' }}>
-                      <option value="">Select state…</option>
-                      {['NSW','VIC','QLD','WA','SA','TAS','ACT','NT'].map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ paddingTop: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontSize: '13px' }}>
-                      <input type="checkbox" checked={!!security.isFirstHomeBuyer}
-                        onChange={(e) => updateSecurity(index, 'isFirstHomeBuyer', e.target.checked)} />
-                      First Home Buyer
-                    </label>
-                    {security.isFirstHomeBuyer && (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontSize: '13px' }}>
-                        <input type="checkbox" checked={!!security.isNewHome}
-                          onChange={(e) => updateSecurity(index, 'isNewHome', e.target.checked)} />
-                        New / off-the-plan home
-                      </label>
-                    )}
-                  </div>
-                </div>
-
-                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-success-emphasis)' }}>
-                  How does the client intend to complete the purchase?
-                </label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px', marginBottom: '12px' }}>
-                  {PURCHASE_COMPLETION.map(method => (
-                    <ToggleButton key={method} label={method} color="success"
-                      active={(security.purchaseCompletionMethods || []).includes(method)}
-                      onClick={() => togglePurchaseCompletion(index, method)} />
-                  ))}
-                </div>
-
-                {(security.purchaseCompletionMethods || []).map(method => (
-                  <div key={method} style={{ marginBottom: '10px', padding: '10px 12px', background: 'var(--bg-primary)', borderRadius: '6px', border: '1px solid #d1fae5' }}>
-                    {(method === 'Own Savings' || method === 'Gift from Family') && (
-                      <div>
-                        <label style={{ fontSize: '13px' }}>{method} — Amount</label>
-                        <input type="text"
-                          value={formatCurrency(security.purchaseCompletionAmounts?.[method] || '')}
-                          onChange={(e) => updateSecurity(index, 'purchaseCompletionAmounts', {
-                            ...(security.purchaseCompletionAmounts || {}), [method]: parseCurrency(e.target.value),
-                          })}
-                          placeholder="e.g. 80,000" style={{ fontSize: '13px' }} />
-                        {method === 'Gift from Family' && (
-                          <div style={{ marginTop: '8px' }}>
-                            <label style={{ fontSize: '13px' }}>Gift Relationship</label>
-                            <select value={security.giftRelationship || ''} style={{ fontSize: '13px' }}
-                              onChange={(e) => updateSecurity(index, 'giftRelationship', e.target.value)}>
-                              <option value="">Select…</option>
-                              {['Parent(s)', 'Grandparent(s)', 'Sibling', 'Other family member'].map(r => (
-                                <option key={r} value={r}>{r}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {method === 'Equity from Existing Property' && (() => {
-                      const eqIdx = security.equityPropertyIndex;
-                      const equityProp = (eqIdx !== '' && eqIdx !== undefined) ? formData.securities[parseInt(eqIdx)] : null;
-                      const epIsCashout = equityProp?.primaryTransactionTypes?.includes('Refinance') && equityProp?.secondaryTransactionTypes?.includes('Cashout');
-                      const availEquity = equityProp
-                        ? epIsCashout
-                          ? (parseFloat(parseCurrency(equityProp.cashoutAmount || '')) || 0)
-                          : Math.max(0, (parseFloat(equityProp.propertyValue)||0) * 0.8 - (parseFloat(equityProp.loanAmount)||0))
-                        : null;
-                      return (
-                        <div>
-                          <label style={{ fontSize: '13px' }}>Link to Existing Property</label>
-                          <select value={eqIdx ?? ''} style={{ fontSize: '13px' }}
-                            onChange={(e) => updateSecurity(index, 'equityPropertyIndex', e.target.value === '' ? '' : parseInt(e.target.value))}>
-                            <option value="">Select property…</option>
-                            {formData.securities.map((s, i) => i !== index ? (
-                              <option key={i} value={i}>Security {i + 1}{s.address ? ` — ${s.address}` : ''}</option>
-                            ) : null)}
-                          </select>
-                          {equityProp && (
-                            <div style={{ marginTop: '8px', padding: '8px 10px', background: 'var(--bg-success-surface)', borderRadius: '4px', fontSize: '12px' }}>
-                              <div>Property Value: <strong>{formatCurrencyDisplay(equityProp.propertyValue)}</strong></div>
-                              <div style={{ marginTop: '4px', color: availEquity > 0 ? '#166534' : '#dc2626', fontWeight: '600' }}>
-                                {epIsCashout ? 'Cashout Amount' : 'Available Equity (80% LVR)'}: <strong>${(availEquity || 0).toLocaleString()}</strong>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                    {method === 'First Home Owner Grant' && (() => {
-                      const st = security.state;
-                      const fhogData = st ? FHOG_DATA[st] : null;
-                      const fhogAmt = (fhogData && security.isFirstHomeBuyer) ? calcFHOG(st, security.propertyValue, !!security.isNewHome) : null;
-                      return (
-                        <div>
-                          <label style={{ fontSize: '13px' }}>First Home Owner Grant Eligibility</label>
-                          {!st ? (
-                            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>Select a state above to check FHOG eligibility</div>
-                          ) : !security.isFirstHomeBuyer ? (
-                            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>Tick "First Home Buyer" above to check eligibility</div>
-                          ) : fhogData?.amount === 0 ? (
-                            <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>{fhogData.note}</div>
-                          ) : (
-                            <div style={{ padding: '8px 10px', background: 'var(--bg-success-surface)', borderRadius: '4px', fontSize: '12px', marginTop: '4px' }}>
-                              <div style={{ fontWeight: '600', color: fhogAmt > 0 ? '#16a34a' : '#9ca3af' }}>
-                                {fhogAmt > 0 ? `Grant: $${fhogAmt.toLocaleString()} ✓`
-                                  : fhogAmt === 0 && security.isNewHome ? `Not eligible — property value exceeds ${st} cap`
-                                  : `Potential grant: $${fhogData?.amount?.toLocaleString()} — tick "New home" to confirm`}
-                              </div>
-                              <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>{fhogData?.note}</div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                    {method === 'Other' && (
-                      <div>
-                        <label style={{ fontSize: '13px' }}>Please describe</label>
-                        <textarea value={security.purchaseCompletionOther || ''}
-                          onChange={(e) => updateSecurity(index, 'purchaseCompletionOther', e.target.value)}
-                          placeholder="Describe how the client will complete the purchase…"
-                          rows="2" style={{ fontSize: '13px' }} />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Refinance + Cashout breakdown */}
-            {isRefinanceCashout(security) && (
-              <div className="mb-4" style={{ padding: '14px', background: 'var(--bg-info-surface)', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
-                <p style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: '700', color: '#1e40af' }}>Refinance + Cashout</p>
-                <div className="grid grid-cols-2">
-                  <div>
-                    <label style={{ fontSize: '13px' }}>Current Loan Balance</label>
-                    <input type="text" value={formatCurrency(security.currentLoanBalance || '')}
-                      onChange={(e) => handleRefinanceBreakdown(index, 'currentLoanBalance', e.target.value)}
-                      placeholder="400,000" />
-                    <div className="hint-text" style={{ fontSize: '11px', marginTop: '4px' }}>What the client currently owes</div>
-                  </div>
-                  <div>
-                    {(() => {
-                      const propVal  = parseFloat(security.propertyValue) || 0;
-                      const currBal  = parseFloat(parseCurrency(security.currentLoanBalance || '')) || 0;
-                      const availEq  = Math.max(0, propVal * 0.8 - currBal);
-                      const cashoutV = parseFloat(parseCurrency(security.cashoutAmount || '')) || 0;
-                      const overEq   = cashoutV > availEq && availEq > 0;
-                      return (
-                        <>
-                          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                            <label style={{ fontSize: '13px' }}>Cashout Amount</label>
-                            {availEq > 0 && (
-                              <button type="button"
-                                onClick={() => handleRefinanceBreakdown(index, 'cashoutAmount', String(Math.round(availEq)))}
-                                style={{ fontSize: '11px', color: 'var(--text-info)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', textDecoration: 'underline' }}>
-                                Use max →
-                              </button>
-                            )}
-                          </div>
-                          <input type="text" value={formatCurrency(security.cashoutAmount || '')}
-                            onChange={(e) => handleRefinanceBreakdown(index, 'cashoutAmount', e.target.value)}
-                            placeholder="100,000"
-                            style={overEq ? { borderColor: '#f97316' } : {}} />
-                          {overEq && <div style={{ fontSize: '11px', color: '#c2410c', marginTop: '4px' }}>⚠ Exceeds 80% LVR — see calculator</div>}
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-            )}
-
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
                 <button type="button" onClick={() => setSecurityStep(security.id, 2)}
                   style={{ padding: '10px 22px', background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
@@ -927,24 +757,217 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               </div>
             </div>
 
-            {/* ── Calculator panel (right) ── */}
+            {/* ── Calculator panel — extends the card to the right ── */}
             {calcOpen && (
-              <div style={{ width: '260px', flexShrink: 0, borderLeft: '1px solid var(--border-primary)', paddingLeft: '20px', paddingTop: '4px' }}>
+              <div style={{
+                width: '300px', flexShrink: 0,
+                borderLeft: '2px solid var(--border-primary)',
+                paddingLeft: '24px', paddingTop: '4px',
+              }}>
+                {/* Panel header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    📊 Calculator
+                  </span>
+                  <button type="button" onClick={() => toggleSecCalc(security.id)}
+                    style={{ fontSize: '12px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
+                    ✕
+                  </button>
+                </div>
+
+                {/* Purchase section */}
                 {isPurchase && (
-                  <div style={{ marginBottom: isRefCashout ? '24px' : 0 }}>
-                    <p style={{ margin: '0 0 10px', fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Funds to Complete</p>
-                    <FundsToCompleteCard security={security} allSecurities={formData.securities} />
-                  </div>
-                )}
-                {isRefCashout && (
                   <div>
-                    <p style={{ margin: '0 0 10px', fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Equity Position</p>
-                    <EquityCalcContent security={security} />
+                    <p style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: '700', color: 'var(--text-success-emphasis)' }}>Purchase Details</p>
+
+                    <div style={{ padding: '14px', background: 'var(--bg-success-surface)', border: '1px solid var(--border-success)', borderRadius: '8px', marginBottom: '14px' }}>
+                      <div className="grid grid-cols-2 mb-3">
+                        <div>
+                          <label style={{ fontSize: '13px', color: 'var(--text-success-emphasis)' }}>State / Territory</label>
+                          <select value={security.state || ''} onChange={(e) => updateSecurity(index, 'state', e.target.value)} style={{ fontSize: '13px' }}>
+                            <option value="">Select state…</option>
+                            {['NSW','VIC','QLD','WA','SA','TAS','ACT','NT'].map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                        <div style={{ paddingTop: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontSize: '13px' }}>
+                            <input type="checkbox" checked={!!security.isFirstHomeBuyer}
+                              onChange={(e) => updateSecurity(index, 'isFirstHomeBuyer', e.target.checked)} />
+                            First Home Buyer
+                          </label>
+                          {security.isFirstHomeBuyer && (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontSize: '13px' }}>
+                              <input type="checkbox" checked={!!security.isNewHome}
+                                onChange={(e) => updateSecurity(index, 'isNewHome', e.target.checked)} />
+                              New / off-the-plan home
+                            </label>
+                          )}
+                        </div>
+                      </div>
+
+                      <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-success-emphasis)' }}>
+                        How does the client intend to complete the purchase?
+                      </label>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px', marginBottom: '12px' }}>
+                        {PURCHASE_COMPLETION.map(method => (
+                          <ToggleButton key={method} label={method} color="success"
+                            active={(security.purchaseCompletionMethods || []).includes(method)}
+                            onClick={() => togglePurchaseCompletion(index, method)} />
+                        ))}
+                      </div>
+
+                      {(security.purchaseCompletionMethods || []).map(method => (
+                        <div key={method} style={{ marginBottom: '10px', padding: '10px 12px', background: 'var(--bg-primary)', borderRadius: '6px', border: '1px solid #d1fae5' }}>
+                          {(method === 'Own Savings' || method === 'Gift from Family') && (
+                            <div>
+                              <label style={{ fontSize: '13px' }}>{method} — Amount</label>
+                              <input type="text"
+                                value={formatCurrency(security.purchaseCompletionAmounts?.[method] || '')}
+                                onChange={(e) => updateSecurity(index, 'purchaseCompletionAmounts', {
+                                  ...(security.purchaseCompletionAmounts || {}), [method]: parseCurrency(e.target.value),
+                                })}
+                                placeholder="e.g. 80,000" style={{ fontSize: '13px' }} />
+                              {method === 'Gift from Family' && (
+                                <div style={{ marginTop: '8px' }}>
+                                  <label style={{ fontSize: '13px' }}>Gift Relationship</label>
+                                  <select value={security.giftRelationship || ''} style={{ fontSize: '13px' }}
+                                    onChange={(e) => updateSecurity(index, 'giftRelationship', e.target.value)}>
+                                    <option value="">Select…</option>
+                                    {['Parent(s)', 'Grandparent(s)', 'Sibling', 'Other family member'].map(r => (
+                                      <option key={r} value={r}>{r}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {method === 'Equity from Existing Property' && (() => {
+                            const eqIdx = security.equityPropertyIndex;
+                            const equityProp = (eqIdx !== '' && eqIdx !== undefined) ? formData.securities[parseInt(eqIdx)] : null;
+                            const epIsCashout = equityProp?.primaryTransactionTypes?.includes('Refinance') && equityProp?.secondaryTransactionTypes?.includes('Cashout');
+                            const availEquity = equityProp
+                              ? epIsCashout
+                                ? (parseFloat(parseCurrency(equityProp.cashoutAmount || '')) || 0)
+                                : Math.max(0, (parseFloat(equityProp.propertyValue)||0) * 0.8 - (parseFloat(equityProp.loanAmount)||0))
+                              : null;
+                            return (
+                              <div>
+                                <label style={{ fontSize: '13px' }}>Link to Existing Property</label>
+                                <select value={eqIdx ?? ''} style={{ fontSize: '13px' }}
+                                  onChange={(e) => updateSecurity(index, 'equityPropertyIndex', e.target.value === '' ? '' : parseInt(e.target.value))}>
+                                  <option value="">Select property…</option>
+                                  {formData.securities.map((s, i) => i !== index ? (
+                                    <option key={i} value={i}>Security {i + 1}{s.address ? ` — ${s.address}` : ''}</option>
+                                  ) : null)}
+                                </select>
+                                {equityProp && (
+                                  <div style={{ marginTop: '8px', padding: '8px 10px', background: 'var(--bg-success-surface)', borderRadius: '4px', fontSize: '12px' }}>
+                                    <div>Property Value: <strong>{formatCurrencyDisplay(equityProp.propertyValue)}</strong></div>
+                                    <div style={{ marginTop: '4px', color: availEquity > 0 ? '#166534' : '#dc2626', fontWeight: '600' }}>
+                                      {epIsCashout ? 'Cashout Amount' : 'Available Equity (80% LVR)'}: <strong>${(availEquity || 0).toLocaleString()}</strong>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                          {method === 'First Home Owner Grant' && (() => {
+                            const st = security.state;
+                            const fhogData = st ? FHOG_DATA[st] : null;
+                            const fhogAmt = (fhogData && security.isFirstHomeBuyer) ? calcFHOG(st, security.propertyValue, !!security.isNewHome) : null;
+                            return (
+                              <div>
+                                <label style={{ fontSize: '13px' }}>First Home Owner Grant Eligibility</label>
+                                {!st ? (
+                                  <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>Select a state above to check FHOG eligibility</div>
+                                ) : !security.isFirstHomeBuyer ? (
+                                  <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>Tick "First Home Buyer" above to check eligibility</div>
+                                ) : fhogData?.amount === 0 ? (
+                                  <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>{fhogData.note}</div>
+                                ) : (
+                                  <div style={{ padding: '8px 10px', background: 'var(--bg-success-surface)', borderRadius: '4px', fontSize: '12px', marginTop: '4px' }}>
+                                    <div style={{ fontWeight: '600', color: fhogAmt > 0 ? '#16a34a' : '#9ca3af' }}>
+                                      {fhogAmt > 0 ? `Grant: $${fhogAmt.toLocaleString()} ✓`
+                                        : fhogAmt === 0 && security.isNewHome ? `Not eligible — property value exceeds ${st} cap`
+                                        : `Potential grant: $${fhogData?.amount?.toLocaleString()} — tick "New home" to confirm`}
+                                    </div>
+                                    <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>{fhogData?.note}</div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                          {method === 'Other' && (
+                            <div>
+                              <label style={{ fontSize: '13px' }}>Please describe</label>
+                              <textarea value={security.purchaseCompletionOther || ''}
+                                onChange={(e) => updateSecurity(index, 'purchaseCompletionOther', e.target.value)}
+                                placeholder="Describe how the client will complete the purchase…"
+                                rows="2" style={{ fontSize: '13px' }} />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ borderTop: '1px solid var(--border-primary)', paddingTop: '14px' }}>
+                      <FundsToCompleteCard security={security} allSecurities={formData.securities} />
+                    </div>
                   </div>
                 )}
+
+                {/* Refinance + Cashout section */}
+                {isRefCashout && (
+                  <div style={{ marginTop: isPurchase ? '24px' : '0' }}>
+                    <p style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: '700', color: '#1e40af' }}>Refinance + Cashout</p>
+
+                    <div style={{ padding: '14px', background: 'var(--bg-info-surface)', border: '1px solid #bfdbfe', borderRadius: '8px', marginBottom: '14px' }}>
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={{ fontSize: '13px' }}>Current Loan Balance</label>
+                        <input type="text" value={formatCurrency(security.currentLoanBalance || '')}
+                          onChange={(e) => handleRefinanceBreakdown(index, 'currentLoanBalance', e.target.value)}
+                          placeholder="400,000" style={{ fontSize: '13px' }} />
+                        <div className="hint-text" style={{ fontSize: '11px', marginTop: '4px' }}>What the client currently owes</div>
+                      </div>
+                      <div>
+                        {(() => {
+                          const propVal  = parseFloat(security.propertyValue) || 0;
+                          const currBal  = parseFloat(parseCurrency(security.currentLoanBalance || '')) || 0;
+                          const availEq  = Math.max(0, propVal * 0.8 - currBal);
+                          const cashoutV = parseFloat(parseCurrency(security.cashoutAmount || '')) || 0;
+                          const overEq   = cashoutV > availEq && availEq > 0;
+                          return (
+                            <>
+                              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                                <label style={{ fontSize: '13px' }}>Cashout Amount</label>
+                                {availEq > 0 && (
+                                  <button type="button"
+                                    onClick={() => handleRefinanceBreakdown(index, 'cashoutAmount', String(Math.round(availEq)))}
+                                    style={{ fontSize: '11px', color: 'var(--text-info)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', textDecoration: 'underline' }}>
+                                    Use max →
+                                  </button>
+                                )}
+                              </div>
+                              <input type="text" value={formatCurrency(security.cashoutAmount || '')}
+                                onChange={(e) => handleRefinanceBreakdown(index, 'cashoutAmount', e.target.value)}
+                                placeholder="100,000"
+                                style={{ fontSize: '13px', ...(overEq ? { borderColor: '#f97316' } : {}) }} />
+                              {overEq && <div style={{ fontSize: '11px', color: '#c2410c', marginTop: '4px' }}>⚠ Exceeds 80% LVR — see calculator below</div>}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid var(--border-primary)', paddingTop: '14px' }}>
+                      <EquityCalcContent security={security} />
+                    </div>
+                  </div>
+                )}
+
                 {!isPurchase && !isRefCashout && (
                   <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: 0, paddingTop: '8px' }}>
-                    Select a transaction type to see relevant calculations.
+                    Select Purchase or Refinance + Cashout to see relevant calculations.
                   </p>
                 )}
               </div>
@@ -1105,14 +1128,21 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               </label>
             </div>
 
-            {/* Property Ownership */}
-            <div className="mb-4" style={{ padding: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>🏠 Property Ownership</p>
-                {ownershipRows.length > 0 && (
-                  <span style={{ fontSize: '12px', fontWeight: '600', color: totalOk ? '#16a34a' : '#dc2626' }}>
-                    {totalOk ? '✓ 100%' : `⚠ ${totalPct.toFixed(1)}% — must equal 100%`}
-                  </span>
+            {/* ── Property Ownership — Tile layout ── */}
+            <div className="mb-4">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <label style={{ margin: 0 }}>Property Ownership</label>
+                {ownershipRows.length > 1 && (
+                  <button type="button"
+                    onClick={() => {
+                      const n = ownershipRows.length;
+                      const base = Math.floor(100 / n);
+                      const rem = 100 - base * n;
+                      saveOwnershipRows(ownershipRows.map((r, i) => ({ ...r, percentage: i === 0 ? base + rem : base })));
+                    }}
+                    style={{ fontSize: '12px', padding: '4px 12px', border: '1px solid var(--border-primary)', borderRadius: '6px', background: 'var(--bg-secondary)', cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                    = Equal Split
+                  </button>
                 )}
               </div>
 
@@ -1122,85 +1152,129 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                 </div>
               ) : (
                 <>
-                  <div style={{ marginBottom: '14px' }}>
-                    <div style={{ height: '12px', background: '#e5e7eb', borderRadius: '6px', overflow: 'hidden', display: 'flex', marginBottom: '8px' }}>
-                      {ownershipRows.map((row, i) => {
-                        const pct = parseFloat(row.percentage) || 0;
-                        return <div key={row.id} style={{ width: `${pct}%`, minWidth: pct > 0 ? '2px' : '0', background: OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length], transition: 'width 0.2s ease' }} />;
-                      })}
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                      {ownershipRows.map((row, i) => (
-                        <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length], flexShrink: 0 }} />
-                          <span style={{ fontWeight: '500' }}>{row.name || 'New Owner'}</span>
-                          <span>({parseFloat(row.percentage) || 0}%)</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '10px' }}>
+                  {/* Live bar */}
+                  <div style={{ height: '10px', background: '#e5e7eb', borderRadius: '5px', overflow: 'hidden', display: 'flex', marginBottom: '6px' }}>
                     {ownershipRows.map((row, i) => (
-                      <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '10px 1fr 80px auto', gap: '8px', alignItems: 'center' }}>
-                        <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length], flexShrink: 0 }} />
-                        {row.type === 'applicant' ? (
-                          <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)', padding: '7px 10px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px' }}>
-                            {row.name}
-                            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginLeft: '8px', fontWeight: '400' }}>applicant</span>
-                          </div>
-                        ) : (
-                          <input type="text" value={row.name} placeholder="Owner / entity name"
-                            onChange={(e) => { const rows = [...ownershipRows]; rows[i] = { ...rows[i], name: e.target.value }; saveOwnershipRows(rows); }}
-                            style={{ fontSize: '13px' }} />
-                        )}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <input type="number" value={row.percentage} min="0" max="100" step="1"
-                            onChange={(e) => { const rows = [...ownershipRows]; rows[i] = { ...rows[i], percentage: parseFloat(e.target.value) || 0 }; saveOwnershipRows(rows); }}
-                            style={{ fontSize: '13px', textAlign: 'right', width: '72px' }} />
-                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>%</span>
-                        </div>
-                        {row.type !== 'applicant' ? (
-                          <button type="button" onClick={() => saveOwnershipRows(ownershipRows.filter((_, j) => j !== i))}
-                            style={{ padding: '4px 8px', fontSize: '12px', color: 'var(--text-danger-emphasis)', background: 'none', border: '1px solid var(--border-danger)', borderRadius: '5px', cursor: 'pointer' }}>✕</button>
-                        ) : <div />}
+                      <div key={row.id} style={{ width: `${parseFloat(row.percentage) || 0}%`, background: OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length], transition: 'width 0.2s ease' }} />
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+                    {ownershipRows.map((row, i) => (
+                      <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length] }} />
+                        <span>{row.name || 'New Owner'} ({parseFloat(row.percentage) || 0}%)</span>
                       </div>
                     ))}
                   </div>
 
-                  <button type="button"
-                    onClick={() => saveOwnershipRows([...ownershipRows, { id: `other-${Date.now()}`, type: 'other', name: '', percentage: 0 }])}
-                    style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'none', border: '1px dashed #bfdbfe', borderRadius: '6px', cursor: 'pointer', padding: '6px 14px', width: '100%', marginBottom: '14px', fontWeight: '600' }}>
-                    + Add non-applicant owner (natural person, company, trust, SMSF…)
-                  </button>
-
-                  <div style={{ paddingTop: '12px', borderTop: '1px solid var(--border-primary)', marginBottom: '12px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Guarantors (if any)</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {formData.applicants.map(a => {
-                        const name = getApplicantDisplayName(a) || `${a.role} ${a.number}`;
-                        const isG  = (security.guarantors || []).includes(a.id);
-                        return (
-                          <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', margin: 0, padding: '6px 12px', borderRadius: '20px', background: isG ? '#fdf4ff' : 'var(--bg-primary)', border: `1px solid ${isG ? '#d8b4fe' : '#e5e7eb'}` }}>
-                            <input type="checkbox" checked={isG}
-                              onChange={(e) => {
-                                const curr = security.guarantors || [];
-                                updateSecurity(index, 'guarantors', e.target.checked ? [...curr, a.id] : curr.filter(id => id !== a.id));
-                              }} />
-                            <span style={{ fontWeight: isG ? '600' : '400', color: isG ? '#7c3aed' : '#374151' }}>{name}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
+                  {/* Validation banner */}
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '6px 12px', borderRadius: '6px', marginBottom: '14px',
+                    fontSize: '12px', fontWeight: '600',
+                    background: totalOk ? '#f0fdf4' : '#fef2f2',
+                    border: `1px solid ${totalOk ? '#86efac' : '#fca5a5'}`,
+                    color: totalOk ? '#16a34a' : '#dc2626',
+                  }}>
+                    <span>{totalOk ? '✓ Ownership totals 100%' : `⚠ Total is ${totalPct.toFixed(1)}% — must equal 100%`}</span>
+                    {!totalOk && (
+                      <span>{totalPct > 100 ? `−${(totalPct - 100).toFixed(1)}% over` : `+${(100 - totalPct).toFixed(1)}% remaining`}</span>
+                    )}
                   </div>
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', margin: 0, padding: '8px 12px', borderRadius: '6px', background: security.crossCollateralise ? '#fff7ed' : 'var(--bg-primary)', border: `1px solid ${security.crossCollateralise ? '#fed7aa' : '#e5e7eb'}` }}>
-                    <input type="checkbox" checked={!!security.crossCollateralise}
-                      onChange={(e) => updateSecurity(index, 'crossCollateralise', e.target.checked)} />
-                    <span style={{ fontWeight: security.crossCollateralise ? '600' : '400', color: security.crossCollateralise ? '#c2410c' : '#374151' }}>
-                      🔗 Cross-Collateralise with other securities
-                    </span>
-                  </label>
+                  {/* Owner tiles */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))', gap: '10px', marginBottom: '10px' }}>
+                    {ownershipRows.map((row, i) => {
+                      const col = OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length];
+                      return (
+                        <div key={row.id} style={{
+                          border: `2px solid ${col}35`,
+                          borderRadius: '10px',
+                          padding: '14px 12px 12px',
+                          background: 'var(--bg-primary)',
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                        }}>
+                          {/* Color accent bar */}
+                          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', borderRadius: '10px 0 0 10px', background: col }} />
+
+                          {/* Remove button for non-applicants */}
+                          {row.type !== 'applicant' && (
+                            <button type="button"
+                              onClick={() => saveOwnershipRows(ownershipRows.filter((_, j) => j !== i))}
+                              style={{ position: 'absolute', top: '6px', right: '8px', fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px', opacity: 0.7 }}>
+                              ✕
+                            </button>
+                          )}
+
+                          {/* Name */}
+                          {row.type === 'applicant' ? (
+                            <div style={{ paddingLeft: '8px' }}>
+                              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1.3 }}>{row.name}</div>
+                              <div style={{ fontSize: '10px', fontWeight: '600', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.4px', marginTop: '2px' }}>
+                                Applicant {i + 1}
+                              </div>
+                            </div>
+                          ) : (
+                            <input
+                              type="text"
+                              value={row.name}
+                              placeholder="Owner / entity name"
+                              onChange={(e) => {
+                                const rows = [...ownershipRows];
+                                rows[i] = { ...rows[i], name: e.target.value };
+                                saveOwnershipRows(rows);
+                              }}
+                              style={{ fontSize: '13px', padding: '6px 8px', border: '1px solid var(--border-primary)', borderRadius: '6px', outline: 'none', width: '100%' }}
+                            />
+                          )}
+
+                          {/* % Stepper */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '4px' }}>
+                            <button type="button"
+                              onClick={() => {
+                                const rows = [...ownershipRows];
+                                rows[i] = { ...rows[i], percentage: Math.max(0, (parseFloat(rows[i].percentage) || 0) - 5) };
+                                saveOwnershipRows(rows);
+                              }}
+                              style={{ width: '32px', height: '32px', border: '1px solid var(--border-primary)', borderRadius: '6px 0 0 6px', background: 'var(--bg-secondary)', cursor: 'pointer', fontSize: '18px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
+                              −
+                            </button>
+                            <input
+                              type="number"
+                              value={row.percentage}
+                              min="0"
+                              max="100"
+                              onChange={(e) => {
+                                const rows = [...ownershipRows];
+                                rows[i] = { ...rows[i], percentage: Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)) };
+                                saveOwnershipRows(rows);
+                              }}
+                              style={{ width: '56px', height: '32px', border: '1px solid var(--border-primary)', borderLeft: 'none', borderRight: 'none', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', background: 'var(--bg-primary)' }}
+                            />
+                            <button type="button"
+                              onClick={() => {
+                                const rows = [...ownershipRows];
+                                rows[i] = { ...rows[i], percentage: Math.min(100, (parseFloat(rows[i].percentage) || 0) + 5) };
+                                saveOwnershipRows(rows);
+                              }}
+                              style={{ width: '32px', height: '32px', border: '1px solid var(--border-primary)', borderRadius: '0 6px 6px 0', background: 'var(--bg-secondary)', cursor: 'pointer', fontSize: '18px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
+                              +
+                            </button>
+                          </div>
+                          <div style={{ fontSize: '10px', textAlign: 'center', color: '#94a3b8' }}>% ownership</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button type="button"
+                    onClick={() => saveOwnershipRows([...ownershipRows, { id: `other-${Date.now()}`, type: 'other', name: '', percentage: 0 }])}
+                    style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'none', border: '2px dashed #bfdbfe', borderRadius: '10px', cursor: 'pointer', padding: '10px 14px', width: '100%', fontWeight: '600' }}>
+                    + Add owner &nbsp;·&nbsp; company · trust · other person
+                  </button>
                 </>
               )}
             </div>
@@ -1250,7 +1324,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
           <div>
             <label>Client Type</label>
             <div className="pill-group">
-              {['New', 'Existing', 'Family & Friends'].map(t => (
+              {['New', 'Existing'].map(t => (
                 <button key={t} type="button"
                   className={`pill-btn${formData.clientType === t ? ' pill-btn--active' : ''}`}
                   onClick={() => updateFormData('clientType', formData.clientType === t ? '' : t)}>
@@ -1262,7 +1336,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
           <div>
             <label>Priority</label>
             <div className="pill-group">
-              {[{ label: 'Urgent', cls: 'urgent' }, { label: 'High', cls: 'high' }, { label: 'Medium', cls: 'medium' }, { label: 'Low', cls: 'low' }].map(({ label, cls }) => (
+              {[{ label: 'Urgent', cls: 'urgent' }, { label: 'High', cls: 'high' }, { label: 'Medium', cls: 'medium' }].map(({ label, cls }) => (
                 <button key={label} type="button"
                   className={`pill-btn${formData.priority === label ? ` pill-btn--${cls}` : ''}`}
                   onClick={() => updateFormData('priority', formData.priority === label ? '' : label)}>

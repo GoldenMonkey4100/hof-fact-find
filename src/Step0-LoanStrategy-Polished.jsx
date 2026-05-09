@@ -441,8 +441,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
       primaryTransactionTypes: [], secondaryTransactionTypes: [],
       intendedOccupancy: '', applicationType: '',
       loanTerm: '', loanType: '', repaymentType: '', fixedRatePeriod: '', interestOnlyPeriod: '',
-      split1Amount: '', split1Type: '', split1RateType: '', split1FixedYears: '', split1IOYears: '',
-      split2Amount: '', split2Type: '', split2RateType: '', split2FixedYears: '', split2IOYears: '',
+      splits: [],
       currentLoanBalance: '', cashoutAmount: '', purchaseCompletionMethods: [],
       state: '', isFirstHomeBuyer: false, isNewHome: false,
       purchaseCompletionAmounts: {}, purchaseCompletionOther: '',
@@ -456,6 +455,23 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
   const removeSecurity = (index) => {
     if (formData.securities.length > 1)
       updateFormData('securities', formData.securities.filter((_, i) => i !== index));
+  };
+
+  const newSplitRow = () => ({ id: Date.now() + Math.random(), percentage: '', type: '', rateType: '', fixedYears: '', ioYears: '' });
+
+  const addSplit = (secIndex) => {
+    const sec = formData.securities[secIndex];
+    updateSecurityFields(secIndex, { splits: [...(sec.splits || []), newSplitRow()] });
+  };
+
+  const removeSplit = (secIndex, splitId) => {
+    const sec = formData.securities[secIndex];
+    updateSecurityFields(secIndex, { splits: (sec.splits || []).filter(s => s.id !== splitId) });
+  };
+
+  const updateSplit = (secIndex, splitId, field, value) => {
+    const sec = formData.securities[secIndex];
+    updateSecurityFields(secIndex, { splits: (sec.splits || []).map(s => s.id === splitId ? { ...s, [field]: value } : s) });
   };
 
   const toggleTransactionType = (securityIndex, type, isPrimary) => {
@@ -965,7 +981,13 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               <label>Loan Type</label>
               <LoanTypeMatrix
                 security={security}
-                onSelect={(rep, type) => updateSecurityFields(index, { repaymentType: rep, loanType: type })}
+                onSelect={(rep, type) => {
+                  const updates = { repaymentType: rep, loanType: type };
+                  if (rep === 'Split' && (!security.splits || security.splits.length === 0)) {
+                    updates.splits = [newSplitRow(), newSplitRow()];
+                  }
+                  updateSecurityFields(index, updates);
+                }}
               />
             </div>
 
@@ -999,113 +1021,157 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               </div>
             )}
 
-            {security.repaymentType === 'Split' && (
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ marginBottom: '12px', display: 'block' }}>Split Details</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  {[1, 2].map(splitNum => {
-                    const amtKey   = `split${splitNum}Amount`;
-                    const typeKey  = `split${splitNum}Type`;
-                    const rateKey  = `split${splitNum}RateType`;
-                    const fixedKey = `split${splitNum}FixedYears`;
-                    const ioKey    = `split${splitNum}IOYears`;
-                    const accentCol = splitNum === 1 ? '#3b82f6' : '#10b981';
-                    return (
-                      <div key={splitNum} style={{
-                        padding: '16px 14px 16px 18px',
-                        background: 'var(--bg-secondary)',
-                        borderRadius: '10px',
-                        border: '1px solid var(--border-primary)',
-                        borderLeft: `4px solid ${accentCol}`,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '14px',
-                      }}>
-                        <div style={{ fontSize: '12px', fontWeight: '700', color: accentCol, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          Split {splitNum}
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '12px', marginBottom: '4px', display: 'block' }}>Amount</label>
-                          <input type="text" value={formatCurrency(security[amtKey] || '')}
-                            onChange={(e) => updateSecurity(index, amtKey, parseCurrency(e.target.value))}
-                            placeholder="e.g. 300,000" style={{ fontSize: '13px' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '12px', marginBottom: '8px', display: 'block' }}>Loan Type</label>
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {['Principal & Interest', 'Interest Only'].map(opt => (
-                              <button key={opt} type="button"
-                                onClick={() => updateSecurity(index, typeKey, security[typeKey] === opt ? '' : opt)}
-                                className={`pill-btn${security[typeKey] === opt ? ' pill-btn--active' : ''}`}
-                                style={{ fontSize: '12px' }}>
-                                {security[typeKey] === opt && '✓ '}{opt}
+            {security.repaymentType === 'Split' && (() => {
+              const splits = security.splits || [];
+              const loanAmt = parseFloat(security.loanAmount) || 0;
+              const totalPct = splits.reduce((sum, s) => sum + (parseFloat(s.percentage) || 0), 0);
+              const pctOk = Math.abs(totalPct - 100) < 0.01;
+              const splitColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
+              return (
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ marginBottom: '12px', display: 'block' }}>Split Details</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '12px' }}>
+                    {splits.map((sp, si) => {
+                      const col = splitColors[si % splitColors.length];
+                      const computedAmt = loanAmt && parseFloat(sp.percentage) > 0
+                        ? Math.round(loanAmt * parseFloat(sp.percentage) / 100)
+                        : null;
+                      return (
+                        <div key={sp.id} style={{
+                          padding: '16px 14px 16px 18px',
+                          background: 'var(--bg-secondary)',
+                          borderRadius: '10px',
+                          border: '1px solid var(--border-primary)',
+                          borderLeft: `4px solid ${col}`,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '14px',
+                          position: 'relative',
+                        }}>
+                          {/* Header + remove */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '12px', fontWeight: '700', color: col, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              Split {si + 1}
+                            </span>
+                            {splits.length > 2 && (
+                              <button type="button" onClick={() => removeSplit(index, sp.id)}
+                                style={{ fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px', opacity: 0.75 }}>
+                                ✕
                               </button>
-                            ))}
+                            )}
                           </div>
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '12px', marginBottom: '8px', display: 'block' }}>Rate Type</label>
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {['Fixed', 'Variable'].map(opt => (
-                              <button key={opt} type="button"
-                                onClick={() => updateSecurity(index, rateKey, security[rateKey] === opt ? '' : opt)}
-                                className={`pill-btn${security[rateKey] === opt ? ' pill-btn--active' : ''}`}
-                                style={{ fontSize: '12px' }}>
-                                {security[rateKey] === opt && '✓ '}{opt}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        {security[rateKey] === 'Fixed' && (
+
+                          {/* Percentage + computed amount */}
                           <div>
-                            <label style={{ fontSize: '12px', marginBottom: '8px', display: 'block' }}>Fixed Period</label>
+                            <label style={{ fontSize: '12px', marginBottom: '4px', display: 'block' }}>Allocation (%)</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <input type="number" className="no-spin" min="0" max="100"
+                                value={sp.percentage}
+                                onChange={(e) => updateSplit(index, sp.id, 'percentage', e.target.value)}
+                                placeholder="e.g. 60"
+                                style={{ fontSize: '20px', fontWeight: '700', width: '80px', textAlign: 'center', padding: '8px 10px' }} />
+                              <span style={{ fontSize: '18px', color: 'var(--text-tertiary)', fontWeight: '300' }}>%</span>
+                            </div>
+                            {computedAmt !== null ? (
+                              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '5px', fontWeight: '500' }}>
+                                = ${computedAmt.toLocaleString()}
+                              </div>
+                            ) : loanAmt === 0 ? (
+                              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>Enter loan amount above to see $</div>
+                            ) : null}
+                          </div>
+
+                          {/* Loan Type */}
+                          <div>
+                            <label style={{ fontSize: '12px', marginBottom: '8px', display: 'block' }}>Loan Type</label>
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {[1,2,3,4,5].map(y => (
-                                <button key={y} type="button"
-                                  onClick={() => updateSecurity(index, fixedKey, security[fixedKey] === String(y) ? '' : String(y))}
-                                  className={`pill-btn${security[fixedKey] === String(y) ? ' pill-btn--active' : ''}`}
+                              {['Principal & Interest', 'Interest Only'].map(opt => (
+                                <button key={opt} type="button"
+                                  onClick={() => updateSplit(index, sp.id, 'type', sp.type === opt ? '' : opt)}
+                                  className={`pill-btn${sp.type === opt ? ' pill-btn--active' : ''}`}
                                   style={{ fontSize: '12px' }}>
-                                  {y}yr
+                                  {sp.type === opt && '✓ '}{opt}
                                 </button>
                               ))}
                             </div>
                           </div>
-                        )}
-                        {security[typeKey] === 'Interest Only' && (
+
+                          {/* Rate Type */}
                           <div>
-                            <label style={{ fontSize: '12px', marginBottom: '8px', display: 'block' }}>IO Period</label>
+                            <label style={{ fontSize: '12px', marginBottom: '8px', display: 'block' }}>Rate Type</label>
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {[1,2,3,4,5].map(y => (
-                                <button key={y} type="button"
-                                  onClick={() => updateSecurity(index, ioKey, security[ioKey] === String(y) ? '' : String(y))}
-                                  className={`pill-btn${security[ioKey] === String(y) ? ' pill-btn--active' : ''}`}
+                              {['Fixed', 'Variable'].map(opt => (
+                                <button key={opt} type="button"
+                                  onClick={() => updateSplit(index, sp.id, 'rateType', sp.rateType === opt ? '' : opt)}
+                                  className={`pill-btn${sp.rateType === opt ? ' pill-btn--active' : ''}`}
                                   style={{ fontSize: '12px' }}>
-                                  {y}yr
+                                  {sp.rateType === opt && '✓ '}{opt}
                                 </button>
                               ))}
                             </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                {security.split1Amount && security.split2Amount && (() => {
-                  const s1 = parseFloat(parseCurrency(security.split1Amount)) || 0;
-                  const s2 = parseFloat(parseCurrency(security.split2Amount)) || 0;
-                  const total = s1 + s2;
-                  const loan  = parseFloat(parseCurrency(security.loanAmount)) || 0;
-                  const matched = Math.abs(total - loan) < 1;
-                  return (
-                    <div style={{ marginTop: '10px', fontSize: '12px', fontWeight: '600', color: matched ? '#16a34a' : '#f59e0b' }}>
-                      {matched
-                        ? `✓ Total: ${formatCurrencyDisplay(total.toString())} — matches loan amount`
-                        : `⚠ Total: ${formatCurrencyDisplay(total.toString())} — loan amount is ${formatCurrencyDisplay(security.loanAmount)}`}
+
+                          {/* Fixed Period */}
+                          {sp.rateType === 'Fixed' && (
+                            <div>
+                              <label style={{ fontSize: '12px', marginBottom: '8px', display: 'block' }}>Fixed Period</label>
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                {[1,2,3,4,5].map(y => (
+                                  <button key={y} type="button"
+                                    onClick={() => updateSplit(index, sp.id, 'fixedYears', sp.fixedYears === String(y) ? '' : String(y))}
+                                    className={`pill-btn${sp.fixedYears === String(y) ? ' pill-btn--active' : ''}`}
+                                    style={{ fontSize: '12px' }}>
+                                    {y}yr
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* IO Period */}
+                          {sp.type === 'Interest Only' && (
+                            <div>
+                              <label style={{ fontSize: '12px', marginBottom: '8px', display: 'block' }}>IO Period</label>
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                {[1,2,3,4,5].map(y => (
+                                  <button key={y} type="button"
+                                    onClick={() => updateSplit(index, sp.id, 'ioYears', sp.ioYears === String(y) ? '' : String(y))}
+                                    className={`pill-btn${sp.ioYears === String(y) ? ' pill-btn--active' : ''}`}
+                                    style={{ fontSize: '12px' }}>
+                                    {y}yr
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Total % tracker + add button */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', gap: '12px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: pctOk ? '#16a34a' : totalPct > 100 ? '#ef4444' : '#f59e0b' }}>
+                      {pctOk
+                        ? `✓ ${totalPct}% allocated — splits balanced`
+                        : totalPct > 100
+                          ? `⚠ ${totalPct}% — over by ${(totalPct - 100).toFixed(1)}%`
+                          : splits.some(s => s.percentage !== '') ? `${totalPct}% of 100% allocated` : ''}
                     </div>
-                  );
-                })()}
-              </div>
-            )}
+                    <button type="button" onClick={() => addSplit(index)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        padding: '7px 14px', fontSize: '12px', fontWeight: '600',
+                        border: '1px dashed var(--border-primary)', borderRadius: '8px',
+                        background: 'var(--bg-primary)', color: 'var(--text-secondary)',
+                        cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}>
+                      + Add split
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="mb-4">
               <label>Loan Term</label>

@@ -271,27 +271,25 @@ const buildPageBody = (formData) => {
     // ── Loan structure — handle Split repayment type separately ─────────
     let loanLines;
     if (sec.repaymentType === 'Split') {
-      const buildSplit = (n) => {
-        const amt      = sec[`split${n}Amount`];
-        const type     = sec[`split${n}Type`];
-        const rateType = sec[`split${n}RateType`];
-        const fixedYrs = sec[`split${n}FixedYears`];
-        const ioYrs    = sec[`split${n}IOYears`];
-        if (!amt && !type) return '';
+      const loanAmt = parseFloat(sec.loanAmount) || 0;
+      const splitLines = (sec.splits || []).map((sp, i) => {
+        if (!sp.percentage && !sp.type) return '';
+        const dollarAmt = loanAmt && parseFloat(sp.percentage) > 0
+          ? Math.round(loanAmt * parseFloat(sp.percentage) / 100)
+          : null;
         return [
-          `Split ${n}: ${amt ? fmtCurrency(amt) : '—'}`,
-          type     ? `  └ ${type}`                                          : '',
-          rateType ? `  └ ${rateType}${fixedYrs ? ' (' + fixedYrs + 'yr fixed)' : ''}` : '',
-          type === 'Interest Only' && ioYrs ? `  └ IO: ${ioYrs} yrs`       : '',
+          `Split ${i + 1}: ${sp.percentage ? sp.percentage + '%' : '—'}${dollarAmt ? ` (${fmtCurrency(String(dollarAmt))})` : ''}`,
+          sp.type     ? `  └ ${sp.type}` : '',
+          sp.rateType ? `  └ ${sp.rateType}${sp.fixedYears ? ' (' + sp.fixedYears + 'yr fixed)' : ''}` : '',
+          sp.type === 'Interest Only' && sp.ioYears ? `  └ IO: ${sp.ioYears} yrs` : '',
         ].filter(Boolean).join('\n');
-      };
+      }).filter(Boolean);
       loanLines = [
         `Amount: ${fmtCurrency(sec.loanAmount)}`,
         `LVR: ${lvr}`,
         `Repayment: Split`,
         sec.loanTerm ? `Term: ${sec.loanTerm} years` : '',
-        buildSplit(1),
-        buildSplit(2),
+        ...splitLines,
         features !== '—' ? `Features: ${features}` : '',
       ].filter(Boolean).join('\n');
     } else {

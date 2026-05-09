@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import './styles.css';
 import { formatCurrencyDisplay, parseCurrency } from './utils';
 import SmartCard from './SmartCard';
@@ -7,7 +7,6 @@ import SmartCard from './SmartCard';
 
 const PERIODS = { weekly: 52, fortnightly: 26, monthly: 12, annual: 1 };
 
-/** Annualise a base income amount given pay frequency */
 const annualiseBase = (amount, freq, hoursPerWeek) => {
   const amt = parseFloat(amount) || 0;
   if (!amt) return 0;
@@ -15,19 +14,14 @@ const annualiseBase = (amount, freq, hoursPerWeek) => {
   return amt * (PERIODS[freq] || 1);
 };
 
-/** Annualise YTD gross by elapsed pay periods */
 const annualiseYTD = ({ ytdGross, freq, inputMode, currentPeriod, totalPeriods, startDate, payDate }) => {
   const ytd = parseFloat(ytdGross) || 0;
   if (!ytd) return 0;
-
   const totalPds = parseFloat(totalPeriods) || PERIODS[freq] || 26;
-
   if (inputMode === 'period') {
     const elapsed = parseFloat(currentPeriod) || 0;
     return elapsed > 0 ? (ytd / elapsed) * totalPds : 0;
   }
-
-  // By date
   if (!startDate || !payDate) return 0;
   const start = new Date(startDate);
   const end   = new Date(payDate);
@@ -38,7 +32,6 @@ const annualiseYTD = ({ ytdGross, freq, inputMode, currentPeriod, totalPeriods, 
   return elapsed > 0 ? (ytd / elapsed) * totalPds : 0;
 };
 
-/** Variance status */
 const getVarianceStatus = (m1Annual, m2Annual) => {
   if (!m1Annual || !m2Annual) return 'incomplete';
   const pct = ((m2Annual - m1Annual) / m1Annual) * 100;
@@ -58,6 +51,30 @@ const normalizeMediaType = (file) => {
   const MAP = { 'image/jpeg': 'image/jpeg', 'image/jpg': 'image/jpeg', 'image/png': 'image/png', 'image/webp': 'image/webp', 'image/gif': 'image/gif', 'application/pdf': 'application/pdf' };
   return MAP[(file.type || '').toLowerCase()] || 'image/jpeg';
 };
+
+// ── SubStepBar (mirrors Step 1) ───────────────────────────────────────────────
+
+const SubStepBar = ({ step, labels, onGoTo }) => (
+  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
+    {labels.map((label, i) => {
+      const n = i + 1; const done = n < step; const active = n === step;
+      return (
+        <React.Fragment key={n}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', cursor: done ? 'pointer' : 'default' }}
+            onClick={() => done && onGoTo(n)}>
+            <div style={{ width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', transition: 'all 0.2s', background: done ? '#10b981' : active ? 'var(--color-primary)' : 'var(--bg-secondary)', color: done || active ? 'white' : 'var(--text-tertiary)', border: done ? '2px solid #10b981' : active ? '2px solid var(--color-primary)' : '1px solid var(--border-primary)' }}>
+              {done ? '✓' : n}
+            </div>
+            <span style={{ fontSize: '11px', fontWeight: active ? '600' : '400', color: active ? 'var(--color-primary)' : done ? '#10b981' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{label}</span>
+          </div>
+          {i < labels.length - 1 && (
+            <div style={{ flex: 1, height: '2px', background: done ? '#10b981' : 'var(--border-primary)', margin: '0 8px', marginBottom: '14px', transition: 'background 0.2s' }} />
+          )}
+        </React.Fragment>
+      );
+    })}
+  </div>
+);
 
 // ── Income Verification Modal ─────────────────────────────────────────────────
 
@@ -115,29 +132,19 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
   return (
     <div style={{ marginTop: '12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '10px', overflow: 'hidden' }}>
       <div>
-
-        {/* Header */}
         <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-primary)' }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
-              💰 Income Verification Tool
-            </h2>
+            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>💰 Income Verification Tool</h2>
             <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>{applicantName}</p>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px 8px' }}>✕</button>
         </div>
 
         <div style={{ padding: '16px' }}>
-
-          {/* Two methods side by side */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
 
-            {/* Method 1: Base Income */}
             <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '10px', padding: '18px' }}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                Method 1 — Base Income
-              </h3>
-
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>Method 1 — Base Income</h3>
               <div style={{ marginBottom: '12px' }}>
                 <label style={labelStyle}>Pay Frequency</label>
                 <select value={m1Freq} onChange={(e) => setM1Freq(e.target.value)} style={inputStyle}>
@@ -148,40 +155,30 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
                   <option value="annual">Annual salary</option>
                 </select>
               </div>
-
               <div style={{ marginBottom: '12px' }}>
                 <label style={labelStyle}>
                   {m1Freq === 'hourly' ? 'Hourly Rate ($)' : m1Freq === 'weekly' ? 'Weekly Gross ($)' : m1Freq === 'fortnightly' ? 'Fortnightly Gross ($)' : m1Freq === 'monthly' ? 'Monthly Gross ($)' : 'Annual Salary ($)'}
                 </label>
                 <input type="number" value={m1Amount} onChange={(e) => setM1Amount(e.target.value)} placeholder="0.00" style={inputStyle} />
               </div>
-
               {m1Freq === 'hourly' && (
                 <div style={{ marginBottom: '12px' }}>
                   <label style={labelStyle}>Ordinary Hours per Week</label>
                   <input type="number" value={m1Hours} onChange={(e) => setM1Hours(e.target.value)} placeholder="38" style={inputStyle} />
                 </div>
               )}
-
               <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', textAlign: 'center' }}>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Annualised Base Income</div>
-                <div style={{ fontSize: '22px', fontWeight: '700', color: m1Annual ? 'var(--color-success-dark)' : 'var(--text-tertiary)' }}>
-                  {m1Annual ? fmt(m1Annual) : '—'}
-                </div>
+                <div style={{ fontSize: '22px', fontWeight: '700', color: m1Annual ? 'var(--color-success-dark)' : 'var(--text-tertiary)' }}>{m1Annual ? fmt(m1Annual) : '—'}</div>
               </div>
             </div>
 
-            {/* Method 2: YTD Annualisation */}
             <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '10px', padding: '18px' }}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                Method 2 — YTD Annualisation
-              </h3>
-
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>Method 2 — YTD Annualisation</h3>
               <div style={{ marginBottom: '12px' }}>
                 <label style={labelStyle}>YTD Gross Earnings (from payslip)</label>
                 <input type="number" value={m2YTDGross} onChange={(e) => setM2YTDGross(e.target.value)} placeholder="0.00" style={inputStyle} />
               </div>
-
               <div style={{ marginBottom: '12px' }}>
                 <label style={labelStyle}>Pay Frequency</label>
                 <select value={m2Freq} onChange={(e) => { setM2Freq(e.target.value); setM2TotalPeriods(String(PERIODS[e.target.value] || 26)); }} style={inputStyle}>
@@ -190,8 +187,6 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
                   <option value="monthly">Monthly (12 periods/year)</option>
                 </select>
               </div>
-
-              {/* Input mode toggle */}
               <div style={{ marginBottom: '12px' }}>
                 <label style={labelStyle}>Calculate by</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -205,7 +200,6 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
                   ))}
                 </div>
               </div>
-
               {m2InputMode === 'period' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
                   <div>
@@ -229,17 +223,13 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
                   </div>
                 </div>
               )}
-
               <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', textAlign: 'center' }}>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Annualised YTD Income</div>
-                <div style={{ fontSize: '22px', fontWeight: '700', color: m2Annual ? 'var(--color-success-dark)' : 'var(--text-tertiary)' }}>
-                  {m2Annual ? fmt(m2Annual) : '—'}
-                </div>
+                <div style={{ fontSize: '22px', fontWeight: '700', color: m2Annual ? 'var(--color-success-dark)' : 'var(--text-tertiary)' }}>{m2Annual ? fmt(m2Annual) : '—'}</div>
               </div>
             </div>
           </div>
 
-          {/* Comparison summary */}
           <div style={{ padding: '16px', background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: '10px', marginBottom: status === 'ytd_lower' ? '16px' : '0' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '12px', alignItems: 'center', marginBottom: '10px' }}>
               <div style={{ textAlign: 'center' }}>
@@ -263,12 +253,9 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
             <p style={{ margin: 0, fontSize: '12px', color: cfg.color }}>{cfg.text}</p>
           </div>
 
-          {/* Explanation section — only when YTD is significantly lower */}
           {status === 'ytd_lower' && (
-            <div style={{ padding: '16px', background: 'var(--bg-warning-surface)', border: '1px solid var(--border-warning)', borderRadius: '10px', marginBottom: '0' }}>
-              <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-warning-emphasis)' }}>
-                Explanation required — select all that apply:
-              </h4>
+            <div style={{ padding: '16px', background: 'var(--bg-warning-surface)', border: '1px solid var(--border-warning)', borderRadius: '10px', marginBottom: '0', marginTop: '16px' }}>
+              <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-warning-emphasis)' }}>Explanation required — select all that apply:</h4>
               {EXPLANATIONS.map(exp => (
                 <label key={exp} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px', cursor: 'pointer' }}>
                   <input type="checkbox" checked={checkedExps.includes(exp)} onChange={() => toggleExp(exp)} style={{ marginTop: '2px', flexShrink: 0 }} />
@@ -276,28 +263,18 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
                 </label>
               ))}
               <div style={{ marginTop: '8px' }}>
-                <label style={{ ...labelStyle, color: 'var(--text-warning-emphasis)' }}>Additional notes</label>
-                <textarea
-                  value={otherNotes}
-                  onChange={(e) => setOtherNotes(e.target.value)}
-                  placeholder="Any additional context the lender may need…"
-                  rows={3}
-                  style={{ width: '100%', fontSize: '13px', padding: '8px', border: '1px solid var(--border-warning)', borderRadius: '6px', resize: 'vertical', boxSizing: 'border-box' }}
-                />
+                <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-warning-emphasis)', display: 'block', marginBottom: '4px' }}>Additional notes</label>
+                <textarea value={otherNotes} onChange={(e) => setOtherNotes(e.target.value)}
+                  placeholder="Any additional context the lender may need…" rows={3}
+                  style={{ width: '100%', fontSize: '13px', padding: '8px', border: '1px solid var(--border-warning)', borderRadius: '6px', resize: 'vertical', boxSizing: 'border-box' }} />
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer */}
         <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'flex-end', gap: '12px', background: 'var(--bg-primary)' }}>
           <button onClick={onClose} className="btn-secondary">Cancel</button>
-          <button
-            onClick={handleSave}
-            className="btn-primary"
-            disabled={!m1Annual || !m2Annual}
-            style={{ opacity: (!m1Annual || !m2Annual) ? 0.5 : 1 }}
-          >
+          <button onClick={handleSave} className="btn-primary" disabled={!m1Annual || !m2Annual} style={{ opacity: (!m1Annual || !m2Annual) ? 0.5 : 1 }}>
             Save Verification
           </button>
         </div>
@@ -310,9 +287,14 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
 
 const Step2Employment = ({ formData, updateFormData }) => {
   const [employmentRecords, setEmploymentRecords] = useState([]);
-  const [payslipState,    setPayslipState]    = useState({}); // { [idx]: { files, extracting, data, error, dragging } }
-  const [verifierExpanded, setVerifierExpanded] = useState({}); // { [idx]: bool }
-  const [abnLookup,        setAbnLookup]        = useState({}); // { [key]: { loading, result, error } }
+  const [payslipState,    setPayslipState]    = useState({});
+  const [verifierExpanded, setVerifierExpanded] = useState({});
+  const [abnLookup,        setAbnLookup]        = useState({});
+
+  // Sub-step tracking per applicant id (1 = Current Employment, 2 = Income & History)
+  const [employmentStep, setEmploymentStep] = useState({});
+  const getEmpStep  = (id) => employmentStep[id] || 1;
+  const goToEmpStep = (id, n) => setEmploymentStep(p => ({ ...p, [id]: n }));
 
   const getApplicantType = (applicantId) =>
     (formData.applicants || []).find(a => a.id === applicantId)?.type || 'Natural Person';
@@ -365,7 +347,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
     return total;
   };
 
-  // ── ABN lookup ─────────────────────────────────────────────────────────────
+  // ── ABN lookup ──────────────────────────────────────────────────────────────
   const lookupABN = async (key, abn, onSuccess) => {
     const clean = (abn || '').replace(/\D/g, '');
     if (clean.length !== 11) return;
@@ -466,7 +448,6 @@ const Step2Employment = ({ formData, updateFormData }) => {
     const old = payslipState[idx]?.previewUrl;
     if (old) URL.revokeObjectURL(old);
     const previewUrl = file ? URL.createObjectURL(file) : null;
-    // auto-open preview when a file is attached; close when removed
     updatePayslip(idx, { files: file ? [file] : [], previewUrl, data: null, error: null, previewOpen: !!file });
   };
 
@@ -493,17 +474,11 @@ const Step2Employment = ({ formData, updateFormData }) => {
       if (data.error) { updatePayslip(idx, { extracting: false, error: data.error }); return; }
       updatePayslip(idx, { extracting: false, data });
 
-      // ── Upload payslip to Vercel Blob so URL can be stored in Notion ──────
       try {
         const ext = file.name.split('.').pop() || 'pdf';
         const blobRes = await fetch('/api/upload-blob', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            base64,
-            filename: `payslip-${idx}-${Date.now()}.${ext}`,
-            contentType: normalizeMediaType(file),
-          }),
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ base64, filename: `payslip-${idx}-${Date.now()}.${ext}`, contentType: normalizeMediaType(file) }),
         });
         const blobData = await blobRes.json();
         if (blobData.url) updateCurrentEmployment(idx, 'payslipUrl', blobData.url);
@@ -511,146 +486,131 @@ const Step2Employment = ({ formData, updateFormData }) => {
         console.warn('[Payslip Blob upload] failed:', e.message);
       }
 
-      // Prefill all available fields from extraction
       if (data.employerName)  updateCurrentEmployment(idx, 'employer',    data.employerName);
       if (data.employerABN)   updateCurrentEmployment(idx, 'abn',         data.employerABN);
       if (data.jobTitle)      updateCurrentEmployment(idx, 'role',        data.jobTitle);
-      if (data.payFrequency && data.payFrequency !== 'unknown') {
-        updateCurrentEmployment(idx, 'payFrequency', data.payFrequency);
-      }
+      if (data.payFrequency && data.payFrequency !== 'unknown') updateCurrentEmployment(idx, 'payFrequency', data.payFrequency);
       if (data.grossPay) {
         const freq = data.payFrequency || 'fortnightly';
         const annualised = Math.round(parseFloat(data.grossPay) * (PERIODS[freq] || 26));
         updateCurrentEmployment(idx, 'baseIncome', String(annualised));
       }
-      // Auto-flag HECS if tax analysis suggests it
-      if (data.taxAnalysis?.flag === 'higher_than_expected') {
-        updateCurrentEmployment(idx, 'hecs', 'Yes');
-      }
+      if (data.taxAnalysis?.flag === 'higher_than_expected') updateCurrentEmployment(idx, 'hecs', 'Yes');
     } catch (err) {
       updatePayslip(idx, { extracting: false, error: err.message });
     }
   };
 
-  // ── Payslip upload zone ─────────────────────────────────────────────────────
-  const renderPayslipUpload = (record, idx) => {
-    const ps           = payslipState[idx] || {};
-    const file         = ps.files?.[0];
-    const hasFile      = !!file;
-    const isDragging   = !!ps.dragging;
-    const isPDF        = file?.type === 'application/pdf';
-    const isPreviewOpen = !!ps.previewOpen;
-    const emp          = record.currentEmployment;
-    const fileInputId  = `payslip-input-${idx}`;
-    const isVerOpen    = !!verifierExpanded[idx];
+  // ── Quick Actions (Payslip tile + Income Verifier tile) ─────────────────────
+  const renderEmploymentQuickActions = (record, idx) => {
+    const ps        = payslipState[idx] || {};
+    const file      = ps.files?.[0];
+    const hasFile   = !!file;
+    const extracting = !!ps.extracting;
+    const extracted  = !!ps.data;
+    const iv        = record.currentEmployment.incomeVerification;
+    const inputId   = `ps-qa-${idx}`;
 
-    const HECSBtn = ({ val }) => (
-      <button type="button" onClick={() => updateCurrentEmployment(idx, 'hecs', val)}
-        style={{
-          flex: 1, padding: '7px 0', border: `1px solid ${emp.hecs === val ? 'var(--color-primary)' : 'var(--border-primary)'}`,
-          background: emp.hecs === val ? 'var(--color-primary-light)' : 'var(--bg-primary)',
-          color: emp.hecs === val ? 'var(--color-primary)' : 'var(--text-secondary)',
-          borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer'
-        }}>{val}</button>
-    );
+    const ivStatusMap = {
+      consistent: { label: '✓ Consistent', bg: '#f0fdf4', border: '#86efac', color: '#16a34a' },
+      ytd_higher: { label: 'ℹ YTD Higher', bg: 'var(--bg-info-surface)', border: '#bae6fd', color: '#0369a1' },
+      ytd_lower:  { label: '⚠ YTD Lower', bg: 'var(--bg-warning-surface)', border: 'var(--border-warning)', color: '#b45309' },
+    };
+    const ivCfg = iv ? (ivStatusMap[iv.status] || ivStatusMap.consistent) : null;
 
-    const fmtInc = (v) => {
-      const n = parseFloat((v || '').toString().replace(/,/g, ''));
-      if (!n) return '';
-      return n.toLocaleString('en-AU');
-    };
-    const fmtIncDisplay = (v) => {
-      const n = parseFloat((v || '').toString().replace(/,/g, ''));
-      if (!n) return null;
-      return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 2 }).format(n);
-    };
+    const tile = (extra = {}) => ({
+      padding: '14px 16px', borderRadius: '10px', border: '1px solid var(--border-primary)',
+      background: 'var(--bg-secondary)', display: 'flex', flexDirection: 'column', gap: '10px',
+      ...extra,
+    });
 
     return (
-      <div style={{ marginBottom: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', marginBottom: '20px' }}>
 
-        {/* ── Upload zone ── */}
-        <div
-          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); updatePayslip(idx, { dragging: true }); }}
-          onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); updatePayslip(idx, { dragging: true }); }}
-          onDragLeave={(e) => { e.stopPropagation(); updatePayslip(idx, { dragging: false }); }}
-          onDrop={(e) => { e.stopPropagation(); handlePayslipDrop(idx, e); }}
-          style={{
-            border: `${isDragging ? '2px dashed #3b82f6' : hasFile ? '1px solid var(--border-success)' : '1px dashed var(--border-primary)'}`,
-            borderRadius: '8px', padding: '12px 14px',
-            background: isDragging ? '#dbeafe' : hasFile ? '#f0fdf4' : 'var(--bg-secondary)',
-            transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap'
-          }}
-        >
-          <input id={fileInputId} type="file" accept="image/*,.pdf,application/pdf" style={{ display: 'none' }}
-            onChange={(e) => { if (e.target.files[0]) setPayslipFile(idx, e.target.files[0]); }} />
-          <span style={{ fontSize: '18px' }}>{isDragging ? '📂' : hasFile ? '✅' : '📄'}</span>
-          <div style={{ flex: 1, minWidth: '120px' }}>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: hasFile ? '#166534' : 'var(--text-primary)' }}>
-              {hasFile ? file.name : 'Payslip / Income Document'}
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-              {isDragging ? 'Drop to attach' : hasFile ? 'Attached — click Extract to auto-fill form fields' : 'Drag & drop or click Browse — JPG, PNG, PDF'}
-            </div>
+        {/* Payslip tile */}
+        <div style={tile(extracted ? { background: 'var(--bg-success-surface)', borderColor: 'var(--border-success)' } : {})}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '16px' }}>📄</span>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>Payslip</span>
+            {extracted && <span style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a', background: '#dcfce7', padding: '1px 7px', borderRadius: '10px' }}>✓ DONE</span>}
           </div>
-          {!hasFile && (
-            <button type="button" onClick={() => document.getElementById(fileInputId)?.click()}
-              style={{ padding: '6px 16px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}>
-              Browse
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            {hasFile
+              ? <>{file.name.length > 22 ? file.name.slice(0, 22) + '…' : file.name}{extracted && ps.data?.employerName ? <><br /><span style={{ color: 'var(--text-success-emphasis)', fontWeight: '600' }}>{ps.data.employerName}</span></> : null}</>
+              : 'No file selected'}
+          </div>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input id={inputId} type="file" accept="image/*,.pdf,application/pdf" style={{ display: 'none' }}
+              onChange={(e) => { if (e.target.files[0]) setPayslipFile(idx, e.target.files[0]); }} />
+            <label htmlFor={inputId} style={{ flex: 1, padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px', cursor: 'pointer', textAlign: 'center', color: 'var(--text-primary)' }}>
+              📄 {hasFile ? 'Replace' : 'Upload'}
+            </label>
+            <button type="button" disabled={!hasFile || extracting} onClick={() => handlePayslipExtract(idx)}
+              style={{ flex: 1, padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: hasFile && !extracting ? '#0369a1' : '#e2e8f0', color: hasFile && !extracting ? 'white' : '#9ca3af', border: 'none', borderRadius: '6px', cursor: hasFile && !extracting ? 'pointer' : 'not-allowed' }}>
+              {extracting ? '…' : '✨ Extract'}
             </button>
-          )}
-          {hasFile && (
-            <button type="button" onClick={() => handlePayslipExtract(idx)} disabled={ps.extracting}
-              style={{ padding: '6px 16px', background: ps.extracting ? '#93c5fd' : 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: ps.extracting ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
-              {ps.extracting ? '⏳ Reading…' : '✨ Extract'}
-            </button>
-          )}
+          </div>
+          {ps.error && <div style={{ fontSize: '10px', color: 'var(--text-danger-emphasis)' }}>⚠ {ps.error}</div>}
         </div>
 
-        {/* ── File controls: preview toggle + remove ── */}
-        {hasFile && ps.previewUrl && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', padding: '7px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '7px' }}>
-            <button type="button" onClick={() => updatePayslip(idx, { previewOpen: !isPreviewOpen })}
-              style={{ fontSize: '12px', fontWeight: '600', color: isPreviewOpen ? '#475569' : 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '5px' }}>
-              {isPreviewOpen ? '▲ Hide payslip' : '👁 View payslip'}
-            </button>
-            <button type="button" onClick={() => setPayslipFile(idx, null)}
-              style={{ fontSize: '12px', color: 'var(--text-danger-emphasis)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-              ✕ Remove
-            </button>
+        {/* Income Verifier tile */}
+        <div style={tile(ivCfg ? { background: ivCfg.bg, borderColor: ivCfg.border } : {})}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '16px' }}>💰</span>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>Income Verifier</span>
+            {ivCfg && <span style={{ fontSize: '10px', fontWeight: '700', color: ivCfg.color, background: 'transparent', padding: '1px 0' }}>{ivCfg.label}</span>}
           </div>
-        )}
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            {iv
+              ? <>Base: <strong>{fmt(iv.m1Annual)}</strong> · YTD: <strong>{fmt(iv.m2Annual)}</strong><br />Variance: <strong style={{ color: iv.variancePct < -2 ? '#dc2626' : 'var(--text-primary)' }}>{iv.variancePct?.toFixed(1)}%</strong></>
+              : 'No verification yet'}
+          </div>
+          <button type="button"
+            onClick={() => { goToEmpStep(record.applicantId, 2); setVerifierExpanded(p => ({ ...p, [idx]: true })); }}
+            style={{ padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: iv ? 'var(--bg-primary)' : 'var(--color-primary)', color: iv ? 'var(--text-primary)' : 'white', border: iv ? '1px solid var(--border-primary)' : 'none', borderRadius: '6px', cursor: 'pointer' }}>
+            {iv ? '✏️ Edit Verification' : 'Open Verifier'}
+          </button>
+        </div>
 
-        {/* ── Collapsible inline preview ── */}
-        {hasFile && ps.previewUrl && isPreviewOpen && (
-          <div style={{ marginTop: '8px', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-primary)', background: 'var(--bg-secondary)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+      </div>
+    );
+  };
+
+  // ── Payslip Step 2 section (preview + extracted summary) ────────────────────
+  const renderPayslipStep2 = (record, idx) => {
+    const ps          = payslipState[idx] || {};
+    const file        = ps.files?.[0];
+    const hasFile     = !!file;
+    const isPDF       = file?.type === 'application/pdf';
+    const isPreviewOpen = !!ps.previewOpen;
+
+    if (!hasFile) return null;
+
+    return (
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '7px', marginBottom: '6px' }}>
+          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>📄 {file.name.length > 30 ? file.name.slice(0, 30) + '…' : file.name}</span>
+          <button type="button" onClick={() => updatePayslip(idx, { previewOpen: !isPreviewOpen })}
+            style={{ fontSize: '12px', fontWeight: '600', color: isPreviewOpen ? 'var(--text-secondary)' : 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+            {isPreviewOpen ? '▲ Hide' : '👁 View payslip'}
+          </button>
+        </div>
+        {isPreviewOpen && (
+          <div style={{ marginBottom: '8px', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-primary)' }}>
             {isPDF
               ? <embed src={ps.previewUrl} type="application/pdf" width="100%" style={{ height: '520px', display: 'block' }} />
               : <img src={ps.previewUrl} alt="Payslip preview" style={{ width: '100%', display: 'block', objectFit: 'contain', background: 'var(--bg-secondary)' }} />
             }
           </div>
         )}
-
-        {/* ── Extraction error ── */}
-        {ps.error && (
-          <div style={{ marginTop: '8px', padding: '8px 12px', background: 'var(--bg-danger-surface)', border: '1px solid var(--border-danger)', borderRadius: '6px', fontSize: '12px', color: 'var(--text-danger-emphasis)' }}>
-            ⚠️ {ps.error}
-          </div>
-        )}
-
-        {/* ── Extracted summary ── */}
         {ps.data && (
-          <div style={{ marginTop: '8px', padding: '12px 14px', background: 'var(--bg-success-surface)', border: '1px solid var(--border-success)', borderRadius: '8px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-success-emphasis)', marginBottom: '8px' }}>✓ Payslip extracted — form fields pre-filled below</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', marginBottom: ps.data.taxAnalysis ? '8px' : '0' }}>
+          <div style={{ padding: '10px 14px', background: 'var(--bg-success-surface)', border: '1px solid var(--border-success)', borderRadius: '8px', marginBottom: '4px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-success-emphasis)', marginBottom: '6px' }}>✓ Payslip extracted — form fields pre-filled below</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
               {[
-                ['Employer', ps.data.employerName],
-                ['ABN', ps.data.employerABN],
-                ['Job Title', ps.data.jobTitle],
-                ['Pay Date', ps.data.payDate],
-                ['Gross This Period', ps.data.grossPay ? `$${Number(ps.data.grossPay).toLocaleString()}` : ''],
+                ['Employer', ps.data.employerName], ['ABN', ps.data.employerABN], ['Job Title', ps.data.jobTitle],
+                ['Pay Date', ps.data.payDate], ['Gross/Period', ps.data.grossPay ? `$${Number(ps.data.grossPay).toLocaleString()}` : ''],
                 ['YTD Gross', ps.data.ytdGross ? `$${Number(ps.data.ytdGross).toLocaleString()}` : ''],
-                ['YTD Tax', ps.data.ytdTax ? `$${Number(ps.data.ytdTax).toLocaleString()}` : ''],
-                ['Period #', ps.data.payPeriodNumber],
               ].filter(([, v]) => v).map(([label, val]) => (
                 <div key={label} style={{ fontSize: '11px' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>{label}: </span>
@@ -661,116 +621,81 @@ const Step2Employment = ({ formData, updateFormData }) => {
             {ps.data.taxAnalysis && (() => {
               const ta = ps.data.taxAnalysis;
               const isHigh = ta.flag === 'higher_than_expected';
-              const isLow  = ta.flag === 'lower_than_expected';
-              const color  = isHigh ? '#92400e' : isLow ? '#1e40af' : '#166534';
-              const bg     = isHigh ? '#fefce8' : isLow ? '#eff6ff' : '#f0fdf4';
-              const border = isHigh ? '#fde68a' : isLow ? '#bfdbfe' : '#86efac';
+              const color  = isHigh ? '#92400e' : '#1e40af';
+              const bg     = isHigh ? '#fefce8' : '#eff6ff';
+              const border = isHigh ? '#fde68a' : '#bfdbfe';
               return (
-                <div style={{ padding: '7px 10px', background: bg, border: `1px solid ${border}`, borderRadius: '6px', fontSize: '11px', color }}>
+                <div style={{ marginTop: '6px', padding: '6px 10px', background: bg, border: `1px solid ${border}`, borderRadius: '6px', fontSize: '11px', color }}>
                   <strong>Tax Check:</strong> {ta.note}
-                  <span style={{ marginLeft: '8px', color: 'var(--text-secondary)' }}>
-                    (Expected ${ta.expectedTax?.toLocaleString()} · Actual ${ta.annualisedTax?.toLocaleString()} annualised)
-                  </span>
                 </div>
               );
             })()}
           </div>
         )}
+      </div>
+    );
+  };
 
-        {/* ── Income Details card ── */}
-        <div style={{ marginTop: '12px', padding: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px' }}>
-          <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Income Details</h4>
-          <div className="grid grid-cols-2 mb-3">
-            <div>
-              <label style={{ fontSize: '12px' }}>Pay Frequency</label>
-              <div className="pill-group" style={{ marginTop: '6px' }}>
-                {[['weekly', 'Weekly'], ['fortnightly', 'Fortnightly'], ['monthly', 'Monthly']].map(([val, lbl]) => (
-                  <button key={val} type="button"
-                    className={`pill-btn${emp.payFrequency === val ? ' pill-btn--active' : ''}`}
-                    style={{ fontSize: '12px', padding: '6px 11px' }}
-                    onClick={() => updateCurrentEmployment(idx, 'payFrequency', emp.payFrequency === val ? '' : val)}>
-                    {lbl}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label style={{ fontSize: '12px' }}>Base Income (annual)</label>
-              <input type="text" value={fmtInc(emp.baseIncome)} placeholder="0"
-                onChange={(e) => updateCurrentEmployment(idx, 'baseIncome', parseCurrency(e.target.value))}
-                style={{ fontSize: '13px' }} />
-              {fmtIncDisplay(emp.baseIncome) && (
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>{fmtIncDisplay(emp.baseIncome)}</div>
-              )}
-            </div>
+  // ── 3-Year History tracker ──────────────────────────────────────────────────
+  const renderHistoryTracker = (record, idx) => {
+    const totalYears = record.totalYears;
+    const met        = record.meetsRequirement;
+    const pct        = Math.min((totalYears / 3) * 100, 100);
+    const ty         = Math.floor(totalYears);
+    const tm         = Math.round((totalYears - ty) * 12);
+
+    return (
+      <div style={{ border: '1px solid var(--border-primary)', borderRadius: '10px', overflow: 'hidden', marginBottom: '16px' }}>
+        <div style={{ padding: '12px 16px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '15px' }}>⏱</span>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>3-Year Employment History</span>
+            <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 9px', borderRadius: '10px', background: met ? '#dcfce7' : '#fef9c3', color: met ? '#15803d' : '#92400e' }}>
+              {met ? `✓ ${ty}y ${tm}m` : `⚠ ${ty}y ${tm}m / 3y needed`}
+            </span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-            <div>
-              <label style={{ fontSize: '12px' }}>Bonus Income (annual)</label>
-              <input type="text" value={fmtInc(emp.bonusIncome)} placeholder="0"
-                onChange={(e) => updateCurrentEmployment(idx, 'bonusIncome', parseCurrency(e.target.value))}
-                style={{ fontSize: '13px' }} />
-              {fmtIncDisplay(emp.bonusIncome) && (
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>{fmtIncDisplay(emp.bonusIncome)}</div>
-              )}
-            </div>
-            <div>
-              <label style={{ fontSize: '12px' }}>Commissions (annual)</label>
-              <input type="text" value={fmtInc(emp.commissions)} placeholder="0"
-                onChange={(e) => updateCurrentEmployment(idx, 'commissions', parseCurrency(e.target.value))}
-                style={{ fontSize: '13px' }} />
-              {fmtIncDisplay(emp.commissions) && (
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>{fmtIncDisplay(emp.commissions)}</div>
-              )}
-            </div>
-            <div>
-              <label style={{ fontSize: '12px' }}>HECS Debt</label>
-              <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
-                <HECSBtn val="Yes" />
-                <HECSBtn val="No" />
-              </div>
-            </div>
-          </div>
-
-          {/* ── Saved verification summary ── */}
-          {record.currentEmployment.incomeVerification && !isVerOpen && (() => {
-            const v = record.currentEmployment.incomeVerification;
-            const statusColors = { consistent: '#166534', ytd_higher: '#0369a1', ytd_lower: '#9a3412', incomplete: '#64748b' };
-            const statusLabels = { consistent: '✓ Consistent', ytd_higher: 'ℹ️ YTD Higher', ytd_lower: '⚠️ YTD Lower — flagged', incomplete: '—' };
-            return (
-              <div style={{ padding: '10px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '12px', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: '600' }}>Income Verification</span>
-                  <span style={{ color: statusColors[v.status] || '#64748b', fontWeight: '600' }}>{statusLabels[v.status] || v.status}</span>
-                </div>
-                <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)' }}>
-                  <span>Base: <strong style={{ color: 'var(--text-primary)' }}>{fmt(v.m1Annual)}</strong></span>
-                  <span>YTD: <strong style={{ color: 'var(--text-primary)' }}>{fmt(v.m2Annual)}</strong></span>
-                  <span>Var: <strong style={{ color: v.variancePct < -2 ? '#dc2626' : 'var(--text-primary)' }}>{v.variancePct?.toFixed(1)}%</strong></span>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* ── Income Verifier inline toggle ── */}
-          {isVerOpen ? (
-            <IncomeVerifierModal
-              applicantName={record.applicantName}
-              initialData={ps.data || null}
-              onClose={() => setVerifierExpanded(p => ({ ...p, [idx]: false }))}
-              onSave={(result) => {
-                updateCurrentEmployment(idx, 'incomeVerification', result);
-                setVerifierExpanded(p => ({ ...p, [idx]: false }));
-              }}
-            />
-          ) : (
-            <button type="button"
-              onClick={() => setVerifierExpanded(p => ({ ...p, [idx]: true }))}
-              style={{ width: '100%', padding: '8px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-              {record.currentEmployment.incomeVerification ? '✏️ Edit Income Verification' : '💰 Open Income Verification Tool'}
-            </button>
-          )}
+          <button type="button" onClick={() => addPreviousEmployment(idx)}
+            style={{ fontSize: '12px', fontWeight: '600', padding: '5px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-primary)' }}>
+            + Add Previous
+          </button>
         </div>
+
+        {/* Progress bar */}
+        <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-primary)', background: 'var(--bg-primary)' }}>
+          <div style={{ height: '6px', background: 'var(--bg-secondary)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${pct}%`, background: met ? '#10b981' : 'var(--color-primary)', borderRadius: '3px', transition: 'width 0.3s' }} />
+          </div>
+        </div>
+
+        {/* Current employment row */}
+        {record.currentEmployment.employer && record.currentEmployment.startDate && (
+          <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: record.previousEmployments.length > 0 ? '1px solid var(--border-primary)' : 'none', background: 'var(--bg-primary)' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: '#0369a1', background: '#dbeafe', padding: '2px 7px', borderRadius: '10px', flexShrink: 0 }}>CURRENT</span>
+            <span style={{ fontSize: '12px', fontWeight: '600', flex: 1, color: 'var(--text-primary)' }}>{record.currentEmployment.employer}</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+              {new Date(record.currentEmployment.startDate).getFullYear()}–present
+            </span>
+            <span style={{ fontSize: '11px', fontWeight: '600', color: '#0369a1', minWidth: '40px', textAlign: 'right' }}>
+              {calculateTenure(record.currentEmployment.startDate).toFixed(1)}y
+            </span>
+          </div>
+        )}
+
+        {/* Previous employment rows */}
+        {record.previousEmployments.map((prev, empIdx) => (
+          prev.employer && prev.startDate && prev.endDate ? (
+            <div key={prev.id} style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: empIdx < record.previousEmployments.length - 1 ? '1px solid var(--border-primary)' : 'none', background: 'var(--bg-primary)' }}>
+              <span style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', background: 'var(--bg-secondary)', padding: '2px 7px', borderRadius: '10px', flexShrink: 0 }}>PREV {empIdx + 1}</span>
+              <span style={{ fontSize: '12px', fontWeight: '600', flex: 1, color: 'var(--text-primary)' }}>{prev.employer}</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                {new Date(prev.startDate).getFullYear()}–{new Date(prev.endDate).getFullYear()}
+              </span>
+              <span style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', minWidth: '40px', textAlign: 'right' }}>
+                {calculateTenure(prev.startDate, prev.endDate).toFixed(1)}y
+              </span>
+            </div>
+          ) : null
+        ))}
       </div>
     );
   };
@@ -791,16 +716,31 @@ const Step2Employment = ({ formData, updateFormData }) => {
       </div>
 
       {employmentRecords.map((record, index) => {
-        const appType         = getApplicantType(record.applicantId);
+        const appType           = getApplicantType(record.applicantId);
         const isCompanyBorrower = appType === 'Company Borrower';
+        const empStep           = getEmpStep(record.applicantId);
 
         const empSummary = [
-          isCompanyBorrower ? 'Company Borrower' : record.currentEmployments?.[0]?.employerName,
-          isCompanyBorrower ? null : record.currentEmployments?.[0]?.employmentType,
+          isCompanyBorrower ? 'Company Borrower' : record.currentEmployment.employer,
+          isCompanyBorrower ? null : record.currentEmployment.employmentType,
           record.totalYears > 0 ? `${record.totalYears.toFixed(1)} yrs` : null,
         ].filter(Boolean).join(' · ') || null;
-        const empStatus = record.meetsRequirement ? 'done'
-          : record.totalYears > 0 ? 'partial' : 'empty';
+        const empStatus = record.meetsRequirement ? 'done' : record.totalYears > 0 ? 'partial' : 'empty';
+
+        const fmtInc = (v) => {
+          const n = parseFloat((v || '').toString().replace(/,/g, ''));
+          if (!n) return '';
+          return n.toLocaleString('en-AU');
+        };
+        const fmtIncDisplay = (v) => {
+          const n = parseFloat((v || '').toString().replace(/,/g, ''));
+          if (!n) return null;
+          return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 2 }).format(n);
+        };
+        const HECSBtn = ({ val }) => (
+          <button type="button" onClick={() => updateCurrentEmployment(index, 'hecs', val)}
+            style={{ flex: 1, padding: '7px 0', border: `1px solid ${record.currentEmployment.hecs === val ? 'var(--color-primary)' : 'var(--border-primary)'}`, background: record.currentEmployment.hecs === val ? 'var(--color-primary-light)' : 'var(--bg-primary)', color: record.currentEmployment.hecs === val ? 'var(--color-primary)' : 'var(--text-secondary)', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>{val}</button>
+        );
 
         return (
           <SmartCard
@@ -815,7 +755,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
             {/* ── Company Borrower ── */}
             {isCompanyBorrower && (
               <div className="mb-6">
-                {renderPayslipUpload(record, index)}
+                {renderEmploymentQuickActions(record, index)}
                 <div style={{ padding: '14px 16px', background: 'var(--bg-secondary)', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Employment Type:</span>
                   <span className="badge badge-info" style={{ fontSize: '13px' }}>Self-Employed</span>
@@ -853,169 +793,244 @@ const Step2Employment = ({ formData, updateFormData }) => {
               </div>
             )}
 
-            {/* ── Natural Person / Director Guarantor ── */}
+            {/* ── Natural Person / Director Guarantor — Quick Actions + 2-step ── */}
             {!isCompanyBorrower && (
               <>
-                <div className="mb-6">
-                  <h4 style={{ fontSize: '15px', fontWeight: '600', marginTop: 0, marginBottom: '16px' }}>Current Employment</h4>
+                {renderEmploymentQuickActions(record, index)}
 
-                  {renderPayslipUpload(record, index)}
+                <SubStepBar
+                  step={empStep}
+                  labels={['Current Employment', 'Income & History']}
+                  onGoTo={(n) => goToEmpStep(record.applicantId, n)}
+                />
 
-                  <div className="mb-4">
-                    <label>Employment Type</label>
-                    <div className="pill-group">
-                      {['Full-Time', 'Part-Time', 'Casual', 'Self-Employed', 'Contract', 'Unemployed', 'Retired'].map(t => (
-                        <button key={t} type="button"
-                          className={`pill-btn${record.currentEmployment.employmentType === t ? ' pill-btn--active' : ''}`}
-                          onClick={() => updateCurrentEmployment(index, 'employmentType', record.currentEmployment.employmentType === t ? '' : t)}>
-                          {t}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {record.currentEmployment.employmentType === 'Self-Employed' && (
+                {/* Step 1: Current Employment */}
+                {empStep === 1 && (
+                  <div>
                     <div className="mb-4">
-                      <label>Entity Type</label>
-                      <select value={record.currentEmployment.entityType || ''} onChange={(e) => updateCurrentEmployment(index, 'entityType', e.target.value)}>
-                        <option value="">Select Entity Type...</option>
-                        <option value="Sole Trader">Sole Trader</option>
-                        <option value="Partnership">Partnership</option>
-                        <option value="Company">Company</option>
-                        <option value="Trust">Trust</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {record.currentEmployment.employmentType === 'Unemployed' && (
-                    <div className="mb-4" style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '6px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', margin: 0 }}>
-                        <input type="checkbox" checked={record.currentEmployment.receivingCentrelink || false}
-                          onChange={(e) => updateCurrentEmployment(index, 'receivingCentrelink', e.target.checked)} style={{ marginRight: '8px' }} />
-                        <span>Receiving Government Benefits (Centrelink)</span>
-                      </label>
-                    </div>
-                  )}
-
-                  {record.currentEmployment.employmentType &&
-                   record.currentEmployment.employmentType !== 'Unemployed' &&
-                   record.currentEmployment.employmentType !== 'Retired' && (
-                    <>
-                      <div className="grid grid-cols-2 mb-4">
-                        <div>
-                          <label>Employer Name</label>
-                          <input type="text" value={record.currentEmployment.employer} onChange={(e) => updateCurrentEmployment(index, 'employer', e.target.value)} placeholder="Company name" />
-                        </div>
-                        <div>
-                          <label>Job Title / Role</label>
-                          <input type="text" value={record.currentEmployment.role} onChange={(e) => updateCurrentEmployment(index, 'role', e.target.value)} placeholder="e.g., Senior Developer" />
-                        </div>
+                      <label>Employment Type</label>
+                      <div className="pill-group">
+                        {['Full-Time', 'Part-Time', 'Casual', 'Self-Employed', 'Contract', 'Unemployed', 'Retired'].map(t => (
+                          <button key={t} type="button"
+                            className={`pill-btn${record.currentEmployment.employmentType === t ? ' pill-btn--active' : ''}`}
+                            onClick={() => updateCurrentEmployment(index, 'employmentType', record.currentEmployment.employmentType === t ? '' : t)}>
+                            {t}
+                          </button>
+                        ))}
                       </div>
-                      <div className="grid grid-cols-2 mb-4">
-                        <div>
-                          <label>Start Date</label>
-                          <input type="date" value={record.currentEmployment.startDate} onChange={(e) => updateCurrentEmployment(index, 'startDate', e.target.value)} />
-                          {record.currentEmployment.startDate && <div className="hint-text">{calculateTenure(record.currentEmployment.startDate).toFixed(1)} years</div>}
-                        </div>
-                        <div>
-                          <ABNField idx={index} empKey="paye-current" value={record.currentEmployment.abn}
-                            onChange={(v) => updateCurrentEmployment(index, 'abn', v)}
-                            onABNResult={(r) => { if (!record.currentEmployment.employer && r.entityName) updateCurrentEmployment(index, 'employer', r.tradingNames?.[0] || r.entityName); }} />
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Previous Employment */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h4 style={{ fontSize: '15px', fontWeight: '600', margin: 0 }}>Previous Employment</h4>
-                    <button onClick={() => addPreviousEmployment(index)} className="btn-secondary" style={{ fontSize: '13px', padding: '8px 16px' }}>
-                      + Add Previous Employment
-                    </button>
-                  </div>
-
-                  {record.previousEmployments.length === 0 && (
-                    <div style={{ padding: '32px', textAlign: 'center', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '2px dashed var(--border-primary)' }}>
-                      <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)' }}>
-                        No previous employment added.
-                        {!record.meetsRequirement && ' Add employment history to meet 3-year requirement.'}
-                      </p>
                     </div>
-                  )}
 
-                  {record.previousEmployments.map((prevEmp, empIdx) => (
-                    <div key={prevEmp.id} style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '12px', border: '1px solid var(--border-primary)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: '500' }}>Previous Employment {empIdx + 1}</span>
-                        <button onClick={() => removePreviousEmployment(index, empIdx)} className="btn-danger" style={{ fontSize: '12px', padding: '4px 12px' }}>Remove</button>
-                      </div>
-
+                    {record.currentEmployment.employmentType === 'Self-Employed' && (
                       <div className="mb-4">
-                        <label>Employment Type</label>
-                        <div className="pill-group">
-                          {['Full-Time', 'Part-Time', 'Casual', 'Self-Employed', 'Contract'].map(t => (
-                            <button key={t} type="button"
-                              className={`pill-btn${prevEmp.employmentType === t ? ' pill-btn--active' : ''}`}
-                              onClick={() => updatePreviousEmployment(index, empIdx, 'employmentType', prevEmp.employmentType === t ? '' : t)}>
-                              {t}
-                            </button>
-                          ))}
-                        </div>
+                        <label>Entity Type</label>
+                        <select value={record.currentEmployment.entityType || ''} onChange={(e) => updateCurrentEmployment(index, 'entityType', e.target.value)}>
+                          <option value="">Select Entity Type...</option>
+                          <option value="Sole Trader">Sole Trader</option>
+                          <option value="Partnership">Partnership</option>
+                          <option value="Company">Company</option>
+                          <option value="Trust">Trust</option>
+                        </select>
                       </div>
+                    )}
 
-                      <div className="grid grid-cols-2 mb-4">
-                        <div>
-                          <label>Employer Name</label>
-                          <input type="text" value={prevEmp.employer} onChange={(e) => updatePreviousEmployment(index, empIdx, 'employer', e.target.value)} placeholder="Company name" />
-                        </div>
-                        <div>
-                          <label>Job Title / Role</label>
-                          <input type="text" value={prevEmp.role} onChange={(e) => updatePreviousEmployment(index, empIdx, 'role', e.target.value)} placeholder="e.g., Developer" />
-                        </div>
+                    {record.currentEmployment.employmentType === 'Unemployed' && (
+                      <div className="mb-4" style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '6px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', margin: 0 }}>
+                          <input type="checkbox" checked={record.currentEmployment.receivingCentrelink || false}
+                            onChange={(e) => updateCurrentEmployment(index, 'receivingCentrelink', e.target.checked)} style={{ marginRight: '8px' }} />
+                          <span>Receiving Government Benefits (Centrelink)</span>
+                        </label>
                       </div>
+                    )}
 
-                      <div className="grid grid-cols-3">
-                        <div>
-                          <label>Start Date</label>
-                          <input type="date" value={prevEmp.startDate} onChange={(e) => updatePreviousEmployment(index, empIdx, 'startDate', e.target.value)} />
+                    {record.currentEmployment.employmentType &&
+                     record.currentEmployment.employmentType !== 'Unemployed' &&
+                     record.currentEmployment.employmentType !== 'Retired' && (
+                      <>
+                        <div className="grid grid-cols-2 mb-4">
+                          <div>
+                            <label>Employer Name</label>
+                            <input type="text" value={record.currentEmployment.employer} onChange={(e) => updateCurrentEmployment(index, 'employer', e.target.value)} placeholder="Company name" />
+                          </div>
+                          <div>
+                            <label>Job Title / Role</label>
+                            <input type="text" value={record.currentEmployment.role} onChange={(e) => updateCurrentEmployment(index, 'role', e.target.value)} placeholder="e.g., Senior Developer" />
+                          </div>
                         </div>
-                        <div>
-                          <label>End Date</label>
-                          <input type="date" value={prevEmp.endDate} onChange={(e) => updatePreviousEmployment(index, empIdx, 'endDate', e.target.value)} />
+                        <div className="grid grid-cols-2 mb-4">
+                          <div>
+                            <label>Start Date</label>
+                            <input type="date" value={record.currentEmployment.startDate} onChange={(e) => updateCurrentEmployment(index, 'startDate', e.target.value)} />
+                            {record.currentEmployment.startDate && <div className="hint-text">{calculateTenure(record.currentEmployment.startDate).toFixed(1)} years</div>}
+                          </div>
+                          <div>
+                            <ABNField idx={index} empKey="paye-current" value={record.currentEmployment.abn}
+                              onChange={(v) => updateCurrentEmployment(index, 'abn', v)}
+                              onABNResult={(r) => { if (!record.currentEmployment.employer && r.entityName) updateCurrentEmployment(index, 'employer', r.tradingNames?.[0] || r.entityName); }} />
+                          </div>
                         </div>
-                        <div>
-                          <label>Duration</label>
-                          <input type="text" readOnly style={{ background: 'var(--bg-primary)', cursor: 'not-allowed' }}
-                            value={prevEmp.startDate && prevEmp.endDate ? `${calculateTenure(prevEmp.startDate, prevEmp.endDate).toFixed(1)} years` : 'Calculating…'} />
-                        </div>
-                      </div>
+                      </>
+                    )}
 
-                      {prevEmp.employmentType === 'Self-Employed' && (
-                        <div className="mt-4">
-                          <ABNField idx={index} empKey={`prev-${empIdx}`} value={prevEmp.abn}
-                            onChange={(v) => updatePreviousEmployment(index, empIdx, 'abn', v)}
-                            onABNResult={(r) => { if (!prevEmp.employer && r.entityName) updatePreviousEmployment(index, empIdx, 'employer', r.tradingNames?.[0] || r.entityName); }} />
-                        </div>
-                      )}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                      <button type="button" className="btn-primary"
+                        onClick={() => goToEmpStep(record.applicantId, 2)}
+                        style={{ padding: '9px 24px', fontSize: '13px' }}>
+                        Next: Income &amp; History →
+                      </button>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
 
-                {/* Employment summary */}
-                {(record.currentEmployment.employmentType || record.previousEmployments.length > 0) && (
-                  <div className="mt-6" style={{ padding: '16px', background: record.meetsRequirement ? 'var(--color-success-light)' : 'var(--color-warning-light)', borderRadius: 'var(--radius-md)', border: `1px solid ${record.meetsRequirement ? 'var(--color-success)' : 'var(--color-warning)'}` }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <p style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '500', color: record.meetsRequirement ? 'var(--color-success-dark)' : 'var(--color-warning-dark)' }}>Total Employment History</p>
-                        <p style={{ margin: 0, fontSize: '20px', fontWeight: '600', color: record.meetsRequirement ? 'var(--color-success-dark)' : 'var(--color-warning-dark)' }}>{record.totalYears.toFixed(1)} years</p>
+                {/* Step 2: Income & History */}
+                {empStep === 2 && (
+                  <div>
+                    {/* Payslip preview (if uploaded via Quick Actions) */}
+                    {renderPayslipStep2(record, index)}
+
+                    {/* Income Details */}
+                    <div style={{ padding: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px', marginBottom: '16px' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Income Details</h4>
+                      <div className="grid grid-cols-2 mb-3">
+                        <div>
+                          <label style={{ fontSize: '12px' }}>Pay Frequency</label>
+                          <div className="pill-group" style={{ marginTop: '6px' }}>
+                            {[['weekly', 'Weekly'], ['fortnightly', 'Fortnightly'], ['monthly', 'Monthly']].map(([val, lbl]) => (
+                              <button key={val} type="button"
+                                className={`pill-btn${record.currentEmployment.payFrequency === val ? ' pill-btn--active' : ''}`}
+                                style={{ fontSize: '12px', padding: '6px 11px' }}
+                                onClick={() => updateCurrentEmployment(index, 'payFrequency', record.currentEmployment.payFrequency === val ? '' : val)}>
+                                {lbl}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '12px' }}>Base Income (annual)</label>
+                          <input type="text" value={fmtInc(record.currentEmployment.baseIncome)} placeholder="0"
+                            onChange={(e) => updateCurrentEmployment(index, 'baseIncome', parseCurrency(e.target.value))}
+                            style={{ fontSize: '13px' }} />
+                          {fmtIncDisplay(record.currentEmployment.baseIncome) && (
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>{fmtIncDisplay(record.currentEmployment.baseIncome)}</div>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        {record.meetsRequirement
-                          ? <span className="badge badge-success" style={{ fontSize: '13px', padding: '8px 16px' }}>✓ Meets Requirement</span>
-                          : <span className="badge badge-warning" style={{ fontSize: '13px', padding: '8px 16px' }}>⚠️ {(3 - record.totalYears).toFixed(1)} years needed</span>}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                        <div>
+                          <label style={{ fontSize: '12px' }}>Bonus Income (annual)</label>
+                          <input type="text" value={fmtInc(record.currentEmployment.bonusIncome)} placeholder="0"
+                            onChange={(e) => updateCurrentEmployment(index, 'bonusIncome', parseCurrency(e.target.value))}
+                            style={{ fontSize: '13px' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '12px' }}>Commissions (annual)</label>
+                          <input type="text" value={fmtInc(record.currentEmployment.commissions)} placeholder="0"
+                            onChange={(e) => updateCurrentEmployment(index, 'commissions', parseCurrency(e.target.value))}
+                            style={{ fontSize: '13px' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '12px' }}>HECS Debt</label>
+                          <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                            <HECSBtn val="Yes" /><HECSBtn val="No" />
+                          </div>
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Income Verifier */}
+                    {verifierExpanded[index] ? (
+                      <IncomeVerifierModal
+                        applicantName={record.applicantName}
+                        initialData={payslipState[index]?.data || null}
+                        onClose={() => setVerifierExpanded(p => ({ ...p, [index]: false }))}
+                        onSave={(result) => {
+                          updateCurrentEmployment(index, 'incomeVerification', result);
+                          setVerifierExpanded(p => ({ ...p, [index]: false }));
+                        }}
+                      />
+                    ) : record.currentEmployment.incomeVerification ? (
+                      (() => {
+                        const v = record.currentEmployment.incomeVerification;
+                        const statusColors = { consistent: '#166534', ytd_higher: '#0369a1', ytd_lower: '#9a3412', incomplete: '#64748b' };
+                        const statusLabels = { consistent: '✓ Consistent', ytd_higher: 'ℹ️ YTD Higher', ytd_lower: '⚠️ YTD Lower — flagged', incomplete: '—' };
+                        return (
+                          <div style={{ padding: '10px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '12px', marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                              <span style={{ fontWeight: '600' }}>Income Verification</span>
+                              <span style={{ color: statusColors[v.status] || '#64748b', fontWeight: '600' }}>{statusLabels[v.status] || v.status}</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '16px', color: 'var(--text-secondary)' }}>
+                              <span>Base: <strong style={{ color: 'var(--text-primary)' }}>{fmt(v.m1Annual)}</strong></span>
+                              <span>YTD: <strong style={{ color: 'var(--text-primary)' }}>{fmt(v.m2Annual)}</strong></span>
+                              <span>Var: <strong style={{ color: v.variancePct < -2 ? '#dc2626' : 'var(--text-primary)' }}>{v.variancePct?.toFixed(1)}%</strong></span>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ) : null}
+
+                    {/* 3-Year History tracker + previous employment */}
+                    {renderHistoryTracker(record, index)}
+
+                    {record.previousEmployments.map((prevEmp, empIdx) => (
+                      <div key={prevEmp.id} style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '12px', border: '1px solid var(--border-primary)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span style={{ fontSize: '14px', fontWeight: '500' }}>Previous Employment {empIdx + 1}</span>
+                          <button onClick={() => removePreviousEmployment(index, empIdx)} className="btn-danger" style={{ fontSize: '12px', padding: '4px 12px' }}>Remove</button>
+                        </div>
+                        <div className="mb-4">
+                          <label>Employment Type</label>
+                          <div className="pill-group">
+                            {['Full-Time', 'Part-Time', 'Casual', 'Self-Employed', 'Contract'].map(t => (
+                              <button key={t} type="button"
+                                className={`pill-btn${prevEmp.employmentType === t ? ' pill-btn--active' : ''}`}
+                                onClick={() => updatePreviousEmployment(index, empIdx, 'employmentType', prevEmp.employmentType === t ? '' : t)}>
+                                {t}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 mb-4">
+                          <div>
+                            <label>Employer Name</label>
+                            <input type="text" value={prevEmp.employer} onChange={(e) => updatePreviousEmployment(index, empIdx, 'employer', e.target.value)} placeholder="Company name" />
+                          </div>
+                          <div>
+                            <label>Job Title / Role</label>
+                            <input type="text" value={prevEmp.role} onChange={(e) => updatePreviousEmployment(index, empIdx, 'role', e.target.value)} placeholder="e.g., Developer" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3">
+                          <div>
+                            <label>Start Date</label>
+                            <input type="date" value={prevEmp.startDate} onChange={(e) => updatePreviousEmployment(index, empIdx, 'startDate', e.target.value)} />
+                          </div>
+                          <div>
+                            <label>End Date</label>
+                            <input type="date" value={prevEmp.endDate} onChange={(e) => updatePreviousEmployment(index, empIdx, 'endDate', e.target.value)} />
+                          </div>
+                          <div>
+                            <label>Duration</label>
+                            <input type="text" readOnly style={{ background: 'var(--bg-primary)', cursor: 'not-allowed' }}
+                              value={prevEmp.startDate && prevEmp.endDate ? `${calculateTenure(prevEmp.startDate, prevEmp.endDate).toFixed(1)} years` : 'Calculating…'} />
+                          </div>
+                        </div>
+                        {prevEmp.employmentType === 'Self-Employed' && (
+                          <div className="mt-4">
+                            <ABNField idx={index} empKey={`prev-${empIdx}`} value={prevEmp.abn}
+                              onChange={(v) => updatePreviousEmployment(index, empIdx, 'abn', v)}
+                              onABNResult={(r) => { if (!prevEmp.employer && r.entityName) updatePreviousEmployment(index, empIdx, 'employer', r.tradingNames?.[0] || r.entityName); }} />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '8px' }}>
+                      <button type="button"
+                        onClick={() => goToEmpStep(record.applicantId, 1)}
+                        style={{ padding: '9px 24px', fontSize: '13px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
+                        ← Back: Current Employment
+                      </button>
                     </div>
                   </div>
                 )}

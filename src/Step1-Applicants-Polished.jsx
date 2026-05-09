@@ -1032,8 +1032,8 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {dlExtracted[index]?.error && <div style={{ fontSize: '10px', color: 'var(--text-danger-emphasis)' }}>⚠ {dlExtracted[index].error}</div>}
         </div>}
 
-        {/* 2 — E-Signature */}
-        <div style={tile(isSigned ? { background: '#f0fdf4', borderColor: '#86efac' } : isPending ? { background: 'var(--bg-info-surface)', borderColor: 'var(--border-info)' } : isDeclined ? { background: 'var(--bg-danger-surface)', borderColor: 'var(--border-danger)' } : {})}>
+        {/* 2 — E-Signature (Natural Person / Director Guarantor only) */}
+        {applicant.type !== 'Company Borrower' && <div style={tile(isSigned ? { background: '#f0fdf4', borderColor: '#86efac' } : isPending ? { background: 'var(--bg-info-surface)', borderColor: 'var(--border-info)' } : isDeclined ? { background: 'var(--bg-danger-surface)', borderColor: 'var(--border-danger)' } : {})}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '16px' }}>{isSigned ? '✅' : isPending ? '🕐' : isDeclined ? '❌' : '✍️'}</span>
             <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>Credit Guide</span>
@@ -1061,7 +1061,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             </a>
           )}
           {eSignError[index] && <div style={{ fontSize: '10px', color: 'var(--text-danger-emphasis)' }}>⚠ {eSignError[index]}</div>}
-        </div>
+        </div>}
 
         {/* 3 — Equifax */}
         <div style={tile()}>

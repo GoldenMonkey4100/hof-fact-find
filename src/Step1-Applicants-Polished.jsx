@@ -461,14 +461,20 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
     const bgColor     = isSigned ? '#f0fdf4' : isDeclined ? '#fef2f2' : isPending ? '#f0f9ff' : '#fafafa';
     const borderColor = isSigned ? '#86efac' : isDeclined ? '#fca5a5' : isPending ? '#bae6fd' : 'var(--border-primary)';
-    const icon        = isSigned ? '✅' : isDeclined ? '❌' : isPending ? '🕐' : '✍️';
+    const iconEl = isSigned
+      ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      : isDeclined
+        ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        : isPending
+          ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>;
 
     return (
       <div style={{ marginBottom: '12px', padding: '14px 16px', background: bgColor, border: `1px solid ${borderColor}`, borderRadius: '8px' }}>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '18px' }}>{icon}</span>
+            <span style={{ display: 'flex', alignItems: 'center', color: isSigned ? 'var(--color-success)' : isDeclined ? 'var(--color-danger)' : isPending ? '#0369a1' : 'var(--text-tertiary)', flexShrink: 0 }}>{iconEl}</span>
             <div>
               <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Credit Guide — E-Signature</div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -507,7 +513,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
         {error && (
           <div style={{ marginTop: '8px', padding: '7px 10px', background: 'var(--bg-danger-surface)', border: '1px solid var(--border-danger)', borderRadius: '5px', fontSize: '12px', color: 'var(--text-danger-emphasis)' }}>
-            ⚠️ {error}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> {error}
           </div>
         )}
 
@@ -550,7 +556,9 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         <div style={{ background: 'var(--bg-info-surface)', border: '1px solid var(--border-info)', borderRadius: '8px', padding: '14px 16px' }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-            <span style={{ fontSize: '20px' }}>🪪</span>
+            <div style={{ width: '30px', height: '30px', borderRadius: '7px', background: 'rgba(3,105,161,0.10)', border: '1px solid rgba(3,105,161,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#0369a1' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="7" y1="15" x2="10" y2="15"/><line x1="14" y1="15" x2="17" y2="15"/></svg>
+            </div>
             <div>
               <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-info)' }}>Driver Licence — Auto-fill</div>
               <div style={{ fontSize: '12px', color: '#0284c7' }}>
@@ -580,7 +588,18 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               display: 'flex', alignItems: 'center', gap: '12px',
             }}
           >
-            <span style={{ fontSize: '24px', flexShrink: 0 }}>{isDragging ? '📂' : fileCount > 0 ? '✅' : '📷'}</span>
+            <div style={{ width: '42px', height: '42px', borderRadius: '9px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: isDragging ? 'rgba(59,130,246,0.10)' : fileCount > 0 ? 'rgba(16,185,129,0.10)' : 'var(--color-gold-light)',
+              border: `1px solid ${isDragging ? 'rgba(59,130,246,0.30)' : fileCount > 0 ? 'rgba(16,185,129,0.30)' : 'var(--color-gold-border)'}`,
+              color: isDragging ? '#3b82f6' : fileCount > 0 ? 'var(--color-success)' : 'var(--color-gold)',
+            }}>
+              {isDragging
+                ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                : fileCount > 0
+                  ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              }
+            </div>
             {fileCount === 0 ? (
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>
@@ -594,7 +613,12 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 {[['front', files.front], ['back', files.back]].map(([side, file]) => (
                   <div key={side} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '13px' }}>{file ? '✅' : '⬜'}</span>
+                    <span style={{ display: 'flex', color: file ? 'var(--color-success)' : 'var(--text-tertiary)', flexShrink: 0 }}>
+                      {file
+                        ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                      }
+                    </span>
                     <div>
                       <div style={{ fontSize: '11px', fontWeight: '600', color: file ? '#166534' : '#94a3b8' }}>
                         {side === 'front' ? 'Front' : 'Back'}{side === 'front' ? ' *' : ' (optional)'}
@@ -625,11 +649,12 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {/* Extract button */}
           <button type="button" disabled={!isReady} onClick={() => handleDLExtract(index)}
             style={{ width: '100%', padding: '8px', background: isReady ? '#0369a1' : '#93c5fd', color: 'var(--bg-primary)', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: isReady ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            {dlExtracting[index] ? (
-              <><span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'var(--bg-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Reading licence…</>
-            ) : !hasFront
-              ? '📷 Upload licence to auto-fill'
-              : `✨ Extract & Auto-fill${hasBack ? ' (Front + Back)' : ' (Front only)'}`}
+            {dlExtracting[index]
+              ? <><span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: 'var(--bg-primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Reading licence…</>
+              : !hasFront
+                ? 'Upload licence to auto-fill'
+                : `Extract & Auto-fill${hasBack ? ' (Front + Back)' : ' (Front only)'}`
+            }
           </button>
         </div>
 
@@ -640,7 +665,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         )}
         {dlExtracted[index]?.error && (
           <div style={{ marginTop: '6px', padding: '8px 12px', background: 'var(--bg-danger-surface)', border: '1px solid var(--border-danger)', borderRadius: '6px', fontSize: '12px', color: 'var(--text-danger-emphasis)' }}>
-            ⚠️ Could not extract data: {dlExtracted[index].error}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Could not extract data: {dlExtracted[index].error}
           </div>
         )}
       </div>
@@ -774,7 +799,9 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-primary)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '15px' }}>🏠</span>
+            <span style={{ display: 'flex', color: 'var(--color-gold)', flexShrink: 0 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </span>
             <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>3-Year Address History</span>
             <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 9px', borderRadius: '10px',
               background: met ? '#dcfce7' : '#fef9c3', color: met ? '#15803d' : '#92400e' }}>
@@ -1009,24 +1036,39 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         {/* 1 — Driver Licence (Natural Person / Director Guarantor only) */}
         {applicant.type !== 'Company Borrower' && <div style={tile(extracted ? { background: 'var(--bg-success-surface)', borderColor: 'var(--border-success)' } : {})}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '16px' }}>🪪</span>
+            <span style={{ display: 'flex', color: extracted ? 'var(--color-success)' : '#0369a1', flexShrink: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="7" y1="15" x2="10" y2="15"/><line x1="14" y1="15" x2="17" y2="15"/></svg>
+            </span>
             <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>Driver Licence</span>
             {extracted && <span style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a', background: '#dcfce7', padding: '1px 7px', borderRadius: '10px' }}>✓ DONE</span>}
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
             {hasFront
-              ? <>{`✅ ${files.front.name.length > 20 ? files.front.name.slice(0,20)+'…' : files.front.name}`}<br />{hasBack ? `✅ ${files.back.name.length > 20 ? files.back.name.slice(0,20)+'…' : files.back.name}` : '⬜ Back (optional)'}</>
+              ? <>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: 'var(--color-success)' }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    {files.front.name.length > 20 ? files.front.name.slice(0,20)+'…' : files.front.name}
+                  </span>
+                  <br />
+                  {hasBack
+                    ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: 'var(--color-success)' }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        {files.back.name.length > 20 ? files.back.name.slice(0,20)+'…' : files.back.name}
+                      </span>
+                    : <span style={{ color: 'var(--text-tertiary)' }}>Back (optional)</span>
+                  }
+                </>
               : 'No files selected'}
           </div>
           <div style={{ display: 'flex', gap: '6px' }}>
             <input id={inputId} type="file" accept="image/*,.pdf,application/pdf" multiple style={{ display: 'none' }}
               onChange={(e) => { const arr = Array.from(e.target.files); if (arr[0]) setDLFile(index,'front',arr[0]); if (arr[1]) setDLFile(index,'back',arr[1]); }} />
             <label htmlFor={inputId} style={{ flex: 1, padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px', cursor: 'pointer', textAlign: 'center', color: 'var(--text-primary)' }}>
-              📷 {hasFront ? 'Replace' : 'Upload'}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> {hasFront ? 'Replace' : 'Upload'}
             </label>
             <button type="button" disabled={!hasFront || extracting} onClick={() => handleDLExtract(index)}
               style={{ flex: 1, padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: hasFront && !extracting ? '#0369a1' : '#e2e8f0', color: hasFront && !extracting ? 'white' : '#9ca3af', border: 'none', borderRadius: '6px', cursor: hasFront && !extracting ? 'pointer' : 'not-allowed' }}>
-              {extracting ? '…' : '✨ Extract'}
+              {extracting ? '…' : 'Extract'}
             </button>
           </div>
           {dlExtracted[index]?.error && <div style={{ fontSize: '10px', color: 'var(--text-danger-emphasis)' }}>⚠ {dlExtracted[index].error}</div>}
@@ -1035,7 +1077,16 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         {/* 2 — E-Signature (Natural Person / Director Guarantor only) */}
         {applicant.type !== 'Company Borrower' && <div style={tile(isSigned ? { background: '#f0fdf4', borderColor: '#86efac' } : isPending ? { background: 'var(--bg-info-surface)', borderColor: 'var(--border-info)' } : isDeclined ? { background: 'var(--bg-danger-surface)', borderColor: 'var(--border-danger)' } : {})}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '16px' }}>{isSigned ? '✅' : isPending ? '🕐' : isDeclined ? '❌' : '✍️'}</span>
+            <span style={{ display: 'flex', alignItems: 'center', color: isSigned ? 'var(--color-success)' : isPending ? '#0369a1' : isDeclined ? 'var(--color-danger)' : 'var(--text-tertiary)', flexShrink: 0 }}>
+              {isSigned
+                ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                : isPending
+                  ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  : isDeclined
+                    ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                    : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+              }
+            </span>
             <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>Credit Guide</span>
             {isSigned && <span style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a', background: '#dcfce7', padding: '1px 7px', borderRadius: '10px' }}>SIGNED</span>}
             {isPending && <span style={{ fontSize: '10px', fontWeight: '700', color: '#0369a1', background: '#dbeafe', padding: '1px 7px', borderRadius: '10px' }}>PENDING</span>}
@@ -1066,7 +1117,9 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         {/* 3 — Equifax */}
         <div style={tile()}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '16px' }}>📋</span>
+            <span style={{ display: 'flex', color: '#e8041b', flexShrink: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+            </span>
             <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Equifax</span>
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>Credit file check — opens Equifax portal</div>
@@ -1079,7 +1132,9 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         {/* 4 — illion */}
         <div style={tile()}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '16px' }}>📋</span>
+            <span style={{ display: 'flex', color: '#0f5c32', flexShrink: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+            </span>
             <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>illion</span>
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>Credit file check — opens illion portal</div>
@@ -1121,7 +1176,10 @@ const Step1Applicants = ({ formData, updateFormData }) => {
         return (
         <SmartCard
           key={applicant.id}
-          icon={applicant.type === 'Company Borrower' ? '🏢' : '👤'}
+          icon={applicant.type === 'Company Borrower'
+            ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 22V4a2 2 0 012-2h8a2 2 0 012 2v18z"/><path d="M6 12H4a2 2 0 00-2 2v8h4"/><path d="M18 9h2a2 2 0 012 2v11h-4"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+            : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          }
           title={`${applicant.role} ${applicant.number}${appName ? ` — ${appName}` : ''}`}
           summary={appSummary}
           status={appStatus}
@@ -1436,7 +1494,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                     <div className="mb-6">
                       <div style={{ padding: '16px', background: 'var(--color-info-light)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-info)' }}>
                         <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-info-dark)' }}>
-                          ℹ️ <strong>Shared Dependants:</strong> As the spouse of Applicant 1, dependants are automatically shared and managed in Applicant 1's section.
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'inline', verticalAlign: 'middle', marginRight: '5px' }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><strong>Shared Dependants:</strong> As the spouse of Applicant 1, dependants are automatically shared and managed in Applicant 1's section.
                         </p>
                       </div>
                     </div>

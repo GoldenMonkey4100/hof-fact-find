@@ -338,7 +338,10 @@ const FundsToCompleteCard = ({ security, allSecurities }) => {
           })}
           <div style={{ marginTop: '8px', padding: '10px 14px', borderRadius: '8px', background: surplus >= 0 ? '#f0fdf4' : '#fef2f2', border: `2px solid ${surplus >= 0 ? '#86efac' : '#fca5a5'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '14px', fontWeight: '700', color: surplus >= 0 ? '#166534' : '#991b1b' }}>
-              {surplus >= 0 ? '✅ Surplus' : '⚠️ Shortfall'}
+              {surplus >= 0
+                ? <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Surplus</>
+                : <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Shortfall</>
+              }
             </span>
             <span style={{ fontSize: '18px', fontWeight: '800', color: surplus >= 0 ? '#16a34a' : '#dc2626' }}>
               {fmt(Math.abs(surplus))}
@@ -607,7 +610,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
     return (
       <SmartCard
         key={security.id}
-        icon="🏠"
+        icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>}
         title={`Security ${index + 1}${security.address ? ` — ${security.address.split(',')[0]}` : ''}`}
         summary={secSummary}
         status={secStatus}
@@ -620,7 +623,9 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
             background: calcOpen ? '#eef2ff' : 'var(--bg-secondary)',
             color: calcOpen ? '#4338ca' : 'var(--text-secondary)',
           }}>
-            📊 {calcOpen ? '▼' : '▲'}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            Calculator
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: calcOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"/></svg>
           </button>
         }
       >
@@ -655,23 +660,29 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               <label>Transaction Type</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
                 {[
-                  { type: 'Purchase',  icon: '🏠', sub: 'New property purchase' },
-                  { type: 'Refinance', icon: '🔄', sub: 'Existing loan refinance' },
-                ].map(({ type, icon, sub }) => {
+                  { type: 'Purchase',  icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
+                  { type: 'Refinance', icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> },
+                ].map(({ type, icon }) => {
                   const active = security.primaryTransactionTypes.includes(type);
                   return (
                     <button key={type} type="button" onClick={() => toggleTransactionType(index, type, true)}
                       style={{
-                        padding: '16px 12px', borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
+                        padding: '10px 14px', borderRadius: '10px', cursor: 'pointer',
                         border: active ? '2px solid var(--color-success)' : '1px solid var(--border-primary)',
                         background: active ? 'var(--bg-success-surface)' : 'var(--bg-primary)',
                         transition: 'all 0.15s',
+                        display: 'flex', alignItems: 'center', gap: '10px',
                       }}>
-                      <div style={{ fontSize: '26px', marginBottom: '6px' }}>{icon}</div>
-                      <div style={{ fontSize: '14px', fontWeight: '600', color: active ? 'var(--text-success-emphasis)' : 'var(--text-primary)' }}>
-                        {active && '✓ '}{type}
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' }}>{sub}</div>
+                      <div style={{
+                        width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: active ? 'rgba(16,185,129,0.10)' : 'var(--color-gold-light)',
+                        border: `1px solid ${active ? 'rgba(16,185,129,0.30)' : 'var(--color-gold-border)'}`,
+                        color: active ? 'var(--color-success)' : 'var(--color-gold)',
+                      }}>{icon}</div>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: active ? 'var(--text-success-emphasis)' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {active && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}{type}
+                      </span>
                     </button>
                   );
                 })}
@@ -779,8 +790,9 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               }}>
                 {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-                    📊 Calculator
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    Calculator
                   </span>
                   <button type="button" onClick={() => toggleSecCalc(security.id)}
                     style={{ fontSize: '12px', color: 'var(--text-tertiary)', background: 'none', border: '1px solid var(--border-primary)', cursor: 'pointer', padding: '3px 10px', borderRadius: '5px' }}>
@@ -1421,7 +1433,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
     <div className="fade-in">
 
       {/* ── Broker & Application Setup ── */}
-      <SmartCard icon="🏢" title="Broker & Application Setup" summary={brokerSummary} status={brokerStatus} defaultOpen={true}>
+      <SmartCard icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 22V4a2 2 0 012-2h8a2 2 0 012 2v18z"/><path d="M6 12H4a2 2 0 00-2 2v8h4"/><path d="M18 9h2a2 2 0 012 2v11h-4"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>} title="Broker & Application Setup" summary={brokerSummary} status={brokerStatus} defaultOpen={true}>
         <div className="mb-4">
           <label>Applicant Type</label>
           <div className="pill-group">
@@ -1509,7 +1521,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
       {formData.securities.map((security, index) => renderSecurityCard(security, index))}
 
       {/* ── Lender Preference & Notes ── */}
-      <SmartCard icon="🏦" title="Lender Preference & Notes" summary={lenderSummary || (formData.brokerNotes ? 'Notes added' : null)} status={lenderStatus}>
+      <SmartCard icon={<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>} title="Lender Preference & Notes" summary={lenderSummary || (formData.brokerNotes ? 'Notes added' : null)} status={lenderStatus}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '14px' }}>
           <h3 style={{ fontSize: '15px', fontWeight: '600', margin: 0 }}>Lender Preference</h3>
           {formData.lenderPreference?.length > 0 && (

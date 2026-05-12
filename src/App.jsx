@@ -1,4 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const stepVariants = {
+  enter:  (dir) => ({ opacity: 0, x: dir * 30 }),
+  center: { opacity: 1, x: 0 },
+  exit:   (dir) => ({ opacity: 0, x: dir * -20 }),
+};
 import './styles.css';
 import { getBrokerEmail } from './utils';
 import Step0LoanStrategy from './Step0-LoanStrategy-Polished';
@@ -21,6 +28,24 @@ function deepSet(obj, [key, ...rest], value) {
   }
   if (typeof obj !== 'object' || obj === null) return obj;
   return { ...obj, [key]: deepSet(obj[key] ?? {}, rest, value) };
+}
+
+function SectionCountChip({ currentStep, formData }) {
+  const messages = [
+    `${formData.securities.length} securit${formData.securities.length === 1 ? 'y' : 'ies'} to configure`,
+    `${formData.applicants.length} applicant${formData.applicants.length !== 1 ? 's' : ''} to complete`,
+    `${formData.applicants.length} applicant${formData.applicants.length !== 1 ? 's' : ''} to complete`,
+    'Assets & liabilities to record',
+    'Ready to review & submit',
+  ];
+  return (
+    <span className="sc-section-chip">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+      {messages[currentStep]}
+    </span>
+  );
 }
 
 const FactFindApp = () => {
@@ -99,6 +124,7 @@ const FactFindApp = () => {
   });
 
   const [theme, setTheme] = useState(() => localStorage.getItem('hof-theme') || 'light');
+  const [direction, setDirection] = useState(1);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -155,11 +181,11 @@ const FactFindApp = () => {
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
 
   const steps = [
-    { id: 0, name: 'Loan Strategy' },
-    { id: 1, name: 'Applicants' },
-    { id: 2, name: 'Employment' },
-    { id: 3, name: 'Assets & Liabilities' },
-    { id: 4, name: 'Review & Submit' }
+    { id: 0, name: 'Loan Strategy',        subtitle: 'Set up securities, transaction types, loan structure, and lender preference.' },
+    { id: 1, name: 'Applicants',           subtitle: 'Capture identity, contact details, and driver\'s licence for each applicant.' },
+    { id: 2, name: 'Employment',           subtitle: 'Capture current and previous employment details for all applicants.' },
+    { id: 3, name: 'Assets & Liabilities', subtitle: 'Record all assets, savings, superannuation, and outstanding liabilities.' },
+    { id: 4, name: 'Review & Submit',      subtitle: 'Review the completed fact find and submit to the Notion pipeline.' },
   ];
 
   const updateFormData = (field, value) => {
@@ -234,6 +260,7 @@ const FactFindApp = () => {
 
   const goToNextStep = () => {
     if (currentStep < steps.length - 1) {
+      setDirection(1);
       setCurrentStep(currentStep + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -241,12 +268,14 @@ const FactFindApp = () => {
 
   const goToPreviousStep = () => {
     if (currentStep > 0) {
+      setDirection(-1);
       setCurrentStep(currentStep - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const goToStep = (stepIndex) => {
+    setDirection(stepIndex > currentStep ? 1 : -1);
     setCurrentStep(stepIndex);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -281,13 +310,25 @@ const FactFindApp = () => {
             </span>
           </div>
           <div className="app-header-meta">
-            <span style={{ display: 'none' }} className="app-header-tagline">Broker Fact Find</span>
+            <span className="app-header-tagline">Broker Fact Find</span>
             <button
               className="theme-toggle"
               onClick={toggleTheme}
               title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
             >
-              {theme === 'light' ? '🌙' : '☀️'}
+              {theme === 'light' ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="5"/>
+                  <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                  <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+              )}
             </button>
           </div>
         </div>
@@ -316,11 +357,16 @@ const FactFindApp = () => {
               );
             })}
           </div>
-          <div className="app-progress-bar">
-            <div
-              className="app-progress-fill"
-              style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
-            />
+          <div className="app-progress-row">
+            <div className="app-progress-bar">
+              <div
+                className="app-progress-fill"
+                style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+              />
+            </div>
+            <span className="app-progress-label">
+              STEP {currentStep + 1} OF {steps.length} · {Math.round(((currentStep + 1) / steps.length) * 100)}%
+            </span>
           </div>
         </div>
       </div>
@@ -330,9 +376,23 @@ const FactFindApp = () => {
         {/* Step page header */}
         <div className="sc-page-header">
           <h2 className="sc-page-title">{steps[currentStep].name}</h2>
+          <p className="sc-page-subtitle">{steps[currentStep].subtitle}</p>
           <div className="step-accent-bar" />
+          <SectionCountChip currentStep={currentStep} formData={formData} />
         </div>
-        {renderStepContent()}
+        <AnimatePresence mode="wait" custom={direction}>
+          <motion.div
+            key={currentStep}
+            custom={direction}
+            variants={stepVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+          >
+            {renderStepContent()}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* ── Sticky Bottom Nav ────────────────────────────────────────────── */}
@@ -362,10 +422,16 @@ const FactFindApp = () => {
       {/* ── Submission Overlays ───────────────────────────────────────────── */}
 
       {/* Success */}
+      <AnimatePresence>
       {submission.status === 'success' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '16px', padding: '40px', maxWidth: '480px', width: '100%', textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.35)' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎉</div>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <motion.div initial={{ scale: 0.94, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.94, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '16px', padding: '40px', maxWidth: '480px', width: '100%', textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.35)' }}>
+            <div style={{ width: '60px', height: '60px', borderRadius: '14px', background: 'var(--color-success-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: 'var(--color-success)' }}>
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
             <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '20px', fontWeight: 700, color: 'var(--color-success)', margin: '0 0 10px' }}>Submitted Successfully!</h2>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: '0 0 24px', lineHeight: 1.6 }}>
               <strong style={{ color: 'var(--text-primary)' }}>{submission.notionTitle}</strong> has been added to the Pipeline as <strong>Pending Assignment</strong>.
@@ -379,15 +445,22 @@ const FactFindApp = () => {
               style={{ marginTop: '8px', padding: '10px 20px', background: 'none', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>
               Close
             </button>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Duplicate */}
+      <AnimatePresence>
       {submission.status === 'duplicate' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '16px', padding: '36px', maxWidth: '520px', width: '100%', boxShadow: '0 25px 60px rgba(0,0,0,0.35)' }}>
-            <div style={{ fontSize: '40px', marginBottom: '12px', textAlign: 'center' }}>⚠️</div>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <motion.div initial={{ scale: 0.94, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.94, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '16px', padding: '36px', maxWidth: '520px', width: '100%', boxShadow: '0 25px 60px rgba(0,0,0,0.35)' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'var(--color-warning-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: 'var(--color-warning)' }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
             <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '18px', fontWeight: 700, color: 'var(--color-warning-dark)', margin: '0 0 8px', textAlign: 'center' }}>Existing Record Found</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 16px', textAlign: 'center' }}>
               The following pipeline {submission.duplicates.length === 1 ? 'entry matches' : 'entries match'} this applicant name:
@@ -419,18 +492,25 @@ const FactFindApp = () => {
                 Create Anyway
               </button>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Voice Bar */}
       <VoiceBar currentStep={currentStep} onFieldsExtracted={handleFieldsExtracted} />
 
       {/* Error */}
+      <AnimatePresence>
       {submission.status === 'error' && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '16px', padding: '36px', maxWidth: '460px', width: '100%', textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.35)' }}>
-            <div style={{ fontSize: '48px', marginBottom: '12px' }}>❌</div>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <motion.div initial={{ scale: 0.94, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.94, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '16px', padding: '36px', maxWidth: '460px', width: '100%', textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,0.35)' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'var(--color-danger-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: 'var(--color-danger)' }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            </div>
             <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '18px', fontWeight: 700, color: 'var(--color-danger)', margin: '0 0 8px' }}>Submission Failed</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 8px' }}>An error occurred while submitting to Notion:</p>
             <p style={{ fontSize: '12px', color: 'var(--color-danger)', background: 'var(--color-danger-light)', padding: '10px', borderRadius: '6px', margin: '0 0 24px', fontFamily: 'monospace', wordBreak: 'break-word' }}>
@@ -440,9 +520,10 @@ const FactFindApp = () => {
               style={{ padding: '11px 28px', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontFamily: 'var(--font-heading)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               Close &amp; Try Again
             </button>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
     </div>
   );

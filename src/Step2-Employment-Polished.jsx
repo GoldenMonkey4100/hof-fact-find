@@ -113,10 +113,10 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
   const status    = getVarianceStatus(m1Annual, m2Annual);
 
   const statusConfig = {
-    incomplete:  { bg: 'var(--bg-secondary)', border: 'var(--border-primary)', color: 'var(--text-secondary)', icon: '📋', text: 'Enter amounts above to see comparison.' },
-    consistent:  { bg: 'var(--bg-success-surface)', border: '#86efac', color: 'var(--text-success-emphasis)', icon: '✓',  text: 'YTD annualised income is consistent with base income. No issues.' },
-    ytd_higher:  { bg: 'var(--bg-info-surface)', border: '#bae6fd', color: 'var(--text-info)', icon: 'ℹ️', text: 'YTD is higher than base — likely overtime or allowances. Lenders will typically only accept the base income for servicing unless the higher income is proven consistent over 2 years.' },
-    ytd_lower:   { bg: 'var(--bg-warning-surface)', border: 'var(--border-warning)', color: 'var(--text-warning-emphasis)', icon: '⚠️', text: 'YTD is lower than base. This is the income figure lenders will use. An explanation is required.' },
+    incomplete:  { bg: 'var(--bg-secondary)', border: 'var(--border-primary)', color: 'var(--text-secondary)', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>, text: 'Enter amounts above to see comparison.' },
+    consistent:  { bg: 'var(--bg-success-surface)', border: '#86efac', color: 'var(--text-success-emphasis)', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>, text: 'YTD annualised income is consistent with base income. No issues.' },
+    ytd_higher:  { bg: 'var(--bg-info-surface)', border: '#bae6fd', color: 'var(--text-info)', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>, text: 'YTD is higher than base — likely overtime or allowances. Lenders will typically only accept the base income for servicing unless the higher income is proven consistent over 2 years.' },
+    ytd_lower:   { bg: 'var(--bg-warning-surface)', border: 'var(--border-warning)', color: 'var(--text-warning-emphasis)', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>, text: 'YTD is lower than base. This is the income figure lenders will use. An explanation is required.' },
   };
   const cfg = statusConfig[status];
 
@@ -139,7 +139,10 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
       <div>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-primary)' }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>💰 Income Verification Tool</h2>
+            <h2 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              Income Verification Tool
+            </h2>
             <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>{applicantName}</p>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: 'var(--text-secondary)', padding: '4px 8px' }}>✕</button>
@@ -251,8 +254,8 @@ const IncomeVerifierModal = ({ applicantName, initialData, onSave, onClose }) =>
                   {m1Annual && m2Annual ? `${variance >= 0 ? '+' : ''}${variancePct.toFixed(1)}%` : '—'}
                 </div>
               </div>
-              <div style={{ textAlign: 'center', minWidth: '80px' }}>
-                <div style={{ fontSize: '20px' }}>{cfg.icon}</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px', color: cfg.color }}>
+                {cfg.icon}
               </div>
             </div>
             <p style={{ margin: 0, fontSize: '12px', color: cfg.color }}>{cfg.text}</p>
@@ -535,7 +538,9 @@ const Step2Employment = ({ formData, updateFormData }) => {
         {/* Payslip tile */}
         <div style={tile(extracted ? { background: 'var(--bg-success-surface)', borderColor: 'var(--border-success)' } : {})}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '16px' }}>📄</span>
+            <span style={{ display: 'flex', color: extracted ? 'var(--color-success)' : 'var(--color-gold)', flexShrink: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </span>
             <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>Payslip</span>
             {extracted && <span style={{ fontSize: '10px', fontWeight: '700', color: '#16a34a', background: '#dcfce7', padding: '1px 7px', borderRadius: '10px' }}>✓ DONE</span>}
           </div>
@@ -548,11 +553,11 @@ const Step2Employment = ({ formData, updateFormData }) => {
             <input id={inputId} type="file" accept="image/*,.pdf,application/pdf" style={{ display: 'none' }}
               onChange={(e) => { if (e.target.files[0]) setPayslipFile(idx, e.target.files[0]); }} />
             <label htmlFor={inputId} style={{ flex: 1, padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px', cursor: 'pointer', textAlign: 'center', color: 'var(--text-primary)' }}>
-              📄 {hasFile ? 'Replace' : 'Upload'}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> {hasFile ? 'Replace' : 'Upload'}
             </label>
             <button type="button" disabled={!hasFile || extracting} onClick={() => handlePayslipExtract(idx)}
               style={{ flex: 1, padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: hasFile && !extracting ? '#0369a1' : '#e2e8f0', color: hasFile && !extracting ? 'white' : '#9ca3af', border: 'none', borderRadius: '6px', cursor: hasFile && !extracting ? 'pointer' : 'not-allowed' }}>
-              {extracting ? '…' : '✨ Extract'}
+              {extracting ? '…' : 'Extract'}
             </button>
           </div>
           {ps.error && <div style={{ fontSize: '10px', color: 'var(--text-danger-emphasis)' }}>⚠ {ps.error}</div>}
@@ -561,7 +566,9 @@ const Step2Employment = ({ formData, updateFormData }) => {
         {/* Income Verifier tile */}
         <div style={tile(ivCfg ? { background: ivCfg.bg, borderColor: ivCfg.border } : {})}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '16px' }}>💰</span>
+            <span style={{ display: 'flex', color: ivCfg ? ivCfg.color : 'var(--color-gold)', flexShrink: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            </span>
             <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>Income Verifier</span>
             {ivCfg && <span style={{ fontSize: '10px', fontWeight: '700', color: ivCfg.color, background: 'transparent', padding: '1px 0' }}>{ivCfg.label}</span>}
           </div>
@@ -573,7 +580,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
           <button type="button"
             onClick={() => { goToEmpStep(record.applicantId, 2); setVerifierExpanded(p => ({ ...p, [idx]: true })); }}
             style={{ padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: iv ? 'var(--bg-primary)' : 'var(--color-primary)', color: iv ? 'var(--text-primary)' : 'white', border: iv ? '1px solid var(--border-primary)' : 'none', borderRadius: '6px', cursor: 'pointer' }}>
-            {iv ? '✏️ Edit Verification' : 'Open Verifier'}
+            {iv ? <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit Verification</> : 'Open Verifier'}
           </button>
         </div>
 
@@ -594,10 +601,13 @@ const Step2Employment = ({ formData, updateFormData }) => {
     return (
       <div style={{ marginBottom: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '7px', marginBottom: '6px' }}>
-          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>📄 {file.name.length > 30 ? file.name.slice(0, 30) + '…' : file.name}</span>
+          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: 'var(--color-gold)' }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            {file.name.length > 30 ? file.name.slice(0, 30) + '…' : file.name}
+          </span>
           <button type="button" onClick={() => updatePayslip(idx, { previewOpen: !isPreviewOpen })}
             style={{ fontSize: '12px', fontWeight: '600', color: isPreviewOpen ? 'var(--text-secondary)' : 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-            {isPreviewOpen ? '▲ Hide' : '👁 View payslip'}
+            {isPreviewOpen ? '▲ Hide' : <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> View payslip</>}
           </button>
         </div>
         {isPreviewOpen && (
@@ -750,7 +760,10 @@ const Step2Employment = ({ formData, updateFormData }) => {
         return (
           <SmartCard
             key={record.applicantId}
-            icon={isCompanyBorrower ? '🏢' : '💼'}
+            icon={isCompanyBorrower
+              ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 22V4a2 2 0 012-2h8a2 2 0 012 2v18z"/><path d="M6 12H4a2 2 0 00-2 2v8h4"/><path d="M18 9h2a2 2 0 012 2v11h-4"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+              : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+            }
             title={record.applicantName}
             summary={empSummary}
             status={empStatus}
@@ -951,7 +964,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
                       (() => {
                         const v = record.currentEmployment.incomeVerification;
                         const statusColors = { consistent: '#166534', ytd_higher: '#0369a1', ytd_lower: '#9a3412', incomplete: '#64748b' };
-                        const statusLabels = { consistent: '✓ Consistent', ytd_higher: 'ℹ️ YTD Higher', ytd_lower: '⚠️ YTD Lower — flagged', incomplete: '—' };
+                        const statusLabels = { consistent: '✓ Consistent', ytd_higher: 'YTD Higher', ytd_lower: 'YTD Lower — flagged', incomplete: '—' };
                         return (
                           <div style={{ padding: '10px 12px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '12px', marginBottom: '16px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>

@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import './styles.css';
+
+const subStepVariants = {
+  enter:  (dir) => ({ opacity: 0, x: dir * 24 }),
+  center: { opacity: 1, x: 0 },
+  exit:   (dir) => ({ opacity: 0, x: dir * -16 }),
+};
 import { getBrokerEmail, formatCurrency, parseCurrency, calculateLVR, calculatePropertyValue, calculateLoanAmount, formatCurrencyDisplay } from './utils';
 import AddressAutocomplete from './AddressAutocomplete';
 import SmartCard from './SmartCard';
@@ -419,10 +426,14 @@ const EquityCalcContent = ({ security }) => {
 
 const Step0LoanStrategy = ({ formData, updateFormData }) => {
   const [secStep, setSecStep] = useState({});
+  const [secDir, setSecDir] = useState({});
   const [secCalcOpen, setSecCalcOpen] = useState({});
 
   const getSecStep = (id) => secStep[id] || 1;
-  const setSecurityStep = (id, s) => setSecStep(prev => ({ ...prev, [id]: s }));
+  const setSecurityStep = (id, n) => {
+    setSecDir(prev => ({ ...prev, [id]: n > (secStep[id] || 1) ? 1 : -1 }));
+    setSecStep(prev => ({ ...prev, [id]: n }));
+  };
   const toggleSecCalc = (id) => setSecCalcOpen(prev => ({ ...prev, [id]: !prev[id] }));
 
   const updateSecurity = (index, field, value) => {
@@ -643,6 +654,16 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
           onGoTo={(n) => setSecurityStep(security.id, n)}
         />
 
+        <AnimatePresence mode="wait" custom={secDir[security.id] || 1}>
+          <motion.div
+            key={step}
+            custom={secDir[security.id] || 1}
+            variants={subStepVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+          >
         {/* ── Sub-step 1: Property & Loan ──────────────────────────────────── */}
         {step === 1 && (
           <>
@@ -774,10 +795,11 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
-              <button type="button" onClick={() => setSecurityStep(security.id, 2)}
+              <motion.button type="button" onClick={() => setSecurityStep(security.id, 2)}
+                whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                 style={{ padding: '10px 22px', background: 'var(--color-primary)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
                 Next: Structure →
-              </button>
+              </motion.button>
             </div>
 
             {/* ── Calculator — below form, spans full card width ── */}
@@ -1416,13 +1438,16 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '20px' }}>
-              <button type="button" onClick={() => setSecurityStep(security.id, 1)}
+              <motion.button type="button" onClick={() => setSecurityStep(security.id, 1)}
+                whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                 style={{ padding: '10px 20px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
                 ← Back
-              </button>
+              </motion.button>
             </div>
           </>
         )}
+          </motion.div>
+        </AnimatePresence>
       </SmartCard>
     );
   };

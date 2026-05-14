@@ -26,8 +26,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'email or phone query param required' });
   }
 
-  const apiKey = process.env.VITE_MERCURY_API_KEY;
-  const apiToken = process.env.VITE_MERCURY_API_TOKEN;
+  const apiKey = process.env.MERCURY_API_KEY;
+  const apiToken = process.env.MERCURY_API_TOKEN;
   const baseUrl = 'https://apis.connective.com.au/mercury/v1';
 
   if (!apiKey || !apiToken) {

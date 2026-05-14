@@ -1,5 +1,12 @@
 ﻿import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import './styles.css';
+
+const subStepVariants = {
+  enter:  (dir) => ({ opacity: 0, x: dir * 24 }),
+  center: { opacity: 1, x: 0 },
+  exit:   (dir) => ({ opacity: 0, x: dir * -16 }),
+};
 import AddressAutocomplete from './AddressAutocomplete';
 import SmartCard from './SmartCard';
 
@@ -65,8 +72,12 @@ const Step1Applicants = ({ formData, updateFormData }) => {
 
   // Sub-step tracking per applicant id
   const [applicantStep, setApplicantStep] = useState({});
+  const [applicantDir, setApplicantDir] = useState({});
   const getStep   = (id) => applicantStep[id] || 1;
-  const goToStep  = (id, n) => setApplicantStep(p => ({ ...p, [id]: n }));
+  const goToStep  = (id, n) => {
+    setApplicantDir(prev => ({ ...prev, [id]: n > (applicantStep[id] || 1) ? 1 : -1 }));
+    setApplicantStep(p => ({ ...p, [id]: n }));
+  };
 
   // ── Mercury lookup ──────────────────────────────────────────────────────────
   const lookupMercury = async (applicantIndex, email, phone) => {
@@ -1198,6 +1209,16 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             onGoTo={(n) => goToStep(applicant.id, n)}
           />
 
+          <AnimatePresence mode="wait" custom={applicantDir[applicant.id] || 1}>
+            <motion.div
+              key={step}
+              custom={applicantDir[applicant.id] || 1}
+              variants={subStepVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+            >
           {/* ── Company Borrower — Step 1: ABN & Identity ── */}
           {isCo && step === 1 && (
             <div>
@@ -1271,11 +1292,12 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                <button type="button" className="btn-primary"
+                <motion.button type="button" className="btn-primary"
                   onClick={() => goToStep(applicant.id, 2)}
+                  whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                   style={{ padding: '9px 24px', fontSize: '13px' }}>
                   Next: Contact &amp; Reg →
-                </button>
+                </motion.button>
               </div>
             </div>
           )}
@@ -1331,11 +1353,12 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '8px' }}>
-                <button type="button"
+                <motion.button type="button"
                   onClick={() => goToStep(applicant.id, 1)}
+                  whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                   style={{ padding: '9px 24px', fontSize: '13px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
                   ← Back: ABN &amp; Identity
-                </button>
+                </motion.button>
               </div>
             </div>
           )}
@@ -1421,11 +1444,12 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   )}
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                    <button type="button" className="btn-primary"
+                    <motion.button type="button" className="btn-primary"
                       onClick={() => goToStep(applicant.id, 2)}
+                      whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                       style={{ padding: '9px 24px', fontSize: '13px' }}>
                       Next: Residency →
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
               )}
@@ -1501,16 +1525,19 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                   )}
 
                   <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '8px' }}>
-                    <button type="button"
+                    <motion.button type="button"
                       onClick={() => goToStep(applicant.id, 1)}
+                      whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                       style={{ padding: '9px 24px', fontSize: '13px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
                       ← Back: Identity
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
               )}
             </>
           )}
+            </motion.div>
+          </AnimatePresence>
 
         </SmartCard>
         );

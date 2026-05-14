@@ -185,7 +185,7 @@ const FactFindApp = () => {
     { id: 1, name: 'Applicants',           subtitle: 'Capture identity, contact details, and driver\'s licence for each applicant.' },
     { id: 2, name: 'Employment',           subtitle: 'Capture current and previous employment details for all applicants.' },
     { id: 3, name: 'Assets & Liabilities', subtitle: 'Record all assets, savings, superannuation, and outstanding liabilities.' },
-    { id: 4, name: 'Review & Submit',      subtitle: 'Review the completed fact find and submit to the Notion pipeline.' },
+    { id: 4, name: 'Review & Submit',      subtitle: 'Review the completed fact find and submit to the processing team.' },
   ];
 
   const updateFormData = (field, value) => {
@@ -209,6 +209,7 @@ const FactFindApp = () => {
   const [submission, setSubmission] = useState({
     status: 'idle',
     message: '',
+    mercuryUrl: '',
     notionUrl: '',
     notionTitle: '',
     duplicates: [],
@@ -222,14 +223,14 @@ const FactFindApp = () => {
         submittedAt: new Date().toISOString(),
         submittedBy: formData.brokerEmail,
       };
-      const res  = await fetch('/api/notion-submit', {
+      const res  = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'submit', formData: submissionData }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setSubmission({ status: 'success', message: '', notionUrl: data.pageUrl, notionTitle: data.title, duplicates: [] });
+      setSubmission({ status: 'success', message: '', mercuryUrl: data.mercuryUrl, notionUrl: data.notionUrl, notionTitle: data.title, duplicates: [] });
     } catch (err) {
       setSubmission(s => ({ ...s, status: 'error', message: err.message }));
     }
@@ -238,7 +239,7 @@ const FactFindApp = () => {
   const handleSubmit = useCallback(async () => {
     setSubmission(s => ({ ...s, status: 'checking', message: '' }));
     try {
-      const res  = await fetch('/api/notion-submit', {
+      const res  = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'check', formData }),
@@ -434,12 +435,21 @@ const FactFindApp = () => {
             </div>
             <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '20px', fontWeight: 700, color: 'var(--color-success)', margin: '0 0 10px' }}>Submitted Successfully!</h2>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: '0 0 24px', lineHeight: 1.6 }}>
-              <strong style={{ color: 'var(--text-primary)' }}>{submission.notionTitle}</strong> has been added to the Pipeline as <strong>Pending Assignment</strong>.
+              <strong style={{ color: 'var(--text-primary)' }}>{submission.notionTitle}</strong> has been created in Mercury as a new lead. Teams has been notified.
             </p>
-            <a href={submission.notionUrl} target="_blank" rel="noopener noreferrer"
+            <a href={submission.mercuryUrl} target="_blank" rel="noopener noreferrer"
               style={{ display: 'inline-block', padding: '12px 28px', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', borderRadius: '8px', fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '13px', letterSpacing: '0.06em', textDecoration: 'none', textTransform: 'uppercase', marginBottom: '12px' }}>
-              Open in Notion →
+              Open in Mercury →
             </a>
+            {submission.notionUrl && (
+              <>
+                <br />
+                <a href={submission.notionUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'inline-block', marginTop: '8px', fontSize: '12px', color: 'var(--text-secondary)', textDecoration: 'underline' }}>
+                  View Notion backup →
+                </a>
+              </>
+            )}
             <br />
             <button onClick={() => setSubmission(s => ({ ...s, status: 'idle' }))}
               style={{ marginTop: '8px', padding: '10px 20px', background: 'none', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>
@@ -480,7 +490,7 @@ const FactFindApp = () => {
               ))}
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 20px', textAlign: 'center' }}>
-              Would you like to create a new page anyway, or cancel to review?
+              Would you like to submit anyway, or cancel to review?
             </p>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => setSubmission(s => ({ ...s, status: 'idle' }))}
@@ -512,7 +522,7 @@ const FactFindApp = () => {
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
             </div>
             <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '18px', fontWeight: 700, color: 'var(--color-danger)', margin: '0 0 8px' }}>Submission Failed</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 8px' }}>An error occurred while submitting to Notion:</p>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 8px' }}>An error occurred during submission:</p>
             <p style={{ fontSize: '12px', color: 'var(--color-danger)', background: 'var(--color-danger-light)', padding: '10px', borderRadius: '6px', margin: '0 0 24px', fontFamily: 'monospace', wordBreak: 'break-word' }}>
               {submission.message}
             </p>

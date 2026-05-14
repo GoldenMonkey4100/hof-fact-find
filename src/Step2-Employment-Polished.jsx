@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import './styles.css';
+
+const subStepVariants = {
+  enter:  (dir) => ({ opacity: 0, x: dir * 24 }),
+  center: { opacity: 1, x: 0 },
+  exit:   (dir) => ({ opacity: 0, x: dir * -16 }),
+};
 import { formatCurrencyDisplay, parseCurrency } from './utils';
 import SmartCard from './SmartCard';
 
@@ -301,8 +308,12 @@ const Step2Employment = ({ formData, updateFormData }) => {
 
   // Sub-step tracking per applicant id (1 = Current Employment, 2 = Income & History)
   const [employmentStep, setEmploymentStep] = useState({});
+  const [employmentDir, setEmploymentDir] = useState({});
   const getEmpStep  = (id) => employmentStep[id] || 1;
-  const goToEmpStep = (id, n) => setEmploymentStep(p => ({ ...p, [id]: n }));
+  const goToEmpStep = (id, n) => {
+    setEmploymentDir(prev => ({ ...prev, [id]: n > (employmentStep[id] || 1) ? 1 : -1 }));
+    setEmploymentStep(p => ({ ...p, [id]: n }));
+  };
 
   const getApplicantType = (applicantId) =>
     (formData.applicants || []).find(a => a.id === applicantId)?.type || 'Natural Person';
@@ -822,6 +833,16 @@ const Step2Employment = ({ formData, updateFormData }) => {
                   onGoTo={(n) => goToEmpStep(record.applicantId, n)}
                 />
 
+                <AnimatePresence mode="wait" custom={employmentDir[record.applicantId] || 1}>
+                  <motion.div
+                    key={empStep}
+                    custom={employmentDir[record.applicantId] || 1}
+                    variants={subStepVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                  >
                 {/* Step 1: Current Employment */}
                 {empStep === 1 && (
                   <div>
@@ -885,11 +906,12 @@ const Step2Employment = ({ formData, updateFormData }) => {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                      <button type="button" className="btn-primary"
+                      <motion.button type="button" className="btn-primary"
                         onClick={() => goToEmpStep(record.applicantId, 2)}
+                        whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                         style={{ padding: '9px 24px', fontSize: '13px' }}>
                         Next: Income &amp; History →
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
                 )}
@@ -1038,14 +1060,17 @@ const Step2Employment = ({ formData, updateFormData }) => {
                     ))}
 
                     <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '8px' }}>
-                      <button type="button"
+                      <motion.button type="button"
                         onClick={() => goToEmpStep(record.applicantId, 1)}
+                        whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                         style={{ padding: '9px 24px', fontSize: '13px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
                         ← Back: Current Employment
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
                 )}
+                  </motion.div>
+                </AnimatePresence>
               </>
             )}
           </SmartCard>

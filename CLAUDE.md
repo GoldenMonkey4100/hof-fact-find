@@ -26,17 +26,18 @@ vercel dev       # Test API functions locally (requires Vercel CLI)
 
 **Shared:** `SmartCard.jsx` (collapsible card + status badges), `VoiceBar.jsx` (floating voice input), `AddressAutocomplete.jsx` (Google Maps Places)
 
-**Utilities:** `utils.js` (broker email map, currency, LVR calc), `mercuryApiService.js` (Mercury CRM wrapper), `audioUtils.js` (16kHz mono WAV encoding)
+**Utilities:** `utils.js` (broker email map, currency, LVR calc), `audioUtils.js` (16kHz mono WAV encoding)
 
 ## API Functions (`api/` — Vercel serverless, ES modules)
 
 | File | Purpose |
 |------|---------|
-| `notion-submit.js` | `action:'check'` duplicate detection · `action:'submit'` rich Notion page creation |
+| `submit.js` | `action:'check'` Notion duplicate detection · `action:'submit'` Mercury-first + Notion backup + Teams |
+| `documents.js` | HMAC password-gated document proxy (password delivered via Teams card) |
 | `upload-blob.js` | Receives base64 → PUT to Vercel Blob → returns URL |
 | `extract-license.js` | Claude vision: driver's licence → structured JSON |
 | `extract-payslip.js` | Claude vision: payslip → income fields |
-| `mercury-search.js` | Mercury CRM contact lookup by email/phone |
+| `mercury-search.js` | Mercury CRM contact lookup by email/phone (Step 1 banner) |
 | `abn-lookup.js` | ABR JSONP ABN lookup proxy |
 | `voice.js` | Wispr Flow transcription + Claude field extraction |
 | `docuseal-send.js` | DocuSeal: initiate e-signature |

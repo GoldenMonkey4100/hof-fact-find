@@ -26,6 +26,13 @@ const RITA_USER_ID   = '263d872b-594c-81bf-8c33-00024f1c5613';
 
 const VALID_TX_TYPES = new Set(['Refinance', 'Cashout', 'Purchase', 'Top up', 'Construction']);
 
+// ── Teams @mentions ───────────────────────────────────────────────────────────
+const TEAMS_MENTIONS = [
+  { tag: '<at>Chris</at>',  id: 'chris@houseoffinance.com.au',  name: 'Chris'  },
+  { tag: '<at>Rita</at>',   id: 'rita@houseoffinance.com.au',   name: 'Rita'   },
+  { tag: '<at>David</at>',  id: 'david@houseoffinance.com.au',  name: 'David'  },
+];
+
 // ── Formatters ────────────────────────────────────────────────────────────────
 const parseCurrency = (v) => {
   if (!v) return 0;
@@ -136,146 +143,168 @@ const LIABILITY_TYPE_MAP = {
 // ── notePadText builder ───────────────────────────────────────────────────────
 const buildNotePadText = (formData, docPassword, docProxies) => {
   const { securities = [], applicants = [], employment = [] } = formData;
-  const lines = [];
+  const p = (key, val) => val ? `  ${(key + ':').padEnd(14)} ${val}` : null;
+  const sec = (title) => `\n--- ${title} ---`;
+  const L = (v) => v || [];
 
-  lines.push('=== HOF FACT FIND SUBMISSION ===');
-  lines.push(`Submitted: ${new Date().toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}`);
-  if (formData.brokerName)                   lines.push(`Broker: ${formData.brokerName}`);
-  if (formData.priority)                     lines.push(`Priority: ${formData.priority}`);
-  if (formData.clientType)                   lines.push(`Client Type: ${formData.clientType}`);
-  if (formData.leadSource)                   lines.push(`Lead Source: ${formData.leadSource}`);
-  if (formData.lenderPreference?.length)     lines.push(`Lender Preference: ${formData.lenderPreference.join(', ')}`);
-  if (formData.brokerNotes)                  lines.push(`Broker Notes: ${formData.brokerNotes}`);
+  const lines = [];
+  const now = new Date().toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  lines.push('=== HOF FACT FIND — NEW APPLICATION ===');
+  lines.push('');
+  [
+    p('Submitted',    now),
+    p('Broker',       formData.brokerName),
+    p('Priority',     formData.priority),
+    p('Client Type',  formData.clientType),
+    p('Lead Source',  formData.leadSource),
+    p('Lender Pref',  L(formData.lenderPreference).join(', ') || null),
+    p('Notes',        formData.brokerNotes),
+  ].filter(Boolean).forEach(l => lines.push(l));
 
   // Applicants
   if (applicants.length > 0) {
-    lines.push('\n--- APPLICANT(S) ---');
+    lines.push(sec('APPLICANTS'));
     applicants.forEach((app, i) => {
-      const roleLabel = app.role === 'Guarantor' ? ' (Guarantor)' : '';
+      lines.push('');
+      const roleTag = app.role === 'Guarantor' ? 'Guarantor' : i === 0 ? 'Primary' : 'Secondary';
       if (app.type === 'Company Borrower') {
-        lines.push(`Applicant ${i + 1}${roleLabel}: ${app.companyName || '—'} (Company)`);
-        if (app.companyABN) lines.push(`  ABN: ${app.companyABN}`);
-        if (app.phone)      lines.push(`  Phone: ${app.phone}`);
-        if (app.email)      lines.push(`  Email: ${app.email}`);
+        lines.push(`Applicant ${i + 1} — ${roleTag} (Company)`);
+        [p('Company', app.companyName), p('ABN', app.companyABN), p('Phone', app.phone), p('Email', app.email)].filter(Boolean).forEach(l => lines.push(l));
       } else {
         const name = [app.firstName, app.middleName, app.lastName].filter(Boolean).join(' ');
-        lines.push(`Applicant ${i + 1}${roleLabel}: ${name || '—'}`);
-        if (app.dob)     lines.push(`  DOB: ${app.dob}`);
-        if (app.phone)   lines.push(`  Mobile: ${app.phone}`);
-        if (app.email)   lines.push(`  Email: ${app.email}`);
-        if (app.address) lines.push(`  Address: ${app.address}`);
-        if (app.maritalStatus)  lines.push(`  Marital Status: ${app.maritalStatus}`);
-        if (app.residencyStatus) lines.push(`  Residency: ${app.residencyStatus}`);
-        if (app.numDependants > 0) lines.push(`  Dependants: ${app.numDependants}`);
+        lines.push(`Applicant ${i + 1} — ${roleTag} (Natural Person)`);
+        [
+          p('Name',      name),
+          p('DOB',       app.dob),
+          p('Phone',     app.phone),
+          p('Email',     app.email),
+          p('Address',   app.address),
+          p('Residency', app.residencyStatus),
+          p('Marital',   app.maritalStatus),
+          app.numDependants > 0 ? p('Dependants', String(app.numDependants)) : null,
+        ].filter(Boolean).forEach(l => lines.push(l));
       }
     });
   }
 
   // Loan structure
   if (securities.length > 0) {
-    lines.push('\n--- LOAN STRUCTURE ---');
+    lines.push(sec('LOAN STRUCTURE'));
     const totalLoan     = securities.reduce((s, sec) => s + parseCurrency(sec.loanAmount), 0);
     const totalSecurity = securities.reduce((s, sec) => s + parseCurrency(sec.propertyValue), 0);
     const blendedLVR    = totalSecurity > 0 ? (totalLoan / totalSecurity * 100).toFixed(1) + '%' : '—';
 
-    securities.forEach((sec, i) => {
-      lines.push(`Security ${i + 1}: ${sec.address || '(address not entered)'}`);
-      if (sec.propertyValue)    lines.push(`  Property Value: ${fmtCurrency(sec.propertyValue)}`);
-      if (sec.loanAmount)       lines.push(`  Loan Amount: ${fmtCurrency(sec.loanAmount)}`);
-      if (sec.lvr)              lines.push(`  LVR: ${sec.lvr}%`);
-      if (sec.intendedOccupancy) lines.push(`  Occupancy: ${sec.intendedOccupancy}`);
-      const txTypes = [...(sec.primaryTransactionTypes || []), ...(sec.secondaryTransactionTypes || [])].join(', ');
-      if (txTypes) lines.push(`  Transaction Type: ${txTypes}`);
+    securities.forEach((s, i) => {
+      lines.push('');
+      lines.push(`Security ${i + 1} — ${s.address || '(address not entered)'}`);
+      const txTypes = [...L(s.primaryTransactionTypes), ...L(s.secondaryTransactionTypes)].join(', ');
+      const isSplit = s.loanType === 'Split' || s.repaymentType === 'Split';
+      [
+        p('Value',     fmtCurrency(s.propertyValue)),
+        p('Loan',      fmtCurrency(s.loanAmount)),
+        p('LVR',       s.lvr ? s.lvr + '%' : null),
+        p('Occupancy', s.intendedOccupancy),
+        p('Tx Type',   txTypes || null),
+        p('App Type',  s.applicationType),
+      ].filter(Boolean).forEach(l => lines.push(l));
 
-      const isSplit = sec.loanType === 'Split' || sec.repaymentType === 'Split';
       if (isSplit) {
-        lines.push('  Repayment: Split');
-        if (sec.split1Amount || sec.split1Type) {
-          const s1 = [sec.split1Amount && fmtCurrency(sec.split1Amount), sec.split1Type, sec.split1RateType].filter(Boolean).join(' | ');
-          lines.push(`  Split 1: ${s1}`);
+        lines.push(`  ${'Repayment:'.padEnd(14)} Split`);
+        if (s.split1Amount || s.split1Type) {
+          const s1 = [s.split1Amount && fmtCurrency(s.split1Amount), s.split1Type, s.split1RateType].filter(Boolean).join(' | ');
+          lines.push(p('Split 1', s1));
         }
-        if (sec.split2Amount || sec.split2Type) {
-          const s2 = [sec.split2Amount && fmtCurrency(sec.split2Amount), sec.split2Type, sec.split2RateType].filter(Boolean).join(' | ');
-          lines.push(`  Split 2: ${s2}`);
-        }
-        if (sec.splits?.length > 0 && !sec.split1Amount) {
-          sec.splits.forEach((sp, si) => {
-            const str = [sp.amount && fmtCurrency(sp.amount), sp.percentage && sp.percentage + '%', sp.type, sp.rateType].filter(Boolean).join(' | ');
-            lines.push(`  Split ${si + 1}: ${str}`);
-          });
+        if (s.split2Amount || s.split2Type) {
+          const s2 = [s.split2Amount && fmtCurrency(s.split2Amount), s.split2Type, s.split2RateType].filter(Boolean).join(' | ');
+          lines.push(p('Split 2', s2));
         }
       } else {
-        if (sec.loanType)      lines.push(`  Loan Type: ${sec.loanType}`);
-        if (sec.repaymentType) lines.push(`  Repayment: ${sec.repaymentType}`);
-        if (sec.loanTerm)      lines.push(`  Term: ${sec.loanTerm} years`);
+        [p('Repayment', [s.loanType, s.repaymentType].filter(Boolean).join(' / ') || null), p('Term', s.loanTerm ? s.loanTerm + ' years' : null)].filter(Boolean).forEach(l => lines.push(l));
       }
-      if (sec.ownershipRows?.length > 0) {
-        const own = sec.ownershipRows.map(o => `${o.name || '?'} (${o.percentage || 0}%)`).join(', ');
-        lines.push(`  Ownership: ${own}`);
+      if (s.ownershipRows?.length > 0) {
+        lines.push(p('Ownership', s.ownershipRows.map(o => `${o.name || '?'} (${o.percentage || 0}%)`).join(', ')));
       }
-      (sec.purchaseCompletionMethods || []).forEach(m => {
-        const amt = sec.purchaseCompletionAmounts?.[m];
-        lines.push(`  Completion Method: ${m}${amt ? ' — ' + fmtCurrency(amt) : ''}`);
+      L(s.purchaseCompletionMethods).forEach(m => {
+        const amt = s.purchaseCompletionAmounts?.[m];
+        lines.push(p('Completion', `${m}${amt ? ' — ' + fmtCurrency(amt) : ''}`));
       });
     });
 
-    lines.push(`Total Loan Amount: ${fmtCurrency(String(totalLoan))}`);
-    lines.push(`Total Security: ${fmtCurrency(String(totalSecurity))}`);
-    lines.push(`Blended LVR: ${blendedLVR}`);
+    lines.push('');
+    lines.push('Totals');
+    lines.push(p('Total Loan',     fmtCurrency(String(totalLoan))));
+    lines.push(p('Total Security', fmtCurrency(String(totalSecurity))));
+    lines.push(p('Blended LVR',   blendedLVR));
   }
 
   // Employment
   if (employment.length > 0) {
-    lines.push('\n--- EMPLOYMENT ---');
+    lines.push(sec('EMPLOYMENT'));
     employment.forEach((emp, i) => {
+      lines.push('');
       const ce   = emp.currentEmployment || {};
       const name = emp.applicantName || `Applicant ${i + 1}`;
-      lines.push(`${name}:`);
-      if (ce.employer)       lines.push(`  Employer: ${ce.employer}`);
-      if (ce.role)           lines.push(`  Title: ${ce.role}`);
-      if (ce.employmentType) lines.push(`  Type: ${ce.employmentType}`);
-      if (ce.startDate)      lines.push(`  Start Date: ${ce.startDate}`);
-      if (ce.baseIncome) {
-        const inc = [fmtCurrency(ce.baseIncome), 'p.a.', ce.payFrequency && `(paid ${ce.payFrequency})`].filter(Boolean).join(' ');
-        lines.push(`  Base Income: ${inc}`);
+      lines.push(`${name} — ${ce.employmentType || 'Employment'}`);
+      [
+        p('Employer', ce.employer),
+        p('Title',    ce.role),
+        p('Start',    ce.startDate),
+        ce.baseIncome ? p('Base Income', [fmtCurrency(ce.baseIncome), 'p.a.', ce.payFrequency && `(paid ${ce.payFrequency})`].filter(Boolean).join(' ')) : null,
+        ce.bonusIncome ? p('Bonus',       fmtCurrency(ce.bonusIncome)) : null,
+        ce.commissions ? p('Commissions', fmtCurrency(ce.commissions)) : null,
+        ce.hecs        ? p('HECS/HELP',   ce.hecs)                     : null,
+      ].filter(Boolean).forEach(l => lines.push(l));
+      if (ce.incomeVerification?.m2Annual) {
+        lines.push(p('Verified', `${fmtCurrency(String(ce.incomeVerification.m2Annual))} annualised${ce.incomeVerification.status === 'verified' ? ' ✓' : ''}`));
       }
-      if (ce.bonusIncome)  lines.push(`  Bonus: ${fmtCurrency(ce.bonusIncome)}`);
-      if (ce.commissions)  lines.push(`  Commissions: ${fmtCurrency(ce.commissions)}`);
-      if (ce.hecs)         lines.push(`  HECS/HELP: ${ce.hecs}`);
-      (emp.previousEmployments || []).forEach((prev, pi) => {
-        lines.push(`  Previous ${pi + 1}: ${prev.employer || prev.employerName || '—'} | ${prev.startDate || '?'} → ${prev.endDate || '?'}`);
+      L(emp.previousEmployments).forEach((prev, pi) => {
+        lines.push(p(`Previous ${pi + 1}`, `${prev.employer || prev.employerName || '—'} | ${prev.startDate || '?'} → ${prev.endDate || '?'}`));
       });
       if (typeof emp.totalYears === 'number') {
-        lines.push(`  Employment History: ${emp.totalYears.toFixed(1)} years${emp.meetsRequirement ? ' ✓' : ' ⚠ (< 3 years)'}`);
+        lines.push(p('History', `${emp.totalYears.toFixed(1)} yrs ${emp.meetsRequirement ? '✓' : '⚠ (< 3 yrs)'}`));
       }
     });
   }
 
   // Assets
-  const allAssets = applicants.flatMap(app => (app.assets || []).filter(a => parseCurrency(a.value) > 0));
+  const allAssets = applicants.flatMap(app => L(app.assets).filter(a => parseCurrency(a.value) > 0));
   if (allAssets.length > 0) {
-    lines.push('\n--- ASSETS ---');
-    allAssets.forEach(a => lines.push(`  ${a.type || '—'}: ${a.description || '—'} — ${fmtCurrency(a.value)}`));
-    lines.push(`Total Assets: ${fmtCurrency(String(allAssets.reduce((s, a) => s + parseCurrency(a.value), 0)))}`);
+    lines.push(sec('ASSETS'));
+    lines.push('');
+    allAssets.forEach(a => {
+      const institution = a.bank || a.provider || a.lender || '';
+      const detail      = [a.description || a.type || '—', institution].filter(Boolean).join(' / ');
+      lines.push(`  ${detail.padEnd(38)} ${fmtCurrency(a.value)}`);
+    });
+    lines.push(`  ${'─'.repeat(50)}`);
+    lines.push(`  ${'TOTAL ASSETS:'.padEnd(38)} ${fmtCurrency(String(allAssets.reduce((s, a) => s + parseCurrency(a.value), 0)))}`);
   }
 
   // Liabilities
-  const allLiabilities = applicants.flatMap(app =>
-    (app.liabilities || []).filter(l => parseCurrency(l.amount || l.balance) > 0)
-  );
+  const allLiabilities = applicants.flatMap(app => L(app.liabilities).filter(l => parseCurrency(l.amount || l.balance) > 0));
   if (allLiabilities.length > 0) {
-    lines.push('\n--- LIABILITIES ---');
+    lines.push(sec('LIABILITIES'));
+    lines.push('');
     allLiabilities.forEach(l => {
       const institution = l.lender || l.institution || '';
-      lines.push(`  ${l.type || '—'}: ${l.description || '—'}${institution ? ' @ ' + institution : ''} — ${fmtCurrency(l.amount || l.balance)}`);
+      const limitStr    = l.limit ? ` — limit ${fmtCurrency(l.limit)}` : '';
+      const detail      = [l.description || l.type || '—', institution ? institution + limitStr : ''].filter(Boolean).join(' / ');
+      lines.push(`  ${detail.padEnd(38)} ${fmtCurrency(l.amount || l.balance)}`);
     });
-    lines.push(`Total Liabilities: ${fmtCurrency(String(allLiabilities.reduce((s, l) => s + parseCurrency(l.amount || l.balance), 0)))}`);
+    lines.push(`  ${'─'.repeat(50)}`);
+    lines.push(`  ${'TOTAL LIABILITIES:'.padEnd(38)} ${fmtCurrency(String(allLiabilities.reduce((s, l) => s + parseCurrency(l.amount || l.balance), 0)))}`);
   }
 
   // Documents
   if (docProxies.length > 0) {
-    lines.push(`\n--- DOCUMENTS (Password: ${docPassword}) ---`);
-    docProxies.forEach(({ label, url }) => lines.push(`${label}: ${url}`));
+    lines.push(sec(`DOCUMENTS  (Password: ${docPassword})`));
+    docProxies.forEach(({ label, proxyUrl, blobUrl }) => {
+      lines.push('');
+      lines.push(label);
+      if (proxyUrl) lines.push(`  Access: ${proxyUrl}`);
+      if (blobUrl)  lines.push(`  Blob:   ${blobUrl}`);
+    });
   }
 
   return lines.join('\n');
@@ -307,6 +336,8 @@ const postTeamsCard = async (formData, mercuryUrl, notionUrl, docPassword) => {
     });
   });
 
+  const mentionText = TEAMS_MENTIONS.map(m => m.tag).join(' ');
+
   const card = {
     type: 'message',
     attachments: [{
@@ -315,7 +346,15 @@ const postTeamsCard = async (formData, mercuryUrl, notionUrl, docPassword) => {
         '$schema': 'http://adaptivecards.io/schemas/adaptive-card.json',
         type: 'AdaptiveCard',
         version: '1.5',
+        msteams: {
+          entities: TEAMS_MENTIONS.map(m => ({
+            type:      'mention',
+            text:      m.tag,
+            mentioned: { id: m.id, name: m.name },
+          })),
+        },
         body: [
+          { type: 'TextBlock', text: `${mentionText} — New application received`, wrap: true, size: 'Small' },
           { type: 'TextBlock', size: 'Large', weight: 'Bolder', text: 'New Application Received', color: 'Accent' },
           {
             type: 'FactSet',
@@ -765,9 +804,9 @@ export default async function handler(req, res) {
           ? (app.companyName || `Company ${i + 1}`)
           : `${app.firstName || ''} ${app.lastName || ''}`.trim() || `Applicant ${i + 1}`;
         const ce = (formData.employment || [])[i]?.currentEmployment || {};
-        if (secret && app.dlFrontUrl) docProxies.push({ label: `${label} — DL Front`, url: makeProxyUrl(app.dlFrontUrl, docPassword, secret, appBase) });
-        if (secret && app.dlBackUrl)  docProxies.push({ label: `${label} — DL Back`,  url: makeProxyUrl(app.dlBackUrl,  docPassword, secret, appBase) });
-        if (secret && ce.payslipUrl)  docProxies.push({ label: `${label} — Payslip`,  url: makeProxyUrl(ce.payslipUrl,  docPassword, secret, appBase) });
+        if (app.dlFrontUrl) docProxies.push({ label: `${label} — DL Front`, proxyUrl: secret ? makeProxyUrl(app.dlFrontUrl, docPassword, secret, appBase) : null, blobUrl: app.dlFrontUrl });
+        if (app.dlBackUrl)  docProxies.push({ label: `${label} — DL Back`,  proxyUrl: secret ? makeProxyUrl(app.dlBackUrl,  docPassword, secret, appBase) : null, blobUrl: app.dlBackUrl  });
+        if (ce.payslipUrl)  docProxies.push({ label: `${label} — Payslip`,  proxyUrl: secret ? makeProxyUrl(ce.payslipUrl,  docPassword, secret, appBase) : null, blobUrl: ce.payslipUrl  });
       });
 
       // 1. Create Mercury contacts
@@ -801,14 +840,23 @@ export default async function handler(req, res) {
         transactionType: 'Loan',
         opportunityName,
         amount:          totalLoan || 0,
-        status:          'Lead',
-        tranxType:       '',
+        status:          '01. Lead',
+        broker:          formData.brokerName  || '',
+        leadSource:      formData.leadSource  || '',
         notePadText,
         ...(relatedParties.length > 0 ? { relatedParties } : {}),
       });
 
       const opportunityId = oppResult.uniqueId;
       const mercuryUrl    = `https://crm.connective.com.au/#/opportunities/${opportunityId}`;
+
+      // 3b. Create "Review application" task (non-fatal)
+      await mercuryFetch(`/opportunities/${opportunityId}/tasks`, 'POST', {
+        name:     'Review application',
+        dueDate:  new Date().toISOString().split('T')[0],
+        priority: 'Urgent',
+        status:   'Open',
+      }).catch(err => console.error('[mercury] task creation failed:', err.message));
 
       // 4. Push assets (non-fatal if fails)
       const allAssets = applicants.flatMap(app =>

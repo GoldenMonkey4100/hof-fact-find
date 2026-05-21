@@ -829,7 +829,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
 
                 <SubStepBar
                   step={empStep}
-                  labels={['Current Employment', 'Income & History']}
+                  labels={['Employment & Income', 'Employment History']}
                   onGoTo={(n) => goToEmpStep(record.applicantId, n)}
                 />
 
@@ -905,23 +905,6 @@ const Step2Employment = ({ formData, updateFormData }) => {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                      <motion.button type="button" className="btn-primary"
-                        onClick={() => goToEmpStep(record.applicantId, 2)}
-                        whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                        style={{ padding: '9px 24px', fontSize: '13px' }}>
-                        Next: Income &amp; History →
-                      </motion.button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 2: Income & History */}
-                {empStep === 2 && (
-                  <div>
-                    {/* Payslip preview (if uploaded via Quick Actions) */}
-                    {renderPayslipStep2(record, index)}
-
                     {/* Income Details */}
                     <div style={{ padding: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px', marginBottom: '16px' }}>
                       <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Income Details</h4>
@@ -970,6 +953,23 @@ const Step2Employment = ({ formData, updateFormData }) => {
                         </div>
                       </div>
                     </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                      <motion.button type="button" className="btn-primary"
+                        onClick={() => goToEmpStep(record.applicantId, 2)}
+                        whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                        style={{ padding: '9px 24px', fontSize: '13px' }}>
+                        Next: Employment History →
+                      </motion.button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2: Employment History */}
+                {empStep === 2 && (
+                  <div>
+                    {/* Payslip preview (if uploaded via Quick Actions) */}
+                    {renderPayslipStep2(record, index)}
 
                     {/* Income Verifier */}
                     {verifierExpanded[index] ? (
@@ -1064,7 +1064,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
                         onClick={() => goToEmpStep(record.applicantId, 1)}
                         whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                         style={{ padding: '9px 24px', fontSize: '13px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
-                        ← Back: Current Employment
+                        ← Back: Employment & Income
                       </motion.button>
                     </div>
                   </div>

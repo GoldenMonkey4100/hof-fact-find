@@ -26,7 +26,6 @@ const SECONDARY_TYPES = ['Cashout', 'Construction', 'Off the Plan', 'Pre-approva
 const PURCHASE_COMPLETION = ['Own Savings', 'Gift from Family', 'Equity from Existing Property', 'First Home Owner Grant', 'Other'];
 
 // ── Ownership helpers ─────────────────────────────────────────────────────────
-const OWNERSHIP_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899', '#06b6d4'];
 
 const getApplicantDisplayName = (a) => {
   if (!a) return '';
@@ -170,7 +169,7 @@ const ToggleButton = ({ label, active, onClick, color = 'success' }) => {
       color: active ? c.text : 'var(--text-primary)',
       transition: 'all 0.15s'
     }}>
-      {active && '✓ '}{label}
+      {label}
     </button>
   );
 };
@@ -245,7 +244,7 @@ const LoanTypeMatrix = ({ security, onSelect }) => {
                 transition: 'all 0.15s',
               }}>
               <div style={{ fontSize: '13px', fontWeight: '600', color: sel ? 'var(--color-primary)' : 'var(--text-primary)' }}>
-                {sel && '✓ '}{label}
+                {label}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{sub}</div>
             </button>
@@ -260,7 +259,7 @@ const LoanTypeMatrix = ({ security, onSelect }) => {
           transition: 'all 0.15s',
         }}>
         <div style={{ fontSize: '13px', fontWeight: '600', color: isSplit ? 'var(--color-primary)' : 'var(--text-primary)' }}>
-          {isSplit && '✓ '}Split Loan — Fixed + Variable portions
+          Split Loan — Fixed + Variable portions
         </div>
         <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Specify amounts for each portion below</div>
       </button>
@@ -677,6 +676,79 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               />
             </div>
 
+            {/* ── Property Ownership — under address ── */}
+            <div className="mb-4">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <label style={{ margin: 0 }}>Property Ownership</label>
+                {ownershipRows.length > 1 && (
+                  <button type="button"
+                    onClick={() => {
+                      const n = ownershipRows.length;
+                      const base = Math.floor(100 / n);
+                      const rem = 100 - base * n;
+                      saveOwnershipRows(ownershipRows.map((r, i) => ({ ...r, percentage: i === 0 ? base + rem : base })));
+                    }}
+                    style={{ fontSize: '12px', padding: '4px 12px', border: '1px solid var(--border-primary)', borderRadius: '6px', background: 'var(--bg-secondary)', cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                    = Equal Split
+                  </button>
+                )}
+              </div>
+
+              {ownershipRows.length === 0 ? (
+                <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', padding: '6px 0' }}>
+                  Set the number of applicants above — ownership will be pre-allocated automatically.
+                </div>
+              ) : (
+                <>
+                  {/* Header row */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 4px 6px', fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <span>Name</span>
+                    <span>Ownership %</span>
+                  </div>
+                  <div style={{ border: '1px solid var(--border-primary)', borderRadius: '8px', overflow: 'hidden', marginBottom: '10px' }}>
+                    {ownershipRows.map((row, i) => (
+                      <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', borderBottom: i < ownershipRows.length - 1 ? '1px solid var(--border-primary)' : 'none', background: 'var(--bg-primary)' }}>
+                        {/* Name */}
+                        <div style={{ flex: 1 }}>
+                          {row.type === 'applicant' ? (
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{row.name}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '1px' }}>Applicant {i + 1}</div>
+                            </div>
+                          ) : (
+                            <input type="text" value={row.name} placeholder="Owner / entity name"
+                              onChange={(e) => { const rows = [...ownershipRows]; rows[i] = { ...rows[i], name: e.target.value }; saveOwnershipRows(rows); }}
+                              style={{ fontSize: '13px', padding: '5px 8px', border: '1px solid var(--border-primary)', borderRadius: '6px', outline: 'none', width: '100%' }} />
+                          )}
+                        </div>
+                        {/* Percentage input */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                          <input type="number" value={row.percentage} min="0" max="100" className="no-spin"
+                            onChange={(e) => { const rows = [...ownershipRows]; rows[i] = { ...rows[i], percentage: Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)) }; saveOwnershipRows(rows); }}
+                            style={{ width: '64px', padding: '6px 8px', border: '1px solid var(--border-primary)', borderRadius: '6px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', background: 'var(--bg-primary)' }} />
+                          <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>%</span>
+                          {row.type !== 'applicant' && (
+                            <button type="button" onClick={() => saveOwnershipRows(ownershipRows.filter((_, j) => j !== i))}
+                              style={{ fontSize: '13px', color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', lineHeight: 1 }}>✕</button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Validation */}
+                  <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '10px', color: totalOk ? 'var(--color-success-dark)' : '#dc2626', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{totalOk ? '✓ Ownership totals 100%' : `⚠ Total is ${totalPct.toFixed(1)}% — must equal 100%`}</span>
+                    {!totalOk && <span>{totalPct > 100 ? `−${(totalPct - 100).toFixed(1)}% over` : `+${(100 - totalPct).toFixed(1)}% remaining`}</span>}
+                  </div>
+                  <button type="button"
+                    onClick={() => saveOwnershipRows([...ownershipRows, { id: `other-${Date.now()}`, type: 'other', name: '', percentage: 0 }])}
+                    style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'none', border: '2px dashed var(--border-secondary)', borderRadius: '8px', cursor: 'pointer', padding: '10px 14px', width: '100%', fontWeight: '600' }}>
+                    + Add owner · company · trust · other person
+                  </button>
+                </>
+              )}
+            </div>
+
             <div className="mb-4">
               <label>Transaction Type</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
@@ -701,8 +773,8 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                         border: `1px solid ${active ? 'rgba(16,185,129,0.30)' : 'var(--color-gold-border)'}`,
                         color: active ? 'var(--color-success)' : 'var(--color-gold)',
                       }}>{icon}</div>
-                      <span style={{ fontSize: '14px', fontWeight: '600', color: active ? 'var(--text-success-emphasis)' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {active && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}{type}
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: active ? 'var(--text-success-emphasis)' : 'var(--text-primary)' }}>
+                        {type}
                       </span>
                     </button>
                   );
@@ -1165,7 +1237,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                                   onClick={() => updateSplit(index, sp.id, 'type', sp.type === opt ? '' : opt)}
                                   className={`pill-btn${sp.type === opt ? ' pill-btn--active' : ''}`}
                                   style={{ fontSize: '12px' }}>
-                                  {sp.type === opt && '✓ '}{opt}
+                                  {opt}
                                 </button>
                               ))}
                             </div>
@@ -1180,7 +1252,7 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                                   onClick={() => updateSplit(index, sp.id, 'rateType', sp.rateType === opt ? '' : opt)}
                                   className={`pill-btn${sp.rateType === opt ? ' pill-btn--active' : ''}`}
                                   style={{ fontSize: '12px' }}>
-                                  {sp.rateType === opt && '✓ '}{opt}
+                                  {opt}
                                 </button>
                               ))}
                             </div>
@@ -1285,158 +1357,6 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               </label>
             </div>
 
-            {/* ── Property Ownership — Tile layout ── */}
-            <div className="mb-4">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <label style={{ margin: 0 }}>Property Ownership</label>
-                {ownershipRows.length > 1 && (
-                  <button type="button"
-                    onClick={() => {
-                      const n = ownershipRows.length;
-                      const base = Math.floor(100 / n);
-                      const rem = 100 - base * n;
-                      saveOwnershipRows(ownershipRows.map((r, i) => ({ ...r, percentage: i === 0 ? base + rem : base })));
-                    }}
-                    style={{ fontSize: '12px', padding: '4px 12px', border: '1px solid var(--border-primary)', borderRadius: '6px', background: 'var(--bg-secondary)', cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                    = Equal Split
-                  </button>
-                )}
-              </div>
-
-              {ownershipRows.length === 0 ? (
-                <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', padding: '6px 0' }}>
-                  Set the number of applicants above — ownership will be pre-allocated automatically.
-                </div>
-              ) : (
-                <>
-                  {/* Live bar */}
-                  <div style={{ height: '10px', background: '#e5e7eb', borderRadius: '5px', overflow: 'hidden', display: 'flex', marginBottom: '6px' }}>
-                    {ownershipRows.map((row, i) => (
-                      <div key={row.id} style={{ width: `${parseFloat(row.percentage) || 0}%`, background: OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length], transition: 'width 0.2s ease' }} />
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
-                    {ownershipRows.map((row, i) => (
-                      <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length] }} />
-                        <span>{row.name || 'New Owner'} ({parseFloat(row.percentage) || 0}%)</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Validation banner */}
-                  <div style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '6px 12px', borderRadius: '6px', marginBottom: '14px',
-                    fontSize: '12px', fontWeight: '600',
-                    background: totalOk ? '#f0fdf4' : '#fef2f2',
-                    border: `1px solid ${totalOk ? '#86efac' : '#fca5a5'}`,
-                    color: totalOk ? '#16a34a' : '#dc2626',
-                  }}>
-                    <span>{totalOk ? '✓ Ownership totals 100%' : `⚠ Total is ${totalPct.toFixed(1)}% — must equal 100%`}</span>
-                    {!totalOk && (
-                      <span>{totalPct > 100 ? `−${(totalPct - 100).toFixed(1)}% over` : `+${(100 - totalPct).toFixed(1)}% remaining`}</span>
-                    )}
-                  </div>
-
-                  {/* Owner tiles */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))', gap: '10px', marginBottom: '10px' }}>
-                    {ownershipRows.map((row, i) => {
-                      const col = OWNERSHIP_COLORS[i % OWNERSHIP_COLORS.length];
-                      return (
-                        <div key={row.id} style={{
-                          border: `2px solid ${col}35`,
-                          borderRadius: '10px',
-                          padding: '14px 12px 12px',
-                          background: 'var(--bg-primary)',
-                          position: 'relative',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '8px',
-                        }}>
-                          {/* Color accent bar */}
-                          <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', borderRadius: '10px 0 0 10px', background: col }} />
-
-                          {/* Remove button for non-applicants */}
-                          {row.type !== 'applicant' && (
-                            <button type="button"
-                              onClick={() => saveOwnershipRows(ownershipRows.filter((_, j) => j !== i))}
-                              style={{ position: 'absolute', top: '6px', right: '8px', fontSize: '11px', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px', opacity: 0.7 }}>
-                              ✕
-                            </button>
-                          )}
-
-                          {/* Name */}
-                          {row.type === 'applicant' ? (
-                            <div style={{ paddingLeft: '8px' }}>
-                              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1.3 }}>{row.name}</div>
-                              <div style={{ fontSize: '10px', fontWeight: '600', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.4px', marginTop: '2px' }}>
-                                Applicant {i + 1}
-                              </div>
-                            </div>
-                          ) : (
-                            <input
-                              type="text"
-                              value={row.name}
-                              placeholder="Owner / entity name"
-                              onChange={(e) => {
-                                const rows = [...ownershipRows];
-                                rows[i] = { ...rows[i], name: e.target.value };
-                                saveOwnershipRows(rows);
-                              }}
-                              style={{ fontSize: '13px', padding: '6px 8px', border: '1px solid var(--border-primary)', borderRadius: '6px', outline: 'none', width: '100%' }}
-                            />
-                          )}
-
-                          {/* % Stepper */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '4px' }}>
-                            <button type="button"
-                              onClick={() => {
-                                const rows = [...ownershipRows];
-                                rows[i] = { ...rows[i], percentage: Math.max(0, (parseFloat(rows[i].percentage) || 0) - 5) };
-                                saveOwnershipRows(rows);
-                              }}
-                              style={{ width: '32px', height: '32px', border: '1px solid var(--border-primary)', borderRadius: '6px 0 0 6px', background: 'var(--bg-secondary)', cursor: 'pointer', fontSize: '18px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
-                              −
-                            </button>
-                            <input
-                              type="number"
-                              value={row.percentage}
-                              min="0"
-                              max="100"
-                              onChange={(e) => {
-                                const rows = [...ownershipRows];
-                                rows[i] = { ...rows[i], percentage: Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)) };
-                                saveOwnershipRows(rows);
-                              }}
-                              className="no-spin"
-                              style={{ width: '76px', height: '32px', border: '1px solid var(--border-primary)', borderLeft: 'none', borderRight: 'none', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', background: 'var(--bg-primary)' }}
-                            />
-                            <button type="button"
-                              onClick={() => {
-                                const rows = [...ownershipRows];
-                                rows[i] = { ...rows[i], percentage: Math.min(100, (parseFloat(rows[i].percentage) || 0) + 5) };
-                                saveOwnershipRows(rows);
-                              }}
-                              style={{ width: '32px', height: '32px', border: '1px solid var(--border-primary)', borderRadius: '0 6px 6px 0', background: 'var(--bg-secondary)', cursor: 'pointer', fontSize: '18px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
-                              +
-                            </button>
-                          </div>
-                          <div style={{ fontSize: '10px', textAlign: 'center', color: '#94a3b8' }}>% ownership</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <button type="button"
-                    onClick={() => saveOwnershipRows([...ownershipRows, { id: `other-${Date.now()}`, type: 'other', name: '', percentage: 0 }])}
-                    style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'none', border: '2px dashed #bfdbfe', borderRadius: '10px', cursor: 'pointer', padding: '10px 14px', width: '100%', fontWeight: '600' }}>
-                    + Add owner &nbsp;·&nbsp; company · trust · other person
-                  </button>
-                </>
-              )}
-            </div>
-
             <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '20px' }}>
               <motion.button type="button" onClick={() => setSecurityStep(security.id, 1)}
                 whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
@@ -1475,12 +1395,18 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
         <div className="grid grid-cols-3 mb-4">
           <div>
             <label>Broker Name</label>
-            <select value={formData.brokerName} onChange={handleBrokerChange}>
-              <option value="">Select Broker...</option>
-              <option value="Laith Hana">Laith Hana</option>
-              <option value="Mehdi Amirilayeghi">Mehdi Amirilayeghi</option>
-              <option value="Yousif Jirjis">Yousif Jirjis</option>
-            </select>
+            <div className="pill-group">
+              {['Laith Hana', 'Mehdi Amirilayeghi', 'Yousif Jirjis'].map(name => (
+                <button key={name} type="button"
+                  className={`pill-btn${formData.brokerName === name ? ' pill-btn--active' : ''}`}
+                  onClick={() => {
+                    updateFormData('brokerName', name);
+                    updateFormData('brokerEmail', getBrokerEmail(name));
+                  }}>
+                  {name}
+                </button>
+              ))}
+            </div>
           </div>
           <div>
             <label>Client Type</label>
@@ -1558,8 +1484,8 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
         </div>
 
         {[
-          { label: 'Major Banks',           color: '#1e40af', bg: '#eff6ff',                   border: '#bfdbfe', lenders: ['ANZ', 'CBA', 'Westpac', 'NAB', 'St George'] },
-          { label: 'Second-Tier Banks',     color: '#065f46', bg: 'var(--bg-success-surface)',  border: '#bbf7d0', lenders: ['Macquarie', 'Bankwest', 'ING', 'Suncorp', 'BOQ', 'AMP', 'Bendigo', 'ME Bank', 'Newcastle Permanent'] },
+          { label: 'Major Banks',           color: '#1e40af', bg: '#eff6ff',                   border: '#bfdbfe', lenders: ['ANZ', 'CBA', 'Westpac', 'NAB', 'Macquarie', 'ING'] },
+          { label: 'Second-Tier Banks',     color: '#065f46', bg: 'var(--bg-success-surface)',  border: '#bbf7d0', lenders: ['St George', 'Bankwest', 'Suncorp', 'BOQ', 'AMP', 'Bendigo', 'ME Bank', 'Newcastle Permanent'] },
           { label: 'Non-Bank / Specialist', color: '#7c3aed', bg: '#f5f3ff',                   border: '#ddd6fe', lenders: ['Bluestone', 'Brighten', 'Firstmac', 'Granite Home Loans', 'ORDE Financial', 'Pepper Money', 'RedZed', 'Resimac', 'ThinkTank'] },
           { label: 'Other',                 color: 'var(--text-primary)', bg: 'var(--bg-secondary)', border: '#e5e7eb', lenders: ['Others'] },
         ].map(({ label, color, bg, border, lenders }) => (
@@ -1570,8 +1496,8 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                 const selected = (formData.lenderPreference || []).includes(lender);
                 return (
                   <button key={lender} type="button" onClick={() => toggleLender(lender)}
-                    style={{ padding: '6px 14px', fontSize: '13px', borderRadius: '20px', cursor: 'pointer', fontWeight: selected ? '600' : '400', border: selected ? `2px solid ${color}` : `1px solid ${border}`, background: selected ? bg : 'var(--bg-primary)', color: selected ? color : '#374151', transition: 'all 0.15s' }}>
-                    {selected && '✓ '}{lender}
+                    style={{ padding: '6px 14px', fontSize: '13px', borderRadius: '20px', cursor: 'pointer', fontWeight: selected ? '600' : '400', border: selected ? `2px solid ${color}` : `1px solid ${border}`, background: selected ? bg : 'var(--bg-primary)', color: selected ? color : 'var(--text-primary)', transition: 'all 0.15s' }}>
+                    {lender}
                   </button>
                 );
               })}
@@ -1579,8 +1505,19 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
           </div>
         ))}
 
+        {(formData.lenderPreference || []).includes('Others') && (
+          <div style={{ marginTop: '10px', marginBottom: '4px' }}>
+            <label style={{ fontSize: '12px' }}>Other lender — please specify</label>
+            <input type="text"
+              value={formData.lenderPreferenceOtherNote || ''}
+              onChange={(e) => updateFormData('lenderPreferenceOtherNote', e.target.value)}
+              placeholder="e.g. RAMS, Heritage Bank…"
+              style={{ fontSize: '13px' }} />
+          </div>
+        )}
+
         {formData.lenderPreference?.length > 0 && (
-          <div style={{ marginTop: '10px', marginBottom: '20px', padding: '8px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '12px', color: '#475569' }}>
+          <div style={{ marginTop: '10px', marginBottom: '20px', padding: '8px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
             Selected ({formData.lenderPreference.length}): <strong>{formData.lenderPreference.join(', ')}</strong>
           </div>
         )}

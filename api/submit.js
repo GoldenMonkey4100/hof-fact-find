@@ -159,6 +159,7 @@ const buildNotePadText = (formData, docPassword, docProxies) => {
     p('Client Type',  formData.clientType),
     p('Lead Source',  formData.leadSource),
     p('Lender Pref',  L(formData.lenderPreference).join(', ') || null),
+    p('Lender Note',  formData.lenderPreferenceOtherNote || null),
     p('Notes',        formData.brokerNotes),
   ].filter(Boolean).forEach(l => lines.push(l));
 
@@ -364,6 +365,7 @@ const postTeamsCard = async (formData, mercuryUrl, notionUrl, docPassword) => {
               { title: 'Loan Amount',        value: fmtCurrency(String(totalLoan)) },
               { title: 'LVR',               value: blendedLVR },
               { title: 'Lender Preference', value: (formData.lenderPreference || []).join(', ') || '—' },
+              { title: 'Lender Note',       value: formData.lenderPreferenceOtherNote || '—' },
               { title: 'Broker',            value: formData.brokerName || '—' },
               { title: 'Priority',          value: formData.priority || '—' },
               { title: 'Doc Password',      value: docPassword },
@@ -562,6 +564,7 @@ const buildPageBody = (formData) => {
     ['Client Type',           formData.clientType    || '—'],
     ['Priority',              formData.priority      || '—'],
     ['Lender Preference',     (formData.lenderPreference || []).join(', ') || '—'],
+    ['Lender Note',           formData.lenderPreferenceOtherNote || '—'],
     ['Applicant Type',        formData.applicantType || '—'],
     ['Applicants / Guarantors', `${formData.numApplicants || 1} / ${formData.numGuarantors || 0}`],
   ];

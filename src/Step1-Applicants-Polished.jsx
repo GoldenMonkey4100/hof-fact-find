@@ -1134,7 +1134,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>Equifax</span>
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>Credit file check — opens Equifax portal</div>
-          <button type="button" onClick={() => window.open('https://www.equifax.com.au/business/credit-risk-management', '_blank')}
+          <button type="button" onClick={() => window.open('https://vedacheck.com/WorkflowHandler', '_blank')}
             style={{ padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: '#e8041b', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
             Open Equifax ↗
           </button>
@@ -1149,7 +1149,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
             <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>illion</span>
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>Credit file check — opens illion portal</div>
-          <button type="button" onClick={() => window.open('https://www.illion.com.au/bureau-services', '_blank')}
+          <button type="button" onClick={() => window.open('https://illiondirect.com.au/integate/Login.mvc', '_blank')}
             style={{ padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: '#0f5c32', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
             Open illion ↗
           </button>
@@ -1205,7 +1205,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {/* Sub-step bar */}
           <SubStepBar
             step={step}
-            labels={isCo ? ['ABN & Identity', 'Contact & Reg'] : ['Identity', 'Residency']}
+            labels={isCo ? ['ABN & Identity', 'Contact & Reg'] : ['Personal Details', 'Address & Relationship']}
             onGoTo={(n) => goToStep(applicant.id, n)}
           />
 
@@ -1443,20 +1443,6 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                    <motion.button type="button" className="btn-primary"
-                      onClick={() => goToStep(applicant.id, 2)}
-                      whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                      style={{ padding: '9px 24px', fontSize: '13px' }}>
-                      Next: Residency →
-                    </motion.button>
-                  </div>
-                </div>
-              )}
-
-              {/* Sub-step 2: Residency */}
-              {step === 2 && (
-                <div>
                   {isNP && (
                     <div className="mb-4">
                       <label>Marital Status</label>
@@ -1495,6 +1481,32 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                     </div>
                   )}
 
+                  {isNP && !shouldShareDependants(index) && renderDependants(applicant, index)}
+
+                  {isNP && shouldShareDependants(index) && (
+                    <div className="mb-6">
+                      <div style={{ padding: '16px', background: 'var(--color-info-light)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-info)' }}>
+                        <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-info-dark)' }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'inline', verticalAlign: 'middle', marginRight: '5px' }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><strong>Shared Dependants:</strong> As the spouse of Applicant 1, dependants are automatically shared and managed in Applicant 1's section.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                    <motion.button type="button" className="btn-primary"
+                      onClick={() => goToStep(applicant.id, 2)}
+                      whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                      style={{ padding: '9px 24px', fontSize: '13px' }}>
+                      Next: Address →
+                    </motion.button>
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-step 2: Address History */}
+              {step === 2 && (
+                <div>
                   {renderAddressHistory(applicant, index)}
 
                   {isNP && index > 0 && (
@@ -1512,24 +1524,12 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                     </div>
                   )}
 
-                  {isNP && !shouldShareDependants(index) && renderDependants(applicant, index)}
-
-                  {isNP && shouldShareDependants(index) && (
-                    <div className="mb-6">
-                      <div style={{ padding: '16px', background: 'var(--color-info-light)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-info)' }}>
-                        <p style={{ margin: 0, fontSize: '14px', color: 'var(--color-info-dark)' }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'inline', verticalAlign: 'middle', marginRight: '5px' }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><strong>Shared Dependants:</strong> As the spouse of Applicant 1, dependants are automatically shared and managed in Applicant 1's section.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
                   <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '8px' }}>
                     <motion.button type="button"
                       onClick={() => goToStep(applicant.id, 1)}
                       whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                       style={{ padding: '9px 24px', fontSize: '13px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
-                      ← Back: Identity
+                      ← Back: Personal Details
                     </motion.button>
                   </div>
                 </div>

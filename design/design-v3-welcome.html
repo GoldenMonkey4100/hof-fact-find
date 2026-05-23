@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HOF Fact Find — New Application</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black: #12110D; --deep: #0e0d09; --panel: #1e1c16; --card: #252219;
+      --gold: #CBB26B; --gold-grad: linear-gradient(135deg,#BFAE75,#DCCB8E);
+      --gold-b: rgba(203,178,107,0.18); --gold-l: rgba(203,178,107,0.08);
+      --hi: rgba(245,244,242,0.92); --mid: rgba(245,244,242,0.58);
+      --low: rgba(245,244,242,0.32); --radius: 8px;
+      --sh: 0 2px 18px rgba(0,0,0,0.40); --sh-md: 0 8px 28px rgba(0,0,0,0.50);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Open Sans',sans-serif;background:var(--black);color:var(--hi);
+      font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;
+      height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+    /* NAVBAR */
+    .nav{height:60px;background:var(--deep);flex-shrink:0;display:flex;align-items:center;
+      justify-content:space-between;padding:0 1.75rem;border-bottom:1px solid rgba(203,178,107,.10)}
+    .nav-l{display:flex;align-items:center;gap:.625rem}
+    .mono{width:32px;height:32px;border:1.5px solid var(--gold);border-radius:6px;display:flex;
+      align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;
+      font-weight:800;font-size:11px;color:var(--gold)}
+    .wm{font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;color:var(--mid);
+      letter-spacing:.07em;text-transform:uppercase}
+    .wm em{font-style:normal;color:var(--gold)}
+    .sep{width:1px;height:20px;background:rgba(203,178,107,.14);margin:0 .875rem}
+    .ctx{font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;
+      letter-spacing:.09em;text-transform:uppercase;color:var(--low)}
+    .nav-r{display:flex;align-items:center;gap:.875rem}
+    .ref{font-size:11px;color:var(--low)}
+    .badge{background:var(--gold-l);border:1px solid var(--gold-b);color:var(--gold);
+      font-family:'Montserrat',sans-serif;font-size:9px;font-weight:700;
+      letter-spacing:.09em;text-transform:uppercase;padding:3px 9px;border-radius:99px}
+
+    /* SHELL */
+    .shell{flex:1;display:flex;overflow:hidden}
+
+    /* SIDEBAR */
+    .sb{width:264px;flex-shrink:0;background:var(--panel);
+      border-right:1px solid rgba(203,178,107,.08);display:flex;flex-direction:column;padding:2rem 1.5rem}
+    .sb-ey{font-family:'Montserrat',sans-serif;font-size:.62rem;font-weight:700;
+      letter-spacing:.12em;text-transform:uppercase;color:var(--low);margin-bottom:1.75rem}
+    .sb-title{font-family:'Montserrat',sans-serif;font-size:.9rem;font-weight:800;
+      color:rgba(245,244,242,.4);margin-bottom:.35rem}
+    .sb-sub{font-size:.72rem;color:var(--low);margin-bottom:1.5rem}
+    .steps-preview{opacity:.25}
+    .sp-item{display:flex;align-items:center;gap:.625rem;padding:.5rem 0}
+    .sp-dot{width:20px;height:20px;border-radius:50%;border:1px solid rgba(245,244,242,.18);
+      display:flex;align-items:center;justify-content:center;
+      font-family:'Montserrat',sans-serif;font-size:9px;font-weight:800;
+      color:rgba(245,244,242,.25);flex-shrink:0}
+    .sp-name{font-family:'Montserrat',sans-serif;font-size:.72rem;font-weight:700;
+      color:rgba(245,244,242,.25);letter-spacing:.02em}
+    .sb-hint{margin-top:auto;padding:.875rem 1rem;background:rgba(203,178,107,.06);
+      border:1px solid rgba(203,178,107,.12);border-radius:var(--radius);
+      font-size:.72rem;color:rgba(203,178,107,.5);text-align:center;line-height:1.5}
+
+    /* MAIN */
+    .main{flex:1;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:2rem;
+      background:var(--panel)}
+    .welcome{max-width:800px;width:100%}
+    .w-header{text-align:center;margin-bottom:2.75rem}
+    .w-ey{font-family:'Montserrat',sans-serif;font-size:.65rem;font-weight:700;
+      letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-bottom:.5rem}
+    .w-title{font-family:'Montserrat',sans-serif;font-size:1.625rem;font-weight:800;
+      color:var(--hi);line-height:1.2;margin-bottom:.5rem}
+    .w-sub{font-size:.9rem;color:var(--mid)}
+
+    /* CARDS */
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:1.375rem}
+    .cc{background:var(--card);border:1px solid rgba(203,178,107,.10);
+      border-left:3px solid rgba(203,178,107,.22);border-radius:var(--radius);
+      padding:2rem 1.75rem;display:flex;flex-direction:column;
+      box-shadow:var(--sh);transition:all .2s;position:relative;overflow:hidden}
+    .cc.enabled{border-left-color:var(--gold);box-shadow:0 0 0 1px rgba(203,178,107,.12),var(--sh-md)}
+    .cc.disabled{opacity:.5;filter:saturate(0.5)}
+    .cs-badge{position:absolute;top:1.25rem;right:1.25rem;
+      background:rgba(245,244,242,.06);color:rgba(245,244,242,.35);
+      font-family:'Montserrat',sans-serif;font-size:.6rem;font-weight:700;
+      letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;
+      border-radius:99px;border:1px solid rgba(245,244,242,.08)}
+    .cc-icon{width:48px;height:48px;border-radius:10px;background:var(--gold-l);
+      border:1px solid var(--gold-b);display:flex;align-items:center;justify-content:center;
+      margin-bottom:1.25rem}
+    .cc-icon svg{width:22px;height:22px;stroke:var(--gold);fill:none;stroke-width:2;
+      stroke-linecap:round;stroke-linejoin:round}
+    .cc.enabled .cc-icon{background:rgba(203,178,107,.13)}
+    .cc-time{display:inline-flex;align-items:center;gap:.375rem;
+      font-family:'Montserrat',sans-serif;font-size:.63rem;font-weight:700;
+      letter-spacing:.08em;text-transform:uppercase;color:var(--low);margin-bottom:.875rem}
+    .cc-time svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2}
+    .cc-title{font-family:'Montserrat',sans-serif;font-size:1.25rem;font-weight:800;
+      color:var(--hi);margin-bottom:.5rem}
+    .cc-desc{font-size:.8rem;color:var(--mid);margin-bottom:1.5rem;line-height:1.55}
+    .cc-bullets{list-style:none;margin-bottom:1.75rem;display:flex;flex-direction:column;gap:.5rem}
+    .cc-bullets li{display:flex;align-items:flex-start;gap:.625rem;
+      font-size:.8rem;color:var(--mid)}
+    .cc-bullets li::before{content:'';width:6px;height:6px;border-radius:50%;
+      background:rgba(203,178,107,.3);margin-top:.46rem;flex-shrink:0}
+    .cc.enabled .cc-bullets li::before{background:var(--gold)}
+    .cc-cta{margin-top:auto}
+    .btn{display:flex;align-items:center;justify-content:center;gap:.5rem;
+      padding:.75rem 1.5rem;border-radius:var(--radius);width:100%;
+      font-family:'Montserrat',sans-serif;font-size:.8125rem;font-weight:700;
+      letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:all .15s;border:none}
+    .btn-gold{background:var(--gold-grad);color:var(--black)}
+    .btn-gold:hover{filter:brightness(1.08);transform:translateY(-1px);
+      box-shadow:0 4px 18px rgba(203,178,107,.30)}
+    .btn-dim{background:rgba(245,244,242,.05);color:rgba(245,244,242,.22);cursor:not-allowed}
+
+    @media(max-width:680px){
+      .grid{grid-template-columns:1fr}
+      .shell{flex-direction:column;overflow:auto}
+      .sb{width:100%;padding:1rem 1.5rem}
+      body{height:auto;overflow:auto}
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-l">
+    <div class="mono">HOF</div>
+    <div class="wm">House of <em>Finance</em></div>
+    <div class="sep"></div>
+    <div class="ctx">New Application</div>
+  </div>
+  <div class="nav-r">
+    <span class="ref">Broker: James Chen</span>
+    <span class="badge">Fact Find</span>
+  </div>
+</nav>
+
+<div class="shell">
+  <aside class="sb">
+    <div class="sb-ey">Application Steps</div>
+    <div class="sb-title">New Fact Find</div>
+    <div class="sb-sub">Select a mode below to begin</div>
+    <div class="steps-preview">
+      <div class="sp-item"><div class="sp-dot">1</div><div class="sp-name">Loan Strategy</div></div>
+      <div class="sp-item"><div class="sp-dot">2</div><div class="sp-name">Applicants</div></div>
+      <div class="sp-item"><div class="sp-dot">3</div><div class="sp-name">Employment</div></div>
+      <div class="sp-item"><div class="sp-dot">4</div><div class="sp-name">Assets &amp; Liabilities</div></div>
+      <div class="sp-item"><div class="sp-dot">5</div><div class="sp-name">Review &amp; Submit</div></div>
+    </div>
+    <div class="sb-hint">Steps will unlock once you select a mode below</div>
+  </aside>
+
+  <main class="main">
+    <div class="welcome">
+      <div class="w-header">
+        <div class="w-ey">House of Finance — Broker Portal</div>
+        <h1 class="w-title">New Client Fact Find</h1>
+        <p class="w-sub">Choose the level of detail required for this application</p>
+      </div>
+
+      <div class="grid">
+        <!-- Quick Fact Find — coming soon -->
+        <div class="cc disabled">
+          <div class="cs-badge">Coming Soon</div>
+          <div class="cc-icon">
+            <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8L21 10h-9l1-8z"/></svg>
+          </div>
+          <div class="cc-time">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+            ~15 minutes
+          </div>
+          <div class="cc-title">Quick Fact Find</div>
+          <div class="cc-desc">Capture the essential details needed for a preliminary assessment or pre-qualification enquiry.</div>
+          <ul class="cc-bullets">
+            <li>Core personal &amp; income details only</li>
+            <li>Ideal for pre-qualification enquiries</li>
+            <li>Complete remaining fields later</li>
+            <li>Fast-track to lender comparison</li>
+          </ul>
+          <div class="cc-cta">
+            <button class="btn btn-dim" disabled>Select Quick Fact Find</button>
+          </div>
+        </div>
+
+        <!-- Full Fact Find — active -->
+        <div class="cc enabled">
+          <div class="cc-icon">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>
+          </div>
+          <div class="cc-time">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+            ~45 minutes
+          </div>
+          <div class="cc-title">Full Fact Find</div>
+          <div class="cc-desc">Complete documentation for a full credit assessment. Submission-ready for all lenders via Mercury CRM.</div>
+          <ul class="cc-bullets">
+            <li>Complete applicant &amp; income documentation</li>
+            <li>Full assets, liabilities &amp; expenses</li>
+            <li>Serviceability &amp; compliance ready</li>
+            <li>Direct submission to Mercury CRM</li>
+          </ul>
+          <div class="cc-cta">
+            <button class="btn btn-gold">Begin Full Fact Find →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

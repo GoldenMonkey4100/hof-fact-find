@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HOF Fact Find — Employment (Multi-Select + Verifier)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --black:#12110D;--deep:#0e0d09;--panel:#1e1c16;--card:#252219;--card2:#2e2b22;
+      --gold:#CBB26B;--gold-grad:linear-gradient(135deg,#BFAE75,#DCCB8E);
+      --gold-b:rgba(203,178,107,.18);--gold-l:rgba(203,178,107,.08);
+      --gold-label:rgba(203,178,107,.80);
+      --hi:rgba(245,244,242,.92);--mid:rgba(245,244,242,.58);--low:rgba(245,244,242,.32);
+      --input-bg:rgba(12,11,8,.65);--input-border:rgba(203,178,107,.18);
+      --success:#16A34A;--success-bg:rgba(22,163,74,.12);
+      --warning:#D97706;--warning-bg:rgba(217,119,6,.12);
+      --radius:8px;--sh:0 2px 16px rgba(0,0,0,.35);--focus:0 0 0 3px rgba(203,178,107,.20);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Open Sans',sans-serif;background:var(--black);color:var(--hi);
+      font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;
+      height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+    .nav{height:60px;background:var(--deep);flex-shrink:0;display:flex;align-items:center;
+      justify-content:space-between;padding:0 1.75rem;border-bottom:1px solid rgba(203,178,107,.10)}
+    .nav-l{display:flex;align-items:center;gap:.625rem}
+    .mono{width:32px;height:32px;border:1.5px solid var(--gold);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;font-weight:800;font-size:11px;color:var(--gold)}
+    .wm{font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;color:var(--mid);letter-spacing:.07em;text-transform:uppercase}
+    .wm em{font-style:normal;color:var(--gold)}
+    .sep{width:1px;height:20px;background:rgba(203,178,107,.14);margin:0 .875rem}
+    .ctx{font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--low)}
+    .nav-r{display:flex;align-items:center;gap:.875rem}
+    .badge{background:var(--gold-l);border:1px solid var(--gold-b);color:var(--gold);font-family:'Montserrat',sans-serif;font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:3px 9px;border-radius:99px}
+
+    .shell{flex:1;display:flex;overflow:hidden}
+
+    .sb{width:264px;flex-shrink:0;background:var(--panel);border-right:1px solid rgba(203,178,107,.08);display:flex;flex-direction:column;overflow-y:auto}
+    .sb-inner{padding:1.75rem 1.5rem;flex:1}
+    .sb-ey{font-family:'Montserrat',sans-serif;font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--low);margin-bottom:1.375rem}
+    .step-item{position:relative;padding:0 0 0 2.5rem}
+    .step-item:not(:last-child)::after{content:'';position:absolute;left:11px;top:32px;width:1px;height:calc(100% - 4px);background:rgba(203,178,107,.12)}
+    .step-item.done:not(:last-child)::after{background:rgba(22,163,74,.3)}
+    .step-item.active:not(:last-child)::after{background:linear-gradient(to bottom,rgba(203,178,107,.4),rgba(203,178,107,.06))}
+    .step-dot{position:absolute;left:0;top:4px;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;font-size:9px;font-weight:800}
+    .step-item .step-dot{background:rgba(245,244,242,.05);color:var(--low);border:1px solid rgba(245,244,242,.08)}
+    .step-item.done .step-dot{background:rgba(22,163,74,.15);color:#4ade80;border:1px solid rgba(22,163,74,.25)}
+    .step-item.active .step-dot{background:var(--gold-grad);color:var(--black);border:none;box-shadow:0 0 0 3px rgba(203,178,107,.16)}
+    .step-content{padding:3px 0 1.375rem 0}
+    .step-name{font-family:'Montserrat',sans-serif;font-size:.8rem;font-weight:700;color:var(--low)}
+    .step-item.done .step-name{color:var(--mid)}
+    .step-item.active .step-name{color:var(--gold)}
+    .step-desc{font-size:.7rem;color:var(--low);margin-top:2px}
+    .step-item.active .step-desc{color:rgba(203,178,107,.45)}
+    .step-tag{display:inline-flex;align-items:center;margin-top:4px;font-family:'Montserrat',sans-serif;font-size:.6rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:99px}
+    .tag-done{background:rgba(22,163,74,.12);color:#4ade80}
+    .tag-active{background:rgba(203,178,107,.10);color:var(--gold)}
+    .sb-footer{padding:1rem 1.5rem;border-top:1px solid rgba(203,178,107,.08)}
+    .prog-lbl{display:flex;justify-content:space-between;margin-bottom:.35rem}
+    .prog-lbl span{font-family:'Montserrat',sans-serif;font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--low)}
+    .prog-lbl em{font-style:normal;color:var(--gold);font-family:'Montserrat',sans-serif;font-size:.62rem;font-weight:700}
+    .prog-track{height:3px;background:rgba(245,244,242,.05);border-radius:99px;overflow:hidden}
+    .prog-fill{height:100%;background:var(--gold-grad);border-radius:99px}
+
+    .main{flex:1;overflow-y:auto;background:var(--panel)}
+    .main-inner{max-width:800px;margin:0 auto;padding:2rem 2rem 5rem}
+    .page-ey{font-family:'Montserrat',sans-serif;font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:.3rem}
+    .page-title{font-family:'Montserrat',sans-serif;font-size:1.375rem;font-weight:800;color:var(--hi);margin-bottom:.35rem}
+    .page-desc{font-size:.875rem;color:var(--mid);margin-bottom:1.5rem}
+
+    .warn-banner{display:flex;align-items:flex-start;gap:.75rem;padding:.75rem 1rem;background:rgba(217,119,6,.10);border:1px solid rgba(217,119,6,.22);border-radius:var(--radius);margin-bottom:1.5rem}
+    .warn-icon svg{width:15px;height:15px;stroke:#fbbf24;fill:none;stroke-width:2;stroke-linecap:round;margin-top:1px}
+    .warn-text{font-size:.8rem;color:rgba(251,191,36,.8)}
+
+    .app-tabs{display:flex;gap:.5rem;margin-bottom:1.5rem}
+    .atab{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem 1rem .5rem .625rem;border-radius:var(--radius);border:1.5px solid rgba(203,178,107,.15);background:transparent;font-family:'Montserrat',sans-serif;font-size:.78rem;font-weight:700;color:var(--mid);cursor:pointer;transition:all .15s;letter-spacing:.02em}
+    .atab:hover{border-color:var(--gold-b);color:var(--hi)}
+    .atab.active{background:rgba(203,178,107,.10);border-color:var(--gold-b);color:var(--gold)}
+    .av{width:24px;height:24px;border-radius:50%;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--gold-grad);color:var(--black)}
+    .atab.active .av{background:rgba(203,178,107,.2);color:var(--gold)}
+
+    /* SUB-TABS */
+    .sub-tabs{display:flex;gap:0;border-bottom:1px solid rgba(203,178,107,.10);margin-bottom:1.5rem}
+    .sub-tab{padding:.625rem 1.25rem;font-family:'Montserrat',sans-serif;font-size:.75rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--low);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+    .sub-tab:hover{color:var(--mid)}
+    .sub-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+
+    /* CARD */
+    .card{background:var(--card);border:1px solid rgba(203,178,107,.12);border-left:3px solid var(--gold);border-radius:var(--radius);box-shadow:var(--sh);margin-bottom:1rem;overflow:hidden}
+    .card-header{display:flex;align-items:center;justify-content:space-between;padding:.875rem 1.375rem;border-bottom:1px solid rgba(203,178,107,.08)}
+    .card-hl{display:flex;align-items:center;gap:.75rem}
+    .card-icon{width:30px;height:30px;border-radius:6px;background:var(--gold-l);border:1px solid var(--gold-b);display:flex;align-items:center;justify-content:center}
+    .card-icon svg{width:13px;height:13px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round}
+    .card-title{font-family:'Montserrat',sans-serif;font-size:.8rem;font-weight:700;color:var(--hi);text-transform:uppercase;letter-spacing:.05em}
+    .card-sub{font-size:.7rem;color:var(--low);margin-top:1px}
+    .card-body{padding:1.25rem 1.375rem}
+
+    /* SEC LABEL */
+    .sec-lbl{font-family:'Montserrat',sans-serif;font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-label);margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem}
+    .sec-lbl::after{content:'';flex:1;height:1px;background:rgba(203,178,107,.14)}
+
+    /* MULTI-SELECT PILLS */
+    .pill-group{display:flex;flex-wrap:wrap;gap:.5rem}
+    .pill{display:inline-flex;align-items:center;padding:.4rem .9rem;border-radius:99px;border:1.5px solid rgba(203,178,107,.18);background:transparent;font-family:'Montserrat',sans-serif;font-size:.73rem;font-weight:700;letter-spacing:.02em;color:var(--mid);cursor:pointer;transition:all .15s;user-select:none}
+    .pill:hover{border-color:var(--gold-b);color:var(--hi)}
+    .pill.active{background:var(--gold-grad);color:var(--black);border-color:transparent;box-shadow:0 2px 8px rgba(203,178,107,.22)}
+    .multi-hint{font-family:'Montserrat',sans-serif;font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(203,178,107,.45);margin-top:.5rem}
+
+    /* CONDITIONAL FIELDS */
+    .conditional{background:rgba(203,178,107,.04);border:1px solid rgba(203,178,107,.10);border-radius:var(--radius);padding:1rem 1.125rem;margin-top:.875rem}
+    .conditional-lbl{font-family:'Montserrat',sans-serif;font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(203,178,107,.5);margin-bottom:.75rem}
+
+    /* FORM */
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.875rem}
+    .span-2{grid-column:span 2}
+    .form-group{display:flex;flex-direction:column}
+    label{font-family:'Montserrat',sans-serif;font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--gold-label);margin-bottom:.3rem}
+    input,select{padding:.55rem .875rem;border:1.5px solid var(--input-border);border-radius:7px;font-family:'Open Sans',sans-serif;font-size:.875rem;color:var(--hi);background:var(--input-bg);outline:none;transition:border-color .15s,box-shadow .15s;width:100%}
+    input:focus,select:focus{border-color:var(--gold);box-shadow:var(--focus)}
+    input::placeholder{color:rgba(245,244,242,.18)}
+    select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23CBB26B' d='M5 7L0 2h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .875rem center;padding-right:2.25rem}
+    select option{background:#1e1c16;color:rgba(245,244,242,.9)}
+
+    .abn-row{display:flex;gap:.625rem;align-items:flex-end}
+    .abn-row .form-group{flex:1}
+    .btn-abn{padding:.55rem 1rem;border-radius:7px;border:1.5px solid var(--gold-b);background:transparent;font-family:'Montserrat',sans-serif;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gold);cursor:pointer;transition:all .15s;white-space:nowrap}
+    .btn-abn:hover{background:var(--gold-l)}
+
+    /* QUICK ACTIONS */
+    .quick-actions{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.125rem}
+    .qa-tile{border:1.5px solid rgba(203,178,107,.15);border-radius:var(--radius);padding:1rem;cursor:pointer;transition:all .15s;background:rgba(255,255,255,.02)}
+    .qa-tile:hover{border-color:var(--gold-b);background:var(--gold-l)}
+    .qa-tile.expanded{border-color:var(--gold);background:rgba(203,178,107,.06)}
+    .qa-tile-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem}
+    .qa-icon{width:28px;height:28px;border-radius:6px;background:var(--gold-l);border:1px solid var(--gold-b);display:flex;align-items:center;justify-content:center}
+    .qa-icon svg{width:13px;height:13px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round}
+    .qa-title{font-family:'Montserrat',sans-serif;font-size:.78rem;font-weight:700;color:var(--hi);margin:.375rem 0 .2rem}
+    .qa-sub{font-size:.72rem;color:var(--low)}
+    .qa-badge{font-family:'Montserrat',sans-serif;font-size:.6rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:99px}
+    .qb-uploaded{background:rgba(22,163,74,.12);color:#4ade80}
+    .qb-consistent{background:rgba(203,178,107,.12);color:var(--gold)}
+
+    /* INCOME VERIFIER PANEL (inline on tab 1) */
+    .verifier-panel{background:rgba(12,11,8,.5);border:1px solid rgba(203,178,107,.15);border-radius:var(--radius);padding:1.125rem 1.25rem;animation:fadeIn .2s ease}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+    .verifier-title{font-family:'Montserrat',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem}
+    .verifier-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .v-method{background:rgba(255,255,255,.02);border:1px solid rgba(203,178,107,.10);border-radius:7px;padding:.875rem 1rem}
+    .v-method-lbl{font-family:'Montserrat',sans-serif;font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--low);margin-bottom:.625rem}
+    .v-field{display:flex;flex-direction:column;margin-bottom:.5rem}
+    .v-field label{font-family:'Montserrat',sans-serif;font-size:.65rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--gold-label);margin-bottom:.25rem}
+    .v-field input{padding:.45rem .75rem;font-size:.875rem}
+    .v-result{display:flex;justify-content:space-between;align-items:center;padding:.5rem .75rem;background:rgba(203,178,107,.08);border-radius:6px;margin-top:.5rem}
+    .v-result-lbl{font-family:'Montserrat',sans-serif;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--low)}
+    .v-result-val{font-family:'Montserrat',sans-serif;font-size:.9rem;font-weight:800;color:var(--gold)}
+    .verifier-variance{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.18);border-radius:var(--radius);margin-top:.875rem}
+    .var-lbl{font-family:'Montserrat',sans-serif;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(74,222,128,.7)}
+    .var-badge{font-family:'Montserrat',sans-serif;font-size:.65rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 10px;border-radius:99px;background:rgba(22,163,74,.15);color:#4ade80;border:1px solid rgba(22,163,74,.2)}
+
+    /* INCOME */
+    .freq-group{display:flex;gap:.375rem;margin-bottom:.875rem}
+    .freq-pill{padding:.35rem .8rem;border-radius:99px;border:1.5px solid rgba(203,178,107,.18);background:transparent;font-family:'Montserrat',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.02em;color:var(--mid);cursor:pointer;transition:all .15s}
+    .freq-pill.active{background:var(--gold-grad);color:var(--black);border-color:transparent}
+
+    /* HECS toggle */
+    .toggle-row{display:flex;gap:.5rem;align-items:center}
+    .toggle-btn{padding:.45rem .9rem;border-radius:99px;border:1.5px solid rgba(203,178,107,.18);background:transparent;font-family:'Montserrat',sans-serif;font-size:.73rem;font-weight:700;color:var(--mid);cursor:pointer;transition:all .15s}
+    .toggle-btn.active{background:var(--gold-grad);color:var(--black);border-color:transparent}
+
+    /* BUTTONS */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;padding:.625rem 1.25rem;border-radius:var(--radius);font-family:'Montserrat',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;border:2px solid transparent;transition:all .15s;white-space:nowrap}
+    .btn-primary{background:var(--gold-grad);color:var(--black);border:none}
+    .btn-primary:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 4px 18px rgba(203,178,107,.28)}
+    .btn-outline{background:transparent;color:var(--mid);border-color:rgba(203,178,107,.20)}
+    .btn-outline:hover{border-color:var(--gold-b);color:var(--gold);background:var(--gold-l)}
+    .btn-ghost{background:transparent;color:var(--low);border-color:transparent;font-family:'Montserrat',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.375rem .75rem;cursor:pointer;transition:all .15s;border-radius:var(--radius)}
+    .btn-ghost:hover{background:rgba(245,244,242,.05);color:var(--mid)}
+    .action-footer{display:flex;justify-content:space-between;align-items:center;padding:1.125rem 1.375rem;background:rgba(12,11,8,.4);border:1px solid rgba(203,178,107,.10);border-left:3px solid transparent;border-radius:var(--radius);margin-top:1.5rem}
+    .footer-r{display:flex;gap:.75rem;align-items:center}
+
+    @media(max-width:640px){
+      .form-grid,.verifier-grid,.quick-actions{grid-template-columns:1fr}
+      .span-2{grid-column:span 1}
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-l">
+    <div class="mono">HOF</div>
+    <div class="wm">House of <em>Finance</em></div>
+    <div class="sep"></div>
+    <div class="ctx">Fact Find</div>
+  </div>
+  <div class="nav-r">
+    <span style="font-size:11px;color:var(--low)">James Chen &nbsp;·&nbsp; REF #FF-2024-0892</span>
+    <span class="badge">Employment</span>
+  </div>
+</nav>
+
+<div class="shell">
+  <aside class="sb">
+    <div class="sb-inner">
+      <div class="sb-ey">Application Steps</div>
+      <ul style="list-style:none">
+        <li class="step-item done"><div class="step-dot">✓</div><div class="step-content"><div class="step-name">Loan Strategy</div><div class="step-desc">Purchase · $875k · ANZ &amp; NAB</div><div class="step-tag tag-done">Complete</div></div></li>
+        <li class="step-item done"><div class="step-dot">✓</div><div class="step-content"><div class="step-name">Applicants</div><div class="step-desc">2 applicants added</div><div class="step-tag tag-done">Complete</div></div></li>
+        <li class="step-item active"><div class="step-dot">3</div><div class="step-content"><div class="step-name">Employment</div><div class="step-desc">Income &amp; employer details</div><div class="step-tag tag-active">In Progress</div></div></li>
+        <li class="step-item"><div class="step-dot">4</div><div class="step-content"><div class="step-name">Assets &amp; Liabilities</div><div class="step-desc">Financial position</div></div></li>
+        <li class="step-item"><div class="step-dot">5</div><div class="step-content"><div class="step-name">Review &amp; Submit</div></div></li>
+      </ul>
+    </div>
+    <div class="sb-footer">
+      <div class="prog-lbl"><span>Progress</span><em>55%</em></div>
+      <div class="prog-track"><div class="prog-fill" style="width:55%"></div></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-inner">
+      <div class="page-ey">Step 3 of 5</div>
+      <h1 class="page-title">Employment</h1>
+      <p class="page-desc">Income, employment details and verification for each applicant.</p>
+
+      <div class="warn-banner">
+        <div class="warn-icon"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+        <div class="warn-text">Employment history must cover the past 3 years. Add previous employment if current tenure is under 3 years.</div>
+      </div>
+
+      <!-- Applicant tabs -->
+      <div class="app-tabs">
+        <button class="atab active"><div class="av">JD</div>Applicant 1 — John Davis</button>
+        <button class="atab"><div class="av" style="background:linear-gradient(135deg,#4b4844,#2a2820);color:rgba(245,244,242,.5)">SC</div>Applicant 2 — Sarah Chen</button>
+      </div>
+
+      <!-- Sub-tabs: Employment & Income | Employment History -->
+      <div class="sub-tabs">
+        <div class="sub-tab active" id="tabEmp" onclick="switchTab('emp')">Employment &amp; Income</div>
+        <div class="sub-tab" id="tabHist" onclick="switchTab('hist')">Employment History</div>
+      </div>
+
+      <!-- TAB 1: Employment & Income -->
+      <div id="panelEmp">
+
+        <!-- Employment Type — MULTI-SELECT -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-hl">
+              <div class="card-icon"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
+              <div><div class="card-title">Employment Type</div><div class="card-sub">Select all that apply — multiple selections supported</div></div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="pill-group" id="empTypePills">
+              <div class="pill active" onclick="toggleEmpType(this,'payg-ft')">PAYG Full-Time</div>
+              <div class="pill" onclick="toggleEmpType(this,'payg-pt')">PAYG Part-Time</div>
+              <div class="pill" onclick="toggleEmpType(this,'casual')">Casual</div>
+              <div class="pill active" onclick="toggleEmpType(this,'se-sole')">Self-Employed (Sole Trader)</div>
+              <div class="pill" onclick="toggleEmpType(this,'se-co')">Self-Employed (Company)</div>
+              <div class="pill" onclick="toggleEmpType(this,'contract')">Contract</div>
+              <div class="pill" onclick="toggleEmpType(this,'unemployed')">Unemployed</div>
+              <div class="pill" onclick="toggleEmpType(this,'retired')">Retired</div>
+            </div>
+            <div class="multi-hint">Multi-select · 2 selected</div>
+
+            <!-- Conditional: self-employed fields shown because SE is selected -->
+            <div class="conditional" id="seFields">
+              <div class="conditional-lbl">Self-Employment Details</div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Entity Type</label>
+                  <select><option selected>Sole Trader</option><option>Company (Pty Ltd)</option><option>Partnership</option><option>Trust</option></select>
+                </div>
+                <div class="abn-row">
+                  <div class="form-group">
+                    <label>ABN</label>
+                    <input type="text" value="83 412 567 890">
+                  </div>
+                  <button class="btn-abn">Verify</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Employer Details -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-hl">
+              <div class="card-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+              <div><div class="card-title">Employer Details</div><div class="card-sub">Current employer information</div></div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Employer / Business Name</label>
+                <input type="text" value="Accenture Australia">
+              </div>
+              <div class="form-group">
+                <label>Job Title / Role</label>
+                <input type="text" value="Senior Consultant">
+              </div>
+              <div class="form-group">
+                <label>Employment Start Date</label>
+                <input type="date" value="2019-04-15">
+              </div>
+              <div class="form-group">
+                <label>Tenure</label>
+                <input type="text" value="5 years 1 month" readonly style="color:var(--mid)">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Income Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-hl">
+              <div class="card-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+              <div><div class="card-title">Income</div><div class="card-sub">Salary, bonuses and deductions</div></div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="sec-lbl">Pay Frequency</div>
+            <div class="freq-group">
+              <div class="freq-pill" onclick="toggleFreq(this)">Weekly</div>
+              <div class="freq-pill" onclick="toggleFreq(this)">Fortnightly</div>
+              <div class="freq-pill active" onclick="toggleFreq(this)">Monthly</div>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Base Income (Annual)</label>
+                <input type="text" value="$145,000">
+              </div>
+              <div class="form-group">
+                <label>Bonus Income (Annual)</label>
+                <input type="text" value="$18,000" placeholder="$0">
+              </div>
+              <div class="form-group">
+                <label>Commissions (Annual)</label>
+                <input type="text" placeholder="$0">
+              </div>
+              <div class="form-group">
+                <label>HECS / HELP Debt</label>
+                <div class="toggle-row" style="margin-top:.35rem">
+                  <button class="toggle-btn" onclick="toggleHecs(this,'yes')">Yes</button>
+                  <button class="toggle-btn active" onclick="toggleHecs(this,'no')">No</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Actions: Payslip + Income Verifier (BOTH on Tab 1) -->
+        <div class="sec-lbl" style="margin-top:1.25rem">Income Verification</div>
+        <div class="quick-actions">
+          <div class="qa-tile">
+            <div class="qa-tile-top">
+              <div class="qa-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></div>
+              <span class="qa-badge qb-uploaded">Uploaded</span>
+            </div>
+            <div class="qa-title">Payslip Upload</div>
+            <div class="qa-sub">May 2024 payslip attached</div>
+          </div>
+          <div class="qa-tile expanded" id="verifierTile" onclick="toggleVerifier()">
+            <div class="qa-tile-top">
+              <div class="qa-icon"><svg viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg></div>
+              <span class="qa-badge qb-consistent">Consistent</span>
+            </div>
+            <div class="qa-title">Income Verifier</div>
+            <div class="qa-sub">Base: $145k · Variance: +2.1%</div>
+          </div>
+        </div>
+
+        <!-- INCOME VERIFIER — inline on Tab 1 -->
+        <div class="verifier-panel" id="verifierPanel">
+          <div class="verifier-title">Income Verification — John Davis</div>
+          <div class="verifier-grid">
+            <div class="v-method">
+              <div class="v-method-lbl">Method 1 — Base Income</div>
+              <div class="v-field"><label>Hourly Rate</label><input type="text" placeholder="$0.00"></div>
+              <div class="v-field"><label>Hours per week</label><input type="text" value="38"></div>
+              <div class="v-result"><span class="v-result-lbl">Annualised</span><span class="v-result-val">$145,000</span></div>
+            </div>
+            <div class="v-method">
+              <div class="v-method-lbl">Method 2 — YTD Annualisation</div>
+              <div class="v-field"><label>YTD Income</label><input type="text" value="$59,740"></div>
+              <div class="v-field"><label>Pay periods to date</label><input type="text" value="5"></div>
+              <div class="v-result"><span class="v-result-lbl">Annualised</span><span class="v-result-val">$148,100</span></div>
+            </div>
+          </div>
+          <div class="verifier-variance">
+            <span class="var-lbl">Variance: YTD is +2.1% higher than base</span>
+            <span class="var-badge">Consistent</span>
+          </div>
+        </div>
+
+      </div><!-- /panelEmp -->
+
+      <!-- TAB 2: Employment History (hidden by default) -->
+      <div id="panelHist" style="display:none">
+        <div style="padding:2rem;text-align:center;color:var(--low)">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="display:block;margin:0 auto .875rem;opacity:.4"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+          <div style="font-family:'Montserrat',sans-serif;font-size:.8rem;font-weight:700;color:var(--mid);margin-bottom:.375rem">Employment History</div>
+          <div style="font-size:.8rem;color:var(--low)">Current tenure: 5 years 1 month — 3-year requirement met. No prior employment needed.</div>
+        </div>
+      </div>
+
+      <div class="action-footer">
+        <button class="btn btn-outline">← Applicants</button>
+        <div class="footer-r">
+          <button class="btn-ghost">Save Draft</button>
+          <button class="btn btn-primary">Next: Assets &amp; Liabilities →</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  function switchTab(t) {
+    document.getElementById('panelEmp').style.display = t === 'emp' ? 'block' : 'none';
+    document.getElementById('panelHist').style.display = t === 'hist' ? 'block' : 'none';
+    document.getElementById('tabEmp').classList.toggle('active', t === 'emp');
+    document.getElementById('tabHist').classList.toggle('active', t === 'hist');
+  }
+  function toggleEmpType(el, type) {
+    el.classList.toggle('active');
+    const seTypes = ['se-sole','se-co'];
+    const pills = document.querySelectorAll('#empTypePills .pill');
+    let anySeActive = false;
+    pills.forEach(p => {
+      if (p.dataset.type && seTypes.includes(p.dataset.type) && p.classList.contains('active')) anySeActive = true;
+    });
+    // crude check: if the se-sole or se-co pill is active
+    const sePills = [...document.querySelectorAll('#empTypePills .pill')];
+    const seActive = sePills.some((p, i) => [3,4].includes(i) && p.classList.contains('active'));
+    document.getElementById('seFields').style.display = seActive ? 'block' : 'none';
+    // count badge
+    const count = sePills.filter(p => p.classList.contains('active')).length;
+    document.querySelector('.multi-hint').textContent = `Multi-select · ${count} selected`;
+  }
+  // Set data-type for detection
+  document.querySelectorAll('#empTypePills .pill').forEach((p, i) => {
+    const types = ['payg-ft','payg-pt','casual','se-sole','se-co','contract','unemployed','retired'];
+    p.dataset.type = types[i];
+  });
+  function toggleFreq(el) {
+    document.querySelectorAll('.freq-pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+  }
+  function toggleHecs(el, val) {
+    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
+  function toggleVerifier() {
+    const panel = document.getElementById('verifierPanel');
+    const tile = document.getElementById('verifierTile');
+    const show = panel.style.display === 'none';
+    panel.style.display = show ? 'block' : 'none';
+    tile.classList.toggle('expanded', show);
+  }
+</script>
+
+</body>
+</html>

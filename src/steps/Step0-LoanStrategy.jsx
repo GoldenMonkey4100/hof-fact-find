@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import './styles.css';
+import '../styles.css';
 
 const subStepVariants = {
   enter:  (dir) => ({ opacity: 0, x: dir * 24 }),
   center: { opacity: 1, x: 0 },
   exit:   (dir) => ({ opacity: 0, x: dir * -16 }),
 };
-import { getBrokerEmail, formatCurrency, parseCurrency, calculateLVR, calculatePropertyValue, calculateLoanAmount, formatCurrencyDisplay } from './utils';
-import AddressAutocomplete from './AddressAutocomplete';
-import SmartCard from './SmartCard';
+import { getBrokerEmail, formatCurrency, parseCurrency, calculateLVR, calculatePropertyValue, calculateLoanAmount, formatCurrencyDisplay } from '../lib/utils';
+import AddressAutocomplete from '../components/AddressAutocomplete';
+import SmartCard from '../components/SmartCard';
 
 const LEAD_SOURCES = [
   'Arrow Lawyers','Aus Realty','Barrak Accountants','Blaze Real Estate','Bright Realty',

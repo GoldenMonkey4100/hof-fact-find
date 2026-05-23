@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import './styles.css';
+import '../styles.css';
 
 const subStepVariants = {
   enter:  (dir) => ({ opacity: 0, x: dir * 24 }),
   center: { opacity: 1, x: 0 },
   exit:   (dir) => ({ opacity: 0, x: dir * -16 }),
 };
-import { formatCurrencyDisplay, parseCurrency } from './utils';
-import SmartCard from './SmartCard';
+import { formatCurrencyDisplay, parseCurrency } from '../lib/utils';
+import SmartCard from '../components/SmartCard';
 
 // ── Income calculation helpers ────────────────────────────────────────────────
 
@@ -305,6 +305,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
   const [payslipState,    setPayslipState]    = useState({});
   const [verifierExpanded, setVerifierExpanded] = useState({});
   const [abnLookup,        setAbnLookup]        = useState({});
+  const [activeApplicantIdx, setActiveApplicantIdx] = useState(0);
 
   // Sub-step tracking per applicant id (1 = Current Employment, 2 = Income & History)
   const [employmentStep, setEmploymentStep] = useState({});
@@ -327,12 +328,15 @@ const Step2Employment = ({ formData, updateFormData }) => {
         : `${applicant.firstName || ''} ${applicant.lastName || ''}`.trim() || `${applicant.role} ${applicant.number}`;
 
       const existing = (formData.employment || []).find(r => r.applicantId === applicant.id);
-      if (existing) return { ...existing, applicantName };
+      if (existing) {
+        const et = existing.currentEmployment?.employmentType;
+        return { ...existing, applicantName, currentEmployment: { ...existing.currentEmployment, employmentType: Array.isArray(et) ? et : et ? [et] : [] } };
+      }
       return {
         applicantId: applicant.id,
         applicantName,
         currentEmployment: {
-          employmentType: applicant.type === 'Company Borrower' ? 'Self-Employed' : '',
+          employmentType: applicant.type === 'Company Borrower' ? ['Self-Employed (Company)'] : [],
           employer: '', role: '', startDate: '', abn: '',
           entityType: '', receivingCentrelink: false, incomeVerification: null,
           payFrequency: '', baseIncome: '', bonusIncome: '', commissions: '', hecs: ''
@@ -355,9 +359,10 @@ const Step2Employment = ({ formData, updateFormData }) => {
 
   const calculateTotalYears = (record) => {
     let total = 0;
+    const _etArr = Array.isArray(record.currentEmployment.employmentType) ? record.currentEmployment.employmentType : record.currentEmployment.employmentType ? [record.currentEmployment.employmentType] : [];
     if (record.currentEmployment.startDate &&
-        record.currentEmployment.employmentType !== 'Unemployed' &&
-        record.currentEmployment.employmentType !== 'Retired') {
+        !_etArr.includes('Unemployed') &&
+        !_etArr.includes('Retired')) {
       total += calculateTenure(record.currentEmployment.startDate);
     }
     record.previousEmployments.forEach(emp => {
@@ -741,14 +746,37 @@ const Step2Employment = ({ formData, updateFormData }) => {
         </div>
       </div>
 
+      {/* Applicant tabs — only shown when 2+ applicants */}
+      {employmentRecords.length > 1 && (
+        <div className="applicant-tabs">
+          {employmentRecords.map((rec, i) => {
+            const parts = rec.applicantName.split(' ');
+            const label = parts.length >= 2
+              ? `${parts[0]} ${parts[parts.length - 1][0]}.`
+              : rec.applicantName || `Applicant ${i + 1}`;
+            return (
+              <button
+                key={rec.applicantId}
+                type="button"
+                className={`applicant-tab${activeApplicantIdx === i ? ' applicant-tab--active' : ''}`}
+                onClick={() => setActiveApplicantIdx(i)}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {employmentRecords.map((record, index) => {
+        if (employmentRecords.length > 1 && index !== Math.min(activeApplicantIdx, employmentRecords.length - 1)) return null;
         const appType           = getApplicantType(record.applicantId);
         const isCompanyBorrower = appType === 'Company Borrower';
         const empStep           = getEmpStep(record.applicantId);
 
         const empSummary = [
           isCompanyBorrower ? 'Company Borrower' : record.currentEmployment.employer,
-          isCompanyBorrower ? null : record.currentEmployment.employmentType,
+          isCompanyBorrower ? null : (() => { const et = record.currentEmployment.employmentType; return Array.isArray(et) ? (et.length ? et.join(' / ') : null) : et || null; })(),
           record.totalYears > 0 ? `${record.totalYears.toFixed(1)} yrs` : null,
         ].filter(Boolean).join(' · ') || null;
         const empStatus = record.meetsRequirement ? 'done' : record.totalYears > 0 ? 'partial' : 'empty';
@@ -778,7 +806,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
             title={record.applicantName}
             summary={empSummary}
             status={empStatus}
-            defaultOpen={record.totalYears === 0}
+            defaultOpen={employmentRecords.length > 1 || record.totalYears === 0}
           >
 
             {/* ── Company Borrower ── */}
@@ -847,40 +875,28 @@ const Step2Employment = ({ formData, updateFormData }) => {
                 {empStep === 1 && (
                   <div>
                     <div className="mb-4">
-                      <label>Employment Type</label>
-                      <div className="pill-group">
-                        {['Full-Time', 'Part-Time', 'Casual', 'Self-Employed', 'Contract', 'Unemployed', 'Retired'].map(t => (
-                          <button key={t} type="button"
-                            className={`pill-btn${record.currentEmployment.employmentType === t ? ' pill-btn--active' : ''}`}
-                            onClick={() => updateCurrentEmployment(index, 'employmentType', record.currentEmployment.employmentType === t ? '' : t)}>
-                            {t}
-                          </button>
-                        ))}
+                      <label>Employment Type <span style={{ fontSize: '11px', fontWeight: '400', color: 'var(--text-tertiary)' }}>Select all that apply</span></label>
+                      <div className="pill-group emp-type-pills">
+                        {[
+                          'PAYG Full-Time', 'PAYG Part-Time', 'PAYG Casual', 'PAYG Contract',
+                          'Self-Employed (Sole Trader)', 'Self-Employed (Company)',
+                          'Rental Income', 'Other'
+                        ].map(t => {
+                          const etArr = Array.isArray(record.currentEmployment.employmentType) ? record.currentEmployment.employmentType : [];
+                          const isActive = etArr.includes(t);
+                          return (
+                            <button key={t} type="button"
+                              className={`pill-btn emp-type-pill${isActive ? ' pill-btn--active' : ''}`}
+                              onClick={() => {
+                                const next = isActive ? etArr.filter(x => x !== t) : [...etArr, t];
+                                updateCurrentEmployment(index, 'employmentType', next);
+                              }}>
+                              {t}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
-
-                    {record.currentEmployment.employmentType === 'Self-Employed' && (
-                      <div className="mb-4">
-                        <label>Entity Type</label>
-                        <select value={record.currentEmployment.entityType || ''} onChange={(e) => updateCurrentEmployment(index, 'entityType', e.target.value)}>
-                          <option value="">Select Entity Type...</option>
-                          <option value="Sole Trader">Sole Trader</option>
-                          <option value="Partnership">Partnership</option>
-                          <option value="Company">Company</option>
-                          <option value="Trust">Trust</option>
-                        </select>
-                      </div>
-                    )}
-
-                    {record.currentEmployment.employmentType === 'Unemployed' && (
-                      <div className="mb-4" style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '6px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', margin: 0 }}>
-                          <input type="checkbox" checked={record.currentEmployment.receivingCentrelink || false}
-                            onChange={(e) => updateCurrentEmployment(index, 'receivingCentrelink', e.target.checked)} style={{ marginRight: '8px' }} />
-                          <span>Receiving Government Benefits (Centrelink)</span>
-                        </label>
-                      </div>
-                    )}
 
                     <div className="grid grid-cols-2 mb-4">
                       <div>

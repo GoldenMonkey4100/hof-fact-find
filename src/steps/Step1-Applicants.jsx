@@ -1,14 +1,14 @@
 ﻿import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import './styles.css';
+import '../styles.css';
 
 const subStepVariants = {
   enter:  (dir) => ({ opacity: 0, x: dir * 24 }),
   center: { opacity: 1, x: 0 },
   exit:   (dir) => ({ opacity: 0, x: dir * -16 }),
 };
-import AddressAutocomplete from './AddressAutocomplete';
-import SmartCard from './SmartCard';
+import AddressAutocomplete from '../components/AddressAutocomplete';
+import SmartCard from '../components/SmartCard';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

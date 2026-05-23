@@ -1,28 +1,24 @@
 /**
  * HOF Fact Find — Unified Submission Endpoint
  *
- * POST /api/submit   { action: 'check', formData }
- *   → { exists, matches, applicantName }
+ * POST /api/submit   { action: 'quick-submit', formData }
+ *   → { success, mercuryUrl, title }
  *
  * POST /api/submit   { action: 'submit', formData }
- *   → { success, mercuryUrl, notionUrl, title }
+ *   → { success, mercuryUrl, title }
  *
  * Orchestration order (submit):
  *   1. Generate doc password + HMAC proxy URLs
  *   2. Create Mercury contacts (one per non-company applicant)
  *   3. Create Mercury opportunity (with relatedParties + full notePadText)
  *   4. Push assets + liabilities to Mercury opportunity
- *   5. Create Notion backup page (non-critical)
+ *   5. Send email + PDF to chris@ and rita@ (non-critical)
  *   6. Post Teams Adaptive Card (non-critical)
  */
 
-import { createHmac } from 'crypto';
-
-// ── Notion constants ──────────────────────────────────────────────────────────
-const NOTION_VERSION = '2022-06-28';
-const PIPELINE_DB_ID = '264d5849ccf68068b10ffe2b2d18125f';
-const BROKERS_DB_ID  = '87ea47cb17de4ca9856fbccd2c4f360a';
-const RITA_USER_ID   = '263d872b-594c-81bf-8c33-00024f1c5613';
+import { createHmac }    from 'crypto';
+import nodemailer         from 'nodemailer';
+import PDFDocument        from 'pdfkit';
 
 const VALID_TX_TYPES = new Set(['Refinance', 'Cashout', 'Purchase', 'Top up', 'Construction']);
 
@@ -246,7 +242,8 @@ const buildNotePadText = (formData, docPassword, docProxies) => {
       lines.push('');
       const ce   = emp.currentEmployment || {};
       const name = emp.applicantName || `Applicant ${i + 1}`;
-      lines.push(`${name} — ${ce.employmentType || 'Employment'}`);
+      const etLabel = Array.isArray(ce.employmentType) ? ce.employmentType.join(' / ') : (ce.employmentType || 'Employment');
+      lines.push(`${name} — ${etLabel}`);
       [
         p('Employer', ce.employer),
         p('Title',    ce.role),
@@ -312,7 +309,7 @@ const buildNotePadText = (formData, docPassword, docProxies) => {
 };
 
 // ── Teams Adaptive Card ───────────────────────────────────────────────────────
-const postTeamsCard = async (formData, mercuryUrl, notionUrl, docPassword) => {
+const postTeamsCard = async (formData, mercuryUrl, docPassword) => {
   const webhookUrl = process.env.TEAMS_WEBHOOK_URL;
   if (!webhookUrl) { console.warn('[teams] TEAMS_WEBHOOK_URL not set — skipping'); return; }
 
@@ -375,7 +372,6 @@ const postTeamsCard = async (formData, mercuryUrl, notionUrl, docPassword) => {
             type: 'ActionSet',
             actions: [
               { type: 'Action.OpenUrl', title: 'Open in Mercury', url: mercuryUrl },
-              ...(notionUrl ? [{ type: 'Action.OpenUrl', title: 'Notion Backup', url: notionUrl }] : []),
             ],
           },
         ],
@@ -391,387 +387,70 @@ const postTeamsCard = async (formData, mercuryUrl, notionUrl, docPassword) => {
   if (!res.ok) console.error('[teams] webhook error:', res.status, await res.text().catch(() => ''));
 };
 
-// ── Notion REST helper ────────────────────────────────────────────────────────
-const notionFetch = async (path, method, body, apiKey) => {
-  const res = await fetch(`https://api.notion.com/v1${path}`, {
-    method,
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Notion-Version': NOTION_VERSION,
-      'Content-Type': 'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || `Notion API ${res.status}: ${JSON.stringify(data)}`);
-  return data;
-};
+// ── Email + PDF helpers ───────────────────────────────────────────────────────
+const generateLoanSummaryPDF = (formData, mercuryUrl) =>
+  new Promise((resolve, reject) => {
+    const doc    = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
+    const chunks = [];
+    doc.on('data', c => chunks.push(c));
+    doc.on('end',  () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
 
-const findBrokerPageId = async (brokerName, apiKey) => {
-  if (!brokerName) return null;
-  try {
-    const data = await notionFetch(`/databases/${BROKERS_DB_ID}/query`, 'POST', {
-      filter: { property: 'Name', title: { equals: brokerName } }
-    }, apiKey);
-    return data.results?.[0]?.id || null;
-  } catch { return null; }
-};
+    const GOLD = '#CBB26B';
+    const DARK = '#1a1814';
 
-const checkDuplicate = async (applicantName, apiKey) => {
-  const data = await notionFetch(`/databases/${PIPELINE_DB_ID}/query`, 'POST', {
-    filter: { property: 'Applicant', title: { contains: applicantName } }
-  }, apiKey);
-  return (data.results || []).map(r => ({
-    id:     r.id,
-    url:    r.url,
-    title:  r.properties?.Applicant?.title?.[0]?.plain_text || applicantName,
-    status: r.properties?.Status?.status?.name || '',
-  }));
-};
+    // Header bar
+    doc.rect(0, 0, doc.page.width, 60).fill(DARK);
+    doc.fontSize(18).fillColor(GOLD).text('HOUSE OF FINANCE', 50, 18);
+    doc.fontSize(9).fillColor('#aaa').text('New Fact Find Application', 50, 42);
 
-// ── Notion block helpers ──────────────────────────────────────────────────────
-const rt = (content, bold = false) => [{
-  type: 'text',
-  text: { content: String(content ?? '').slice(0, 2000) },
-  annotations: { bold },
-}];
+    // Divider
+    doc.moveTo(50, 75).lineTo(545, 75).strokeColor(GOLD).lineWidth(1).stroke();
 
-const para    = (content, bold = false) => ({ object: 'block', type: 'paragraph',  paragraph:  { rich_text: rt(content, bold) } });
-const h2      = (content)               => ({ object: 'block', type: 'heading_2',  heading_2:  { rich_text: rt(content), is_toggleable: false } });
-const h3      = (content)               => ({ object: 'block', type: 'heading_3',  heading_3:  { rich_text: rt(content), is_toggleable: false } });
-const divider = ()                      => ({ object: 'block', type: 'divider',    divider: {} });
+    // Body text — use buildNotePadText as content map
+    const text = buildNotePadText(formData, '—', []);
+    doc.fontSize(8).fillColor(DARK).text(text, 50, 90, { lineGap: 3, width: 495 });
 
-const callout = (text, emoji = '💡', color = 'gray_background') => ({
-  object: 'block', type: 'callout',
-  callout: { rich_text: rt(text), icon: { type: 'emoji', emoji }, color },
-});
+    // Footer
+    const footerY = doc.page.height - 40;
+    doc.fontSize(7).fillColor('#999')
+      .text(`Mercury: ${mercuryUrl}`, 50, footerY, { align: 'left', width: 350 })
+      .text(`Generated ${new Date().toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}`, 400, footerY, { align: 'right', width: 145 });
 
-const toggle = (title, children) => ({
-  object: 'block', type: 'toggle',
-  toggle: { rich_text: rt(title, true), children: children.slice(0, 96) },
-});
-
-const tableCell = (content, bold = false) =>
-  [{ type: 'text', text: { content: String(content ?? '').slice(0, 2000) }, annotations: { bold } }];
-
-const tableRow = (cells, header = false) => ({
-  object: 'block', type: 'table_row',
-  table_row: { cells: cells.map(c => tableCell(c, header)) },
-});
-
-const table = (headers, rows) => ({
-  object: 'block', type: 'table',
-  table: {
-    table_width: headers.length,
-    has_column_header: true,
-    has_row_header: false,
-    children: [tableRow(headers, true), ...rows.map(r => tableRow(r))],
-  },
-});
-
-const imageBlock    = (url) => ({ object: 'block', type: 'image',    image:    { type: 'external', external: { url } } });
-const bookmarkBlock = (url) => ({ object: 'block', type: 'bookmark', bookmark: { url, caption: [] } });
-
-const colList = (...columns) => ({
-  object: 'block', type: 'column_list',
-  column_list: {
-    children: columns.map(blocks => ({
-      object: 'block', type: 'column',
-      column: { children: Array.isArray(blocks) ? blocks : [blocks] },
-    })),
-  },
-});
-
-// ── Notion derived-data helpers ───────────────────────────────────────────────
-const getApplicantTitle = (formData) => {
-  const primary = (formData.applicants || [])[0];
-  if (!primary) return 'Unknown Applicant';
-  if (primary.type === 'Company Borrower') return primary.companyName || 'Company Applicant';
-  return `${primary.firstName || ''} ${primary.lastName || ''}`.trim() || 'Unknown Applicant';
-};
-
-const getTransactionTypes = (formData) => {
-  const types = new Set();
-  (formData.securities || []).forEach(sec => {
-    [...(sec.primaryTransactionTypes || []), ...(sec.secondaryTransactionTypes || [])].forEach(t => {
-      if (VALID_TX_TYPES.has(t)) types.add(t);
-    });
-  });
-  return [...types];
-};
-
-const collectDocumentFiles = (formData) => {
-  const files = [];
-  (formData.applicants || []).forEach(app => {
-    const name = app.type === 'Company Borrower'
-      ? (app.companyName || 'Company')
-      : `${app.firstName || ''} ${app.lastName || ''}`.trim() || 'Applicant';
-    if (app.dlFrontUrl) files.push({ name: `DL Front — ${name}`, type: 'external', external: { url: app.dlFrontUrl } });
-    if (app.dlBackUrl)  files.push({ name: `DL Back — ${name}`,  type: 'external', external: { url: app.dlBackUrl  } });
-  });
-  (formData.employment || []).forEach((emp, i) => {
-    const ce = emp.currentEmployment || {};
-    if (ce.payslipUrl) files.push({ name: `Payslip — ${emp.applicantName || 'Applicant ' + (i + 1)}`, type: 'external', external: { url: ce.payslipUrl } });
-  });
-  return files;
-};
-
-const calcAddressMonths = (app) => {
-  const cy = parseInt(app.yearsAtCurrentAddress)  || 0;
-  const cm = parseInt(app.monthsAtCurrentAddress) || 0;
-  const hy = (app.addressHistory || []).reduce((s, a) => s + (parseInt(a.yearsAtAddress)  || 0), 0);
-  const hm = (app.addressHistory || []).reduce((s, a) => s + (parseInt(a.monthsAtAddress) || 0), 0);
-  return cy * 12 + cm + hy * 12 + hm;
-};
-
-// ── Notion page body builder (verbatim from notion-submit.js) ─────────────────
-const buildPageBody = (formData) => {
-  const blocks     = [];
-  const securities = formData.securities || [];
-  const applicants = formData.applicants || [];
-  const employment = formData.employment || [];
-
-  const totalLoan     = securities.reduce((s, sec) => s + parseCurrency(sec.loanAmount),    0);
-  const totalSecurity = securities.reduce((s, sec) => s + parseCurrency(sec.propertyValue), 0);
-  const blendedLVR    = totalSecurity > 0 ? (totalLoan / totalSecurity * 100) : 0;
-
-  const totalIncome = employment.reduce((sum, emp) => {
-    const ce = emp.currentEmployment || {};
-    return sum + parseCurrency(ce.baseIncome) + parseCurrency(ce.bonusIncome) + parseCurrency(ce.commissions);
-  }, 0);
-
-  const totalAssets = applicants.reduce((sum, app) =>
-    sum + (app.assets || []).reduce((s, a) => s + parseCurrency(a.value || a.amount), 0), 0);
-  const totalLiabilities = applicants.reduce((sum, app) =>
-    sum + (app.liabilities || []).reduce((s, l) => s + parseCurrency(l.balance || l.amount || l.limit), 0), 0);
-  const netPosition = totalAssets - totalLiabilities;
-
-  const lvrFlag = blendedLVR > 80 ? '⚠️' : '✅';
-  const netFlag = netPosition >= 0 ? '✅' : '⚠️';
-
-  blocks.push(colList(
-    callout(`Total Security: ${fmtCurrency(String(totalSecurity))}\nTotal Loan: ${fmtCurrency(String(totalLoan))}\nBlended LVR: ${blendedLVR ? blendedLVR.toFixed(1) + '%' : '—'} ${lvrFlag}`, '🏠', 'blue_background'),
-    callout(`Gross Income: ${fmtCurrency(String(totalIncome))} p.a.\nTotal Assets: ${fmtCurrency(String(totalAssets))}\nTotal Liabilities: ${fmtCurrency(String(totalLiabilities))}\nNet Position: ${fmtCurrency(String(netPosition))} ${netFlag}`, '💰', 'green_background'),
-    callout(`Lender: ${(formData.lenderPreference || []).join(', ') || '—'}\nPriority: ${formData.priority || '—'}\nClient: ${formData.clientType || '—'}`, '📋', 'gray_background')
-  ));
-  blocks.push(divider());
-
-  blocks.push(h2('📋 Broker Details'));
-  const brokerRows = [
-    ['Broker',                formData.brokerName    || '—'],
-    ['Email',                 formData.brokerEmail   || '—'],
-    ['Lead Source',           formData.leadSource    || '—'],
-    ['Client Type',           formData.clientType    || '—'],
-    ['Priority',              formData.priority      || '—'],
-    ['Lender Preference',     (formData.lenderPreference || []).join(', ') || '—'],
-    ['Lender Note',           formData.lenderPreferenceOtherNote || '—'],
-    ['Applicant Type',        formData.applicantType || '—'],
-    ['Applicants / Guarantors', `${formData.numApplicants || 1} / ${formData.numGuarantors || 0}`],
-  ];
-  if (formData.brokerNotes) brokerRows.push(['Broker Notes', formData.brokerNotes]);
-  blocks.push(table(['Field', 'Value'], brokerRows));
-  blocks.push(divider());
-
-  blocks.push(h2('🏠 Securities'));
-  securities.forEach((sec, i) => {
-    const lvr    = sec.lvr ? sec.lvr + '%' : '—';
-    const txTypes = [...(sec.primaryTransactionTypes || []), ...(sec.secondaryTransactionTypes || [])].join(', ') || '—';
-    const features = [sec.isFirstHomeBuyer ? 'First Home Buyer' : '', sec.hasOffset ? 'Offset Account' : '', sec.hasRedraw ? 'Redraw Facility' : ''].filter(Boolean).join(', ') || '—';
-    const ownersText = (sec.ownershipRows || []).length > 0
-      ? sec.ownershipRows.map(o => `${o.name || 'Unknown'} (${o.percentage || 0}%)`).join(', ') : '—';
-    const guarantorText = (sec.guarantors || []).length > 0
-      ? sec.guarantors.map(gId => {
-          const app = applicants.find(a => a.id === gId);
-          if (!app) return null;
-          return app.type === 'Company Borrower' ? (app.companyName || 'Company') : `${app.firstName || ''} ${app.lastName || ''}`.trim();
-        }).filter(Boolean).join(', ') : '—';
-
-    let loanLines;
-    if (sec.repaymentType === 'Split') {
-      const loanAmt   = parseFloat(sec.loanAmount) || 0;
-      const splitLines = (sec.splits || []).map((sp, si) => {
-        const mode = sp.inputMode || 'pct';
-        const hasValue = mode === 'amt' ? !!sp.amount : !!sp.percentage;
-        if (!hasValue && !sp.type) return '';
-        let allocationStr;
-        if (mode === 'amt') {
-          const rawAmt = parseFloat(sp.amount) || 0;
-          const pct = loanAmt > 0 && rawAmt > 0 ? (rawAmt / loanAmt * 100).toFixed(1) + '%' : '';
-          allocationStr = `${fmtCurrency(sp.amount)}${pct ? ` (${pct})` : ''}`;
-        } else {
-          const dollarAmt = loanAmt > 0 && parseFloat(sp.percentage) > 0 ? Math.round(loanAmt * parseFloat(sp.percentage) / 100) : null;
-          allocationStr = `${sp.percentage ? sp.percentage + '%' : '—'}${dollarAmt ? ` (${fmtCurrency(String(dollarAmt))})` : ''}`;
-        }
-        return [`Split ${si + 1}: ${allocationStr}`, sp.type ? `  └ ${sp.type}` : '', sp.rateType ? `  └ ${sp.rateType}${sp.fixedYears ? ' (' + sp.fixedYears + 'yr fixed)' : ''}` : '', sp.type === 'Interest Only' && sp.ioYears ? `  └ IO: ${sp.ioYears} yrs` : ''].filter(Boolean).join('\n');
-      }).filter(Boolean);
-      loanLines = [`Amount: ${fmtCurrency(sec.loanAmount)}`, `LVR: ${lvr}`, 'Repayment: Split', sec.loanTerm ? `Term: ${sec.loanTerm} years` : '', ...splitLines, features !== '—' ? `Features: ${features}` : ''].filter(Boolean).join('\n');
-    } else {
-      loanLines = [`Amount: ${fmtCurrency(sec.loanAmount)}`, `LVR: ${lvr}`, sec.loanType ? `Type: ${sec.loanType}` : '', sec.repaymentType ? `Repayment: ${sec.repaymentType}` : '', sec.repaymentType === 'Fixed' && sec.fixedRatePeriod ? `Fixed Period: ${sec.fixedRatePeriod} years` : '', sec.loanTerm ? `Term: ${sec.loanTerm} years` : '', sec.loanType === 'Interest Only' && sec.interestOnlyPeriod ? `IO Period: ${sec.interestOnlyPeriod} years` : '', features !== '—' ? `Features: ${features}` : ''].filter(Boolean).join('\n');
-    }
-
-    const txLineItems = [`Transaction: ${txTypes}`];
-    if (parseCurrency(sec.cashoutAmount) > 0) txLineItems.push(`Cashout Amount: ${fmtCurrency(sec.cashoutAmount)}`);
-    if (parseCurrency(sec.currentLoanBalance) > 0) txLineItems.push(`Current Loan Balance: ${fmtCurrency(sec.currentLoanBalance)}`);
-    (sec.purchaseCompletionMethods || []).forEach(method => {
-      if (method === 'Equity from Existing Property') {
-        const srcIdx = sec.equityPropertyIndex;
-        const srcSec = (srcIdx !== '' && srcIdx !== undefined) ? securities[parseInt(srcIdx)] : null;
-        txLineItems.push(`Equity Source: Security ${parseInt(srcIdx) + 1}${srcSec?.address ? ' — ' + srcSec.address : ''}`);
-        if (srcSec) {
-          const equityAmt = parseCurrency(srcSec.cashoutAmount) > 0 ? fmtCurrency(srcSec.cashoutAmount) : `~${fmtCurrency(String(Math.max(0, (parseFloat(srcSec.propertyValue) || 0) * 0.8 - (parseFloat(srcSec.loanAmount) || 0))))} (est. 80% LVR equity)`;
-          txLineItems.push(`Equity Available: ${equityAmt}`);
-        }
-      } else if (method === 'Own Savings') {
-        const amt = sec.purchaseCompletionAmounts?.[method];
-        txLineItems.push(`Own Savings: ${amt ? fmtCurrency(amt) : 'amount not entered'}`);
-      } else if (method === 'Gift from Family') {
-        const amt = sec.purchaseCompletionAmounts?.[method];
-        txLineItems.push(`Gift from Family${sec.giftRelationship ? ' (' + sec.giftRelationship + ')' : ''}: ${amt ? fmtCurrency(amt) : 'amount not entered'}`);
-      } else if (method === 'First Home Owner Grant') {
-        txLineItems.push('Purchase via: First Home Owner Grant');
-      } else if (method === 'Other') {
-        txLineItems.push(`Other: ${sec.purchaseCompletionOther || 'see notes'}`);
-      } else {
-        txLineItems.push(`Purchase via: ${method}`);
-      }
-    });
-    if (sec.applicationType) txLineItems.push(`Application Type: ${sec.applicationType}`);
-    if (sec.crossCollateralise) txLineItems.push('⚠️ Cross-Collateralised');
-
-    const propLines = [`Address: ${sec.address || '—'}`, `State: ${sec.state || '—'}`, `Value: ${fmtCurrency(sec.propertyValue)}`, `Occupancy: ${sec.intendedOccupancy || '—'}`, `Ownership: ${ownersText}`, guarantorText !== '—' ? `Guarantors: ${guarantorText}` : ''].filter(Boolean).join('\n');
-    blocks.push(h3(`Security ${i + 1}${sec.address ? ' — ' + sec.address : ''}`));
-    blocks.push(colList([callout(propLines, '📍', 'blue_background')], [callout(loanLines, '🏦', 'green_background')], [callout(txLineItems.join('\n'), '📄', 'gray_background')]));
-    if (i < securities.length - 1) blocks.push(divider());
-  });
-  blocks.push(divider());
-
-  blocks.push(h2('👥 Applicants'));
-  applicants.forEach((app, i) => {
-    const empRecord = employment[i] || {};
-    const ce        = empRecord.currentEmployment || {};
-    const name = app.type === 'Company Borrower'
-      ? (app.companyName || `Company ${i + 1}`)
-      : `${app.firstName || ''} ${app.lastName || ''}`.trim() || `Applicant ${i + 1}`;
-    const toggleTitle = `${app.role} ${app.number}: ${name} (${app.type})`;
-    const inner = [];
-
-    inner.push(h3('Personal Details'));
-    if (app.type === 'Company Borrower') {
-      inner.push(table(['Field', 'Value'], [
-        ['ABN', app.companyABN || '—'], ['ACN', app.companyACN || '—'],
-        ['Entity Type', app.entityType || '—'], ['ABN Status', app.abnStatus || '—'],
-        ['ABN Registered From', app.abnFrom || '—'],
-        ['GST', app.gstRegistered ? `Registered${app.gstDate ? ' from ' + app.gstDate : ''}` : 'Not Registered'],
-        ['Main Business Location', app.mainBusinessLocation || '—'],
-        ['Registered Address', app.registeredAddress || '—'],
-        ['Trading Name', app.tradingName || '—'],
-        ['Phone', app.phone || '—'], ['Email', app.email || '—'],
-      ]));
-    } else {
-      const personalRows = [
-        ['Full Name', [app.firstName, app.middleName, app.lastName].filter(Boolean).join(' ') || '—'],
-        ['Date of Birth', app.dob || '—'], ['Gender', app.gender || '—'],
-        ['Phone', app.phone || '—'], ['Email', app.email || '—'],
-        ['Licence Number', app.licenceNumber || '—'],
-        ['Marital Status', app.maritalStatus || '—'],
-        ['Residency', app.residencyStatus || '—'],
-      ];
-      if (app.visaNumber) personalRows.push(['Visa Number', app.visaNumber]);
-      personalRows.push(['Current Address', app.address || '—']);
-      if (app.yearsAtCurrentAddress || app.monthsAtCurrentAddress) {
-        personalRows.push(['Time at Current Address', [app.yearsAtCurrentAddress && app.yearsAtCurrentAddress + ' years', app.monthsAtCurrentAddress && app.monthsAtCurrentAddress + ' months'].filter(Boolean).join(', ')]);
-      }
-      (app.addressHistory || []).forEach((ah, j) => {
-        const dur = [ah.yearsAtAddress && ah.yearsAtAddress + 'y', ah.monthsAtAddress && ah.monthsAtAddress + 'm'].filter(Boolean).join(' ');
-        personalRows.push([`Previous Address ${j + 1}`, [ah.address, dur].filter(Boolean).join(' — ') || '—']);
-      });
-      if (app.numDependants > 0) {
-        personalRows.push(['Dependants', String(app.numDependants)]);
-        (app.dependants || []).forEach((d, di) => personalRows.push([`Dependant ${di + 1}`, `${d.name || '—'}, Age ${d.age || '—'}`]));
-      } else { personalRows.push(['Dependants', '0']); }
-      if (app.type === 'Director Guarantor' && app.relationshipToCompany) personalRows.push(['Relationship to Company', app.relationshipToCompany]);
-      if (app.type === 'Natural Person' && i > 0 && app.relationshipToApplicant1) personalRows.push(['Relationship to Applicant 1', app.relationshipToApplicant1]);
-      inner.push(table(['Field', 'Value'], personalRows));
-      const totalAddrMonths = calcAddressMonths(app);
-      const addrYears  = Math.floor(totalAddrMonths / 12);
-      const addrMonths = totalAddrMonths % 12;
-      const addrMeets  = totalAddrMonths >= 36;
-      inner.push(callout(`Address History: ${addrYears} years ${addrMonths} months${addrMeets ? ' ✓' : ' ⚠ (< 3 years required)'}`, addrMeets ? '✅' : '⚠️', addrMeets ? 'green_background' : 'orange_background'));
-    }
-
-    if (ce.employmentType || ce.employer || ce.baseIncome) {
-      inner.push(h3('Employment & Income'));
-      const iv = ce.incomeVerification || {};
-      const declaredTotal = parseCurrency(ce.baseIncome) + parseCurrency(ce.bonusIncome) + parseCurrency(ce.commissions);
-      const ytdAnnualised = iv.m2Annual || 0;
-      const varLabel = { consistent: '✓ Consistent', ytd_higher: '↑ YTD Higher (overtime/allowances)', ytd_lower: '⚠ YTD Lower — lender will use YTD figure', incomplete: '' }[iv.status] || '';
-      const empRows = [
-        ['Employment Type', ce.employmentType || '—'], ['Employer', ce.employer || '—'],
-        ['Role / Position', ce.role || '—'], ['Employer ABN', ce.abn || '—'],
-        ['Start Date', ce.startDate || '—'], ['Pay Frequency', ce.payFrequency || '—'],
-        ['Base Income (p.a.)', fmtCurrency(ce.baseIncome)],
-        ['Bonus (p.a.)', ce.bonusIncome ? fmtCurrency(ce.bonusIncome) : '—'],
-        ['Commissions (p.a.)', ce.commissions ? fmtCurrency(ce.commissions) : '—'],
-        ['Total Declared Income', fmtCurrency(String(declaredTotal))],
-      ];
-      if (ytdAnnualised) {
-        empRows.push(['YTD Annualised Income', `${fmtCurrency(String(ytdAnnualised))}${varLabel ? '  ' + varLabel : ''}`]);
-        if (iv.explanations?.length > 0) empRows.push(['Variance Notes', iv.explanations.join('; ')]);
-        if (iv.otherNotes) empRows.push(['Variance Notes (Other)', iv.otherNotes]);
-      }
-      if (ce.hecs) empRows.push(['HECS/HELP Debt', ce.hecs]);
-      inner.push(table(['Field', 'Value'], empRows));
-      (empRecord.previousEmployments || []).forEach((prev, pi) => {
-        inner.push(para([`Previous ${pi + 1}: ${prev.employmentType || '—'}`, prev.employer ? `Employer: ${prev.employer}` : '', prev.abn ? `ABN: ${prev.abn}` : '', prev.role ? `Role: ${prev.role}` : '', `Period: ${prev.startDate || '?'} → ${prev.endDate || 'present'}`].filter(Boolean).join(' · ')));
-      });
-      const yearsLabel = `${(empRecord.totalYears || 0).toFixed(1)} years${empRecord.meetsRequirement ? ' ✓' : ' ⚠ (< 3 years required)'}`;
-      inner.push(callout(`Employment History: ${yearsLabel}`, empRecord.meetsRequirement ? '✅' : '⚠️', empRecord.meetsRequirement ? 'green_background' : 'orange_background'));
-    }
-
-    const assets      = app.assets      || [];
-    const liabilities = app.liabilities || [];
-    if (assets.length > 0 || liabilities.length > 0) {
-      inner.push(h3('Financial Position'));
-      if (assets.length > 0) {
-        inner.push(table(['Asset Type', 'Description', 'Value'], assets.map(a => [a.type || a.category || '—', a.description || a.address || a.institution || a.name || '—', fmtCurrency(a.value || a.amount)])));
-      }
-      if (liabilities.length > 0) {
-        inner.push(table(['Liability Type', 'Lender / Description', 'Balance', 'Repayment'], liabilities.map(l => [l.type || l.category || '—', l.lender || l.institution || l.description || '—', fmtCurrency(l.balance || l.amount || l.limit), l.repayment ? fmtCurrency(l.repayment) + '/mo' : '—'])));
-      }
-      const appAssets = assets.reduce((s, a) => s + parseCurrency(a.value || a.amount), 0);
-      const appLiabs  = liabilities.reduce((s, l) => s + parseCurrency(l.balance || l.amount || l.limit), 0);
-      const appNet    = appAssets - appLiabs;
-      inner.push(callout(`Assets: ${fmtCurrency(String(appAssets))}   Liabilities: ${fmtCurrency(String(appLiabs))}   Net Position: ${fmtCurrency(String(appNet))}`, appNet >= 0 ? '✅' : '⚠️', appNet >= 0 ? 'green_background' : 'orange_background'));
-    }
-
-    if (app.type !== 'Company Borrower') {
-      inner.push(h3('📎 Documents'));
-      const hasDLFront = !!app.dlFrontUrl;
-      const hasDLBack  = !!app.dlBackUrl;
-      const hasPayslip = !!ce.payslipUrl;
-      const hasSigned  = app.eSignature?.status === 'signed';
-      const signedDate = hasSigned && app.eSignature?.signedAt ? new Date(app.eSignature.signedAt).toLocaleDateString('en-AU') : null;
-      inner.push(table(['Document', 'Status', 'Details'], [
-        ['🪪 Driver Licence — Front', hasDLFront ? '✅ Uploaded' : '⬜ Missing', hasDLFront ? 'Stored in Files & media' : 'Upload in fact find → Step 1'],
-        ['🪪 Driver Licence — Back',  hasDLBack  ? '✅ Uploaded' : '⬜ Missing', hasDLBack  ? 'Stored in Files & media' : 'Upload in fact find → Step 1'],
-        ['💰 Payslip / Income Doc',   hasPayslip ? '✅ Uploaded' : '⬜ Missing', hasPayslip ? 'Stored in Files & media' : 'Upload in fact find → Step 2'],
-        ['✍️ Credit Guide',           hasSigned  ? '✅ Signed'   : '⬜ Pending', hasSigned  ? `Signed ${signedDate || '—'}` : 'Send via Step 1 e-signature'],
-      ]));
-      if (hasDLFront) inner.push(imageBlock(app.dlFrontUrl));
-      if (hasDLBack)  inner.push(imageBlock(app.dlBackUrl));
-      if (hasPayslip) inner.push(bookmarkBlock(ce.payslipUrl));
-      if (hasSigned && app.eSignature?.submissionId) inner.push(bookmarkBlock(`/api/docuseal-download?submissionId=${app.eSignature.submissionId}&type=signed`));
-    }
-
-    blocks.push(toggle(toggleTitle, inner));
+    doc.end();
   });
 
-  if (formData.brokerNotes && formData.brokerNotes.length > 200) {
-    blocks.push(divider());
-    blocks.push(callout(formData.brokerNotes, '📝', 'yellow_background'));
-  }
+const sendLoanSummaryEmail = async (formData, pdfBuffer, mercuryUrl, opportunityName) => {
+  const transporter = nodemailer.createTransport({
+    host:   process.env.SMTP_HOST || 'smtp.office365.com',
+    port:   parseInt(process.env.SMTP_PORT || '587'),
+    secure: false,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    tls:  { ciphers: 'SSLv3' },
+  });
 
-  return blocks;
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+      <div style="background:#12110D;padding:20px 24px">
+        <h1 style="color:#CBB26B;margin:0;font-size:20px">House of Finance</h1>
+        <p style="color:#999;margin:4px 0 0;font-size:12px">New Fact Find Application</p>
+      </div>
+      <div style="padding:24px;background:#fff">
+        <h2 style="color:#12110D;font-size:16px;margin:0 0 16px">${opportunityName}</h2>
+        <p style="color:#333;font-size:14px;margin:0 0 16px">A new fact find has been submitted. The full loan summary is attached as a PDF.</p>
+        <a href="${mercuryUrl}" style="background:#CBB26B;color:#12110D;padding:10px 20px;text-decoration:none;border-radius:4px;font-weight:bold;font-size:13px;display:inline-block">Open in Mercury →</a>
+        <p style="color:#aaa;font-size:11px;margin:24px 0 0">Submitted via HOF Fact Find · ${new Date().toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+      </div>
+    </div>`;
+
+  const safeFile = opportunityName.replace(/[^a-zA-Z0-9 _-]/g, '').replace(/\s+/g, '-');
+  await transporter.sendMail({
+    from:        `"House of Finance" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+    to:          'chris@houseoffinance.com.au, rita@houseoffinance.com.au',
+    subject:     `New Fact Find: ${opportunityName}`,
+    html,
+    attachments: [{ filename: `${safeFile}-FactFind.pdf`, content: pdfBuffer }],
+  });
 };
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -783,15 +462,112 @@ export default async function handler(req, res) {
   if (req.method !== 'POST')   return res.status(405).json({ error: 'Method not allowed' });
 
   const { action, formData } = req.body || {};
-  const notionApiKey = process.env.NOTION_API_KEY;
 
   try {
-    // ── Duplicate check ───────────────────────────────────────────────────────
-    if (action === 'check') {
-      if (!notionApiKey) return res.status(500).json({ error: 'NOTION_API_KEY not configured' });
-      const name    = getApplicantTitle(formData);
-      const matches = await checkDuplicate(name, notionApiKey);
-      return res.status(200).json({ exists: matches.length > 0, matches, applicantName: name });
+    // ── Quick Fact Find submission ────────────────────────────────────────────
+    if (action === 'quick-submit') {
+      const { applicants = [], loanPurpose, loanAmount, suburb, state, broker, leadSource, notes } = formData || {};
+
+      // 1. Create Mercury contacts (non-company only)
+      const contactMeta = [];
+      for (const app of applicants) {
+        if (!app.firstName && !app.lastName) continue;
+        const contactId = await createMercuryContact({
+          firstName: app.firstName,
+          lastName:  app.lastName,
+          phone:     app.mobile,
+          email:     app.email,
+        });
+        contactMeta.push({ contactId, app });
+      }
+
+      // 2. Build opportunity name + notePadText
+      const names = applicants.filter(a => a.firstName || a.lastName).map(a => `${a.firstName || ''} ${a.lastName || ''}`.trim()).filter(Boolean);
+      const opportunityName = names.join(' / ') || 'Quick Lead';
+      const location = [suburb, state].filter(Boolean).join(' ');
+      const loanAmtNum = parseFloat(String(loanAmount || '').replace(/[^0-9.]/g, '')) || 0;
+
+      const quickNotePad = [
+        '=== HOF QUICK FACT FIND — LEAD CAPTURE ===',
+        '',
+        `  Submitted:     ${new Date().toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
+        `  Broker:        ${broker || '—'}`,
+        `  Lead Source:   ${leadSource || '—'}`,
+        '',
+        '--- APPLICANT(S) ---',
+        ...applicants.filter(a => a.firstName || a.lastName).map((a, i) =>
+          `  Applicant ${i + 1}:  ${[a.firstName, a.lastName].filter(Boolean).join(' ')}${a.mobile ? ` | ${a.mobile}` : ''}${a.email ? ` | ${a.email}` : ''}`
+        ),
+        '',
+        '--- LOAN DETAILS ---',
+        `  Purpose:       ${loanPurpose || '—'}`,
+        `  Amount:        ${loanAmtNum ? fmtCurrency(String(loanAmtNum)) : '—'}`,
+        `  Location:      ${location || '—'}`,
+        notes ? `\n--- BROKER NOTES ---\n  ${notes}` : '',
+      ].filter(v => v !== null).join('\n');
+
+      const relatedParties = contactMeta.map(({ contactId }, i) => ({
+        personId:     contactId,
+        relationship: i === 0 ? 'Primary applicant' : 'Secondary applicant',
+      }));
+
+      const oppResult = await mercuryFetch('/opportunities', 'POST', {
+        isDeleted:       false,
+        transactionType: 'Loan',
+        opportunityName,
+        amount:          loanAmtNum,
+        status:          '01. Lead',
+        broker:          broker || '',
+        leadSource:      leadSource || '',
+        notePadText:     quickNotePad,
+        ...(relatedParties.length > 0 ? { relatedParties } : {}),
+      });
+
+      const opportunityId = oppResult.uniqueId;
+      const mercuryUrl    = `https://crm.connective.com.au/#/opportunities/${opportunityId}`;
+
+      // 3. Teams notification (simplified card, non-fatal)
+      const webhookUrl = process.env.TEAMS_WEBHOOK_URL;
+      if (webhookUrl) {
+        const mentionText = TEAMS_MENTIONS.map(m => m.tag).join(' ');
+        const quickCard = {
+          type: 'message',
+          attachments: [{
+            contentType: 'application/vnd.microsoft.card.adaptive',
+            content: {
+              '$schema': 'http://adaptivecards.io/schemas/adaptive-card.json',
+              type: 'AdaptiveCard',
+              version: '1.5',
+              msteams: {
+                entities: TEAMS_MENTIONS.map(m => ({ type: 'mention', text: m.tag, mentioned: { id: m.id, name: m.name } })),
+              },
+              body: [
+                { type: 'TextBlock', text: `${mentionText} — Quick lead captured`, wrap: true, size: 'Small' },
+                { type: 'TextBlock', size: 'Large', weight: 'Bolder', text: 'Quick Lead Captured', color: 'Accent' },
+                {
+                  type: 'FactSet',
+                  facts: [
+                    { title: 'Applicant(s)',   value: opportunityName },
+                    { title: 'Purpose',        value: loanPurpose || '—' },
+                    { title: 'Loan Amount',    value: loanAmtNum ? fmtCurrency(String(loanAmtNum)) : '—' },
+                    { title: 'Location',       value: location || '—' },
+                    { title: 'Broker',         value: broker || '—' },
+                    { title: 'Lead Source',    value: leadSource || '—' },
+                  ],
+                },
+                {
+                  type: 'ActionSet',
+                  actions: [{ type: 'Action.OpenUrl', title: 'Open in Mercury', url: mercuryUrl }],
+                },
+              ],
+            },
+          }],
+        };
+        await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(quickCard) })
+          .catch(err => console.error('[teams] quick card failed:', err.message));
+      }
+
+      return res.status(200).json({ success: true, mercuryUrl, title: opportunityName });
     }
 
     // ── Full submission ───────────────────────────────────────────────────────
@@ -891,53 +667,23 @@ export default async function handler(req, res) {
         });
       }
 
-      // 6. Notion backup (non-fatal)
-      let notionUrl = null;
-      if (notionApiKey) {
-        try {
-          const title        = getApplicantTitle(formData);
-          const brokerPageId = await findBrokerPageId(formData.brokerName, notionApiKey);
-          const txTypes      = getTransactionTypes(formData);
-          const lenders      = formData.lenderPreference || [];
-          const docFiles     = collectDocumentFiles(formData);
-          const properties   = {
-            'Applicant':            { title: [{ text: { content: title } }] },
-            'Application Received': { date: { start: new Date().toISOString().split('T')[0] } },
-            'Status':               { status: { name: 'Pending Assignment' } },
-            'Manager':              { people: [{ id: RITA_USER_ID }] },
-          };
-          if (txTypes.length > 0)   properties['Transaction Type'] = { multi_select: txTypes.map(t => ({ name: t })) };
-          if (formData.clientType)  properties['Client Type']      = { multi_select: [{ name: formData.clientType }] };
-          if (formData.priority)    properties['Priority']         = { select: { name: formData.priority } };
-          if (lenders.length > 0)   properties['Lender']           = { multi_select: lenders.map(l => ({ name: l })) };
-          if (brokerPageId)         properties['Broker']           = { relation: [{ id: brokerPageId }] };
-          if (docFiles.length > 0)  properties['Files & media']    = { files: docFiles };
-          const page = await notionFetch('/pages', 'POST', {
-            parent: { database_id: PIPELINE_DB_ID },
-            icon:   { type: 'emoji', emoji: '📋' },
-            properties,
-            children: buildPageBody(formData),
-          }, notionApiKey);
-          notionUrl = page.url;
-        } catch (err) {
-          console.error('[notion] backup failed:', err.message);
-        }
+      // 6. Email + PDF (non-fatal)
+      try {
+        const pdfBuffer = await generateLoanSummaryPDF(formData, mercuryUrl);
+        await sendLoanSummaryEmail(formData, pdfBuffer, mercuryUrl, opportunityName);
+      } catch (err) {
+        console.error('[email] failed:', err.message);
       }
 
       // 7. Teams notification (non-fatal)
-      await postTeamsCard(formData, mercuryUrl, notionUrl || '', docPassword).catch(err => {
+      await postTeamsCard(formData, mercuryUrl, docPassword).catch(err => {
         console.error('[teams] notification failed:', err.message);
       });
 
-      return res.status(200).json({
-        success: true,
-        mercuryUrl,
-        notionUrl,
-        title: opportunityName,
-      });
+      return res.status(200).json({ success: true, mercuryUrl, title: opportunityName });
     }
 
-    return res.status(400).json({ error: 'Invalid action. Use "check" or "submit".' });
+    return res.status(400).json({ error: 'Invalid action. Use "quick-submit" or "submit".' });
 
   } catch (err) {
     console.error('[submit] error:', err.message);

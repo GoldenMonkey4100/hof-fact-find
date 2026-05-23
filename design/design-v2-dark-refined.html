@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HOF Fact Find — Design V2: Dark Refined</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black:       #12110D;
+      --black-deep:  #0e0d09;
+      --black-panel: #1e1c16;
+      --black-card:  #252219;
+      --black-hover: #2A281E;
+      --gold:        #CBB26B;
+      --gold-grad:   linear-gradient(135deg, #BFAE75, #DCCB8E);
+      --gold-subtle: rgba(203,178,107,0.14);
+      --gold-border: rgba(203,178,107,0.18);
+      --gold-light:  rgba(203,178,107,0.08);
+      --gold-label:  rgba(203,178,107,0.80);
+      --porcelain:   #F5F4F2;
+      --text-hi:     rgba(245,244,242,0.92);
+      --text-mid:    rgba(245,244,242,0.60);
+      --text-low:    rgba(245,244,242,0.35);
+      --success:     #16A34A;
+      --success-bg:  rgba(22,163,74,0.12);
+      --warning:     #D97706;
+      --warning-bg:  rgba(217,119,6,0.12);
+      --error:       #DC2626;
+      --error-bg:    rgba(220,38,38,0.12);
+      --radius:      8px;
+      --shadow:      0 2px 16px rgba(0,0,0,0.35);
+      --shadow-md:   0 6px 24px rgba(0,0,0,0.45);
+      --focus-ring:  0 0 0 3px rgba(203,178,107,0.20);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--black);
+      color: var(--text-hi);
+      font-size: 14px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ─── NAVBAR ─────────────────────────────────────── */
+    .navbar {
+      height: 60px;
+      background: var(--black-deep);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.75rem;
+      border-bottom: 1px solid rgba(203,178,107,0.10);
+      z-index: 50;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+    }
+
+    .nav-monogram {
+      width: 32px;
+      height: 32px;
+      border: 1.5px solid var(--gold);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 11px;
+      color: var(--gold);
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+
+    .nav-wordmark {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 12px;
+      color: var(--text-mid);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .nav-wordmark em { font-style: normal; color: var(--gold); }
+
+    .nav-divider {
+      width: 1px;
+      height: 20px;
+      background: rgba(203,178,107,0.15);
+      margin: 0 0.875rem;
+    }
+
+    .nav-context {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-low);
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 0.875rem;
+    }
+
+    .nav-ref {
+      font-size: 11px;
+      color: var(--text-low);
+      letter-spacing: 0.01em;
+    }
+
+    .nav-badge {
+      background: var(--gold-light);
+      border: 1px solid var(--gold-border);
+      color: var(--gold);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 99px;
+    }
+
+    /* ─── APP SHELL (sidebar + main) ────────────────── */
+    .shell {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ─── SIDEBAR ─────────────────────────────────────── */
+    .sidebar {
+      width: 264px;
+      flex-shrink: 0;
+      background: var(--black-panel);
+      border-right: 1px solid rgba(203,178,107,0.10);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .sidebar-inner {
+      padding: 1.75rem 1.5rem;
+      flex: 1;
+    }
+
+    .sidebar-eyebrow {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-low);
+      margin-bottom: 1.375rem;
+    }
+
+    /* Step timeline */
+    .step-list { list-style: none; }
+
+    .step-item {
+      position: relative;
+      padding: 0 0 0 2.5rem;
+      margin-bottom: 0;
+    }
+
+    /* Vertical connector line */
+    .step-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 11px;
+      top: 32px;
+      width: 1px;
+      height: calc(100% - 4px);
+      background: rgba(203,178,107,0.15);
+    }
+
+    .step-item.done:not(:last-child)::after {
+      background: rgba(22,163,74,0.3);
+    }
+
+    .step-item.active:not(:last-child)::after {
+      background: linear-gradient(to bottom, rgba(203,178,107,0.4), rgba(203,178,107,0.08));
+    }
+
+    /* Step dot */
+    .step-dot {
+      position: absolute;
+      left: 0;
+      top: 4px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 9px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .step-item .step-dot {
+      background: rgba(245,244,242,0.06);
+      color: var(--text-low);
+      border: 1px solid rgba(245,244,242,0.10);
+    }
+
+    .step-item.done .step-dot {
+      background: rgba(22,163,74,0.15);
+      color: var(--success);
+      border: 1px solid rgba(22,163,74,0.25);
+    }
+
+    .step-item.active .step-dot {
+      background: var(--gold-grad);
+      color: var(--black);
+      border: none;
+      box-shadow: 0 0 0 3px rgba(203,178,107,0.16);
+    }
+
+    /* Step content */
+    .step-content {
+      padding: 3px 0 1.5rem 0;
+      cursor: pointer;
+    }
+
+    .step-name {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--text-low);
+      line-height: 1.3;
+    }
+
+    .step-item.done  .step-name { color: var(--text-mid); }
+    .step-item.active .step-name { color: var(--gold); }
+
+    .step-desc {
+      font-size: 0.7rem;
+      color: var(--text-low);
+      margin-top: 2px;
+      line-height: 1.4;
+    }
+
+    .step-item.active .step-desc { color: rgba(203,178,107,0.5); }
+
+    .step-done-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-top: 4px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--success);
+      background: var(--success-bg);
+      padding: 2px 7px;
+      border-radius: 99px;
+    }
+
+    .step-active-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-top: 4px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--gold);
+      background: rgba(203,178,107,0.10);
+      padding: 2px 7px;
+      border-radius: 99px;
+    }
+
+    /* Sidebar footer */
+    .sidebar-footer {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid rgba(203,178,107,0.08);
+    }
+
+    .sidebar-progress-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .sidebar-progress-lbl {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-low);
+    }
+
+    .sidebar-progress-pct {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    .sidebar-track {
+      height: 4px;
+      background: rgba(245,244,242,0.06);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+
+    .sidebar-fill {
+      height: 100%;
+      background: var(--gold-grad);
+      width: 40%;
+      border-radius: 99px;
+    }
+
+    .btn-save-exit {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.375rem;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius);
+      border: 1px solid rgba(203,178,107,0.18);
+      background: transparent;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-low);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-save-exit:hover {
+      border-color: var(--gold-border);
+      color: var(--gold);
+      background: var(--gold-light);
+    }
+
+    /* ─── MAIN PANEL ──────────────────────────────────── */
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--black-panel);
+    }
+
+    .main-inner {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 2rem 2rem 5rem;
+    }
+
+    .main-header {
+      margin-bottom: 1.75rem;
+    }
+
+    .main-eyebrow {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 0.3rem;
+    }
+
+    .main-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 1.375rem;
+      font-weight: 800;
+      color: var(--text-hi);
+      line-height: 1.2;
+    }
+
+    .main-desc {
+      margin-top: 0.35rem;
+      font-size: 0.875rem;
+      color: var(--text-mid);
+    }
+
+    /* ─── APPLICANT TABS ──────────────────────────────── */
+    .app-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .app-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem 0.5rem 0.625rem;
+      border-radius: var(--radius);
+      border: 1.5px solid rgba(203,178,107,0.15);
+      background: transparent;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-mid);
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
+    }
+
+    .app-tab:hover  { border-color: var(--gold-border); color: var(--text-hi); }
+    .app-tab.active { background: rgba(203,178,107,0.10); border-color: var(--gold-border); color: var(--gold); }
+
+    .app-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      font-size: 9px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--gold-grad);
+      color: var(--black);
+    }
+
+    .app-tab.active .app-avatar {
+      background: rgba(203,178,107,0.2);
+      color: var(--gold);
+    }
+
+    .app-add {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.5rem 0.875rem;
+      border-radius: var(--radius);
+      border: 1.5px dashed rgba(203,178,107,0.18);
+      background: transparent;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-low);
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
+    }
+
+    .app-add:hover { border-color: var(--gold-border); color: var(--gold); background: var(--gold-light); }
+
+    /* ─── CARD (dark, 3px gold left border) ──────────── */
+    .card {
+      background: var(--black-card);
+      border: 1px solid rgba(203,178,107,0.12);
+      border-left: 3px solid var(--gold);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 1rem;
+      overflow: hidden;
+      transition: box-shadow 0.15s;
+    }
+
+    .card:hover { box-shadow: var(--shadow-md); }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.375rem;
+      border-bottom: 1px solid rgba(203,178,107,0.08);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .card-hl {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .card-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 7px;
+      background: rgba(203,178,107,0.08);
+      border: 1px solid rgba(203,178,107,0.14);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .card-title {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--text-hi);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .card-subtitle {
+      font-size: 0.72rem;
+      color: var(--text-low);
+      margin-top: 2px;
+    }
+
+    .card-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 9px;
+      border-radius: 99px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+
+    .badge-done    { background: var(--success-bg); color: #4ade80; }
+    .badge-partial { background: var(--warning-bg); color: #fbbf24; }
+    .badge-empty   { background: rgba(245,244,242,0.05); color: var(--text-low); border: 1px solid rgba(245,244,242,0.08); }
+
+    .chevron {
+      font-size: 11px;
+      color: var(--text-low);
+      transition: transform 0.2s;
+    }
+
+    .card.closed .card-body { display: none; }
+    .card.closed .chevron   { transform: rotate(-90deg); }
+
+    .card-body {
+      padding: 1.375rem 1.5rem;
+    }
+
+    /* ─── SECTION LABEL ───────────────────────────────── */
+    .sec-label {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gold-label);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+    }
+
+    .sec-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(203,178,107,0.14);
+    }
+
+    /* ─── FORM ────────────────────────────────────────── */
+    .form-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .form-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .span-2 { grid-column: span 2; }
+
+    .form-group { display: flex; flex-direction: column; }
+
+    label {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--gold-label);
+      margin-bottom: 0.35rem;
+    }
+
+    input, select, textarea {
+      padding: 0.6rem 0.875rem;
+      border: 1.5px solid rgba(203,178,107,0.18);
+      border-radius: 7px;
+      font-family: 'Open Sans', sans-serif;
+      font-size: 0.875rem;
+      color: var(--text-hi);
+      background: rgba(12,11,8,0.65);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      width: 100%;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--gold);
+      box-shadow: var(--focus-ring);
+      background: rgba(12,11,8,0.85);
+    }
+
+    input::placeholder { color: rgba(245,244,242,0.18); }
+
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23CBB26B' d='M5 7L0 2h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.875rem center;
+      padding-right: 2.25rem;
+      cursor: pointer;
+    }
+
+    select option { background: #1e1c16; color: rgba(245,244,242,0.9); }
+
+    .helper { font-size: 0.68rem; color: var(--text-low); margin-top: 0.3rem; }
+
+    /* ─── ADDRESS ─────────────────────────────────────── */
+    .addr-wrap { position: relative; }
+    .addr-pin  {
+      position: absolute;
+      left: 0.875rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 13px;
+      pointer-events: none;
+    }
+    .addr-wrap input { padding-left: 2.25rem; }
+
+    /* ─── UPLOAD ──────────────────────────────────────── */
+    .upload {
+      border: 1.5px dashed rgba(203,178,107,0.25);
+      border-radius: 7px;
+      padding: 1.25rem;
+      text-align: center;
+      background: rgba(203,178,107,0.04);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .upload:hover {
+      border-color: rgba(203,178,107,0.45);
+      background: rgba(203,178,107,0.08);
+    }
+
+    .upload-ico  { font-size: 22px; margin-bottom: 0.35rem; }
+    .upload-lbl  {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-hi);
+    }
+    .upload-hint { font-size: 0.7rem; color: var(--text-low); margin-top: 3px; }
+
+    /* ─── CREDIT LINKS ────────────────────────────────── */
+    .credit-row { display: flex; gap: 0.75rem; margin-top: 0.875rem; }
+
+    .credit-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0.875rem;
+      border: 1.5px solid rgba(203,178,107,0.18);
+      border-radius: 7px;
+      background: rgba(12,11,8,0.4);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-mid);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+
+    .credit-btn:hover {
+      border-color: var(--gold-border);
+      color: var(--gold);
+      background: var(--gold-light);
+    }
+
+    .credit-ico {
+      width: 24px;
+      height: 24px;
+      border-radius: 5px;
+      background: rgba(203,178,107,0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    /* ─── DURATION ROW ────────────────────────────────── */
+    .dur-row { display: flex; gap: 0.75rem; align-items: flex-end; margin-top: 0.875rem; }
+    .dur-row .form-group { flex: 1; }
+
+    /* ─── BUTTONS ─────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.625rem 1.25rem;
+      border-radius: var(--radius);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 0.8125rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    /* Dark mode primary: gold gradient + black text (premium) */
+    .btn-primary {
+      background: var(--gold-grad);
+      color: var(--black);
+      border: none;
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 18px rgba(203,178,107,0.30);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text-mid);
+      border-color: rgba(203,178,107,0.20);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--gold-border);
+      color: var(--gold);
+      background: var(--gold-light);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-low);
+      border-color: transparent;
+    }
+
+    .btn-ghost:hover { background: rgba(245,244,242,0.05); color: var(--text-mid); }
+
+    .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.72rem; }
+
+    /* ─── ACTION FOOTER ───────────────────────────────── */
+    .action-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.125rem 1.375rem;
+      background: rgba(12,11,8,0.4);
+      border: 1px solid rgba(203,178,107,0.10);
+      border-left: 3px solid transparent;
+      border-radius: var(--radius);
+      margin-top: 1.5rem;
+    }
+
+    .footer-right { display: flex; gap: 0.75rem; align-items: center; }
+
+    /* ─── RESPONSIVE ──────────────────────────────────── */
+    @media (max-width: 768px) {
+      body { overflow: auto; height: auto; }
+      .shell { flex-direction: column; overflow: visible; }
+      .sidebar { width: 100%; border-right: none; border-bottom: 1px solid rgba(203,178,107,0.10); }
+      .sidebar-inner { padding: 1rem 1.5rem 0.5rem; }
+      .step-list { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+      .step-item { padding: 0; margin-bottom: 0; }
+      .step-item::after { display: none; }
+      .step-dot { position: static; margin-right: 0.375rem; }
+      .step-content { padding: 0; display: flex; align-items: center; gap: 0.375rem; }
+      .step-done-tag, .step-active-tag, .step-desc { display: none; }
+      .step-name { font-size: 0.72rem; }
+      .main { overflow: visible; }
+      .form-grid, .form-grid-3 { grid-template-columns: 1fr; }
+      .span-2 { grid-column: span 1; }
+      .credit-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── NAVBAR ──────────────────────────────────────────── -->
+<nav class="navbar">
+  <div style="display:flex;align-items:center;">
+    <div class="nav-brand">
+      <div class="nav-monogram">HOF</div>
+      <div class="nav-wordmark">House of <em>Finance</em></div>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-context">Fact Find</div>
+  </div>
+  <div class="nav-right">
+    <span class="nav-ref">Broker: James Chen &nbsp;·&nbsp; REF #FF-2024-0892</span>
+    <span class="nav-badge">In Progress</span>
+  </div>
+</nav>
+
+<!-- ─── APP SHELL ───────────────────────────────────────── -->
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+      <div class="sidebar-eyebrow">Application Steps</div>
+      <ul class="step-list">
+
+        <li class="step-item done">
+          <div class="step-dot">✓</div>
+          <div class="step-content">
+            <div class="step-name">Loan Strategy</div>
+            <div class="step-desc">Scenario, securities &amp; lenders</div>
+            <div class="step-done-tag">✓ Complete</div>
+          </div>
+        </li>
+
+        <li class="step-item active">
+          <div class="step-dot">2</div>
+          <div class="step-content">
+            <div class="step-name">Applicants</div>
+            <div class="step-desc">Personal details &amp; address history</div>
+            <div class="step-active-tag">● In Progress</div>
+          </div>
+        </li>
+
+        <li class="step-item">
+          <div class="step-dot">3</div>
+          <div class="step-content">
+            <div class="step-name">Employment</div>
+            <div class="step-desc">Income, employer &amp; payslips</div>
+          </div>
+        </li>
+
+        <li class="step-item">
+          <div class="step-dot">4</div>
+          <div class="step-content">
+            <div class="step-name">Assets &amp; Liabilities</div>
+            <div class="step-desc">Financial position per applicant</div>
+          </div>
+        </li>
+
+        <li class="step-item">
+          <div class="step-dot">5</div>
+          <div class="step-content">
+            <div class="step-name">Review &amp; Submit</div>
+            <div class="step-desc">Confirm &amp; send to Mercury</div>
+          </div>
+        </li>
+
+      </ul>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-progress-label">
+        <span class="sidebar-progress-lbl">Overall Progress</span>
+        <span class="sidebar-progress-pct">40%</span>
+      </div>
+      <div class="sidebar-track">
+        <div class="sidebar-fill"></div>
+      </div>
+      <button class="btn-save-exit">⎘ &nbsp;Save &amp; Exit</button>
+    </div>
+  </aside>
+
+  <!-- MAIN PANEL -->
+  <main class="main">
+    <div class="main-inner">
+
+      <div class="main-header">
+        <div class="main-eyebrow">Step 2 of 5</div>
+        <h1 class="main-title">Applicants</h1>
+        <p class="main-desc">Personal details and address history for each borrower on this application.</p>
+      </div>
+
+      <!-- Applicant switcher -->
+      <div class="app-tabs">
+        <button class="app-tab active">
+          <div class="app-avatar">JD</div>
+          Applicant 1 — John Davis
+        </button>
+        <button class="app-tab">
+          <div class="app-avatar" style="background:linear-gradient(135deg,#4b4844,#2a2820);color:rgba(245,244,242,0.5);">SC</div>
+          Applicant 2 — Sarah Chen
+        </button>
+        <button class="app-add">
+          <span style="font-size:14px;font-weight:300;line-height:1;">+</span>
+          Add Applicant
+        </button>
+      </div>
+
+      <!-- ── CARD: Personal Details ──────────────────────── -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-hl">
+            <div class="card-icon">👤</div>
+            <div>
+              <div class="card-title">Personal Details</div>
+              <div class="card-subtitle">Identity, contact &amp; demographics</div>
+            </div>
+          </div>
+          <div class="card-right">
+            <span class="badge badge-partial">In Progress</span>
+            <span class="chevron">▾</span>
+          </div>
+        </div>
+
+        <div class="card-body">
+
+          <div class="sec-label">Identity</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>First Name</label>
+              <input type="text" value="John">
+            </div>
+            <div class="form-group">
+              <label>Last Name</label>
+              <input type="text" value="Davis">
+            </div>
+            <div class="form-group">
+              <label>Date of Birth</label>
+              <input type="date" value="1985-03-22">
+            </div>
+            <div class="form-group">
+              <label>Gender</label>
+              <select>
+                <option selected>Male</option>
+                <option>Female</option>
+                <option>Non-binary / Other</option>
+                <option>Prefer not to say</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Marital Status</label>
+              <select>
+                <option selected>Married / De Facto</option>
+                <option>Single</option>
+                <option>Divorced / Separated</option>
+                <option>Widowed</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Dependants</label>
+              <select>
+                <option>0</option>
+                <option>1</option>
+                <option selected>2</option>
+                <option>3</option>
+                <option>4+</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-top:1.25rem;">
+            <div class="sec-label">Contact</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Mobile</label>
+                <input type="tel" value="0412 345 678">
+              </div>
+              <div class="form-group">
+                <label>Email</label>
+                <input type="email" value="john.davis@email.com">
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:1.25rem;">
+            <div class="sec-label">Residency &amp; Citizenship</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Residency Status</label>
+                <select>
+                  <option selected>Australian Citizen</option>
+                  <option>Permanent Resident</option>
+                  <option>Temporary Resident (Visa)</option>
+                  <option>Foreign National</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Country of Birth</label>
+                <select>
+                  <option selected>Australia</option>
+                  <option>New Zealand</option>
+                  <option>United Kingdom</option>
+                  <option>Other</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Driver's Licence -->
+          <div style="margin-top:1.375rem;">
+            <div class="sec-label">Driver's Licence</div>
+            <div class="upload">
+              <div class="upload-ico">📷</div>
+              <div class="upload-lbl">Upload Licence Photo</div>
+              <div class="upload-hint">AI will extract licence number, expiry &amp; address · JPG, PNG or PDF</div>
+            </div>
+          </div>
+
+          <!-- Credit Check -->
+          <div style="margin-top:1.25rem;">
+            <div class="sec-label">Credit Check</div>
+            <div class="credit-row">
+              <a class="credit-btn" href="#">
+                <div class="credit-ico">📋</div>
+                Equifax / Veda Check
+              </a>
+              <a class="credit-btn" href="#">
+                <div class="credit-ico">🔍</div>
+                Illion Direct
+              </a>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /card personal -->
+
+      <!-- ── CARD: Address History ────────────────────────── -->
+      <div class="card closed">
+        <div class="card-header">
+          <div class="card-hl">
+            <div class="card-icon">📍</div>
+            <div>
+              <div class="card-title">Address History</div>
+              <div class="card-subtitle">Current &amp; previous addresses · 3 years required</div>
+            </div>
+          </div>
+          <div class="card-right">
+            <span class="badge badge-empty">Not Started</span>
+            <span class="chevron">▾</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="sec-label">Current Address</div>
+          <div class="form-grid">
+            <div class="form-group span-2">
+              <label>Street Address</label>
+              <div class="addr-wrap">
+                <span class="addr-pin">📍</span>
+                <input type="text" placeholder="Start typing an address…">
+              </div>
+              <span class="helper">Powered by Google Maps · Autocomplete enabled</span>
+            </div>
+            <div class="form-group">
+              <label>Suburb</label>
+              <input type="text" placeholder="e.g. Bondi Junction">
+            </div>
+            <div class="form-group">
+              <label>State</label>
+              <select>
+                <option value="">Select state</option>
+                <option>NSW</option><option>VIC</option><option>QLD</option>
+                <option>WA</option><option>SA</option><option>TAS</option>
+                <option>ACT</option><option>NT</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Postcode</label>
+              <input type="text" placeholder="2000" maxlength="4">
+            </div>
+            <div class="form-group">
+              <label>Ownership</label>
+              <select>
+                <option>Renting</option>
+                <option>Owner Occupier</option>
+                <option>Living with Family</option>
+                <option>Boarding</option>
+              </select>
+            </div>
+          </div>
+          <div class="dur-row">
+            <div class="form-group">
+              <label>Years at address</label>
+              <select><option value="">Yrs</option><option>0</option><option>1</option><option>2</option><option>3+</option></select>
+            </div>
+            <div class="form-group">
+              <label>Months</label>
+              <select><option value="">Mths</option><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option></select>
+            </div>
+            <button class="btn btn-ghost btn-sm" style="margin-bottom:1px;">+ Add Previous</button>
+          </div>
+        </div>
+      </div><!-- /card address -->
+
+      <!-- ── ACTION FOOTER ─────────────────────────────────── -->
+      <div class="action-footer">
+        <button class="btn btn-outline">← Loan Strategy</button>
+        <div class="footer-right">
+          <button class="btn btn-ghost btn-sm">Save Draft</button>
+          <button class="btn btn-primary">Next: Employment →</button>
+        </div>
+      </div>
+
+    </div><!-- /main-inner -->
+  </main><!-- /main -->
+
+</div><!-- /shell -->
+
+<script>
+  document.querySelectorAll('.card-header').forEach(h => {
+    h.addEventListener('click', () => h.closest('.card').classList.toggle('closed'));
+  });
+</script>
+
+</body>
+</html>

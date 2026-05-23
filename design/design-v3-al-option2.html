@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HOF Fact Find — A&amp;L Option 2: Accordion + Summary</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --black:#12110D;--deep:#0e0d09;--panel:#1e1c16;--card:#252219;
+      --gold:#CBB26B;--gold-grad:linear-gradient(135deg,#BFAE75,#DCCB8E);
+      --gold-b:rgba(203,178,107,.18);--gold-l:rgba(203,178,107,.08);
+      --hi:rgba(245,244,242,.92);--mid:rgba(245,244,242,.58);--low:rgba(245,244,242,.32);
+      --success:#16A34A;--success-bg:rgba(22,163,74,.12);
+      --error:#DC2626;--error-bg:rgba(220,38,38,.10);
+      --radius:8px;--sh:0 2px 16px rgba(0,0,0,.35);
+      --focus:0 0 0 3px rgba(203,178,107,.20);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Open Sans',sans-serif;background:var(--black);color:var(--hi);
+      font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased;
+      height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+    .nav{height:60px;background:var(--deep);flex-shrink:0;display:flex;align-items:center;
+      justify-content:space-between;padding:0 1.75rem;border-bottom:1px solid rgba(203,178,107,.10)}
+    .nav-l{display:flex;align-items:center;gap:.625rem}
+    .mono{width:32px;height:32px;border:1.5px solid var(--gold);border-radius:6px;display:flex;
+      align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;font-weight:800;font-size:11px;color:var(--gold)}
+    .wm{font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;color:var(--mid);letter-spacing:.07em;text-transform:uppercase}
+    .wm em{font-style:normal;color:var(--gold)}
+    .sep{width:1px;height:20px;background:rgba(203,178,107,.14);margin:0 .875rem}
+    .ctx{font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--low)}
+    .nav-r{display:flex;align-items:center;gap:.875rem}
+    .badge{background:var(--gold-l);border:1px solid var(--gold-b);color:var(--gold);font-family:'Montserrat',sans-serif;font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:3px 9px;border-radius:99px}
+
+    .shell{flex:1;display:flex;overflow:hidden}
+
+    /* LEFT SIDEBAR — steps */
+    .sb{width:240px;flex-shrink:0;background:var(--panel);border-right:1px solid rgba(203,178,107,.08);display:flex;flex-direction:column;overflow-y:auto}
+    .sb-inner{padding:1.5rem 1.25rem;flex:1}
+    .sb-ey{font-family:'Montserrat',sans-serif;font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--low);margin-bottom:1.25rem}
+    .step-item{position:relative;padding:0 0 0 2.25rem;margin-bottom:0}
+    .step-item:not(:last-child)::after{content:'';position:absolute;left:10px;top:28px;width:1px;height:calc(100% - 4px);background:rgba(203,178,107,.12)}
+    .step-item.done:not(:last-child)::after{background:rgba(22,163,74,.3)}
+    .step-item.active:not(:last-child)::after{background:linear-gradient(to bottom,rgba(203,178,107,.4),rgba(203,178,107,.06))}
+    .step-dot{position:absolute;left:0;top:3px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;font-size:9px;font-weight:800}
+    .step-item .step-dot{background:rgba(245,244,242,.05);color:var(--low);border:1px solid rgba(245,244,242,.08)}
+    .step-item.done .step-dot{background:rgba(22,163,74,.15);color:#4ade80;border:1px solid rgba(22,163,74,.25)}
+    .step-item.active .step-dot{background:var(--gold-grad);color:var(--black);border:none;box-shadow:0 0 0 3px rgba(203,178,107,.15)}
+    .step-content{padding:2px 0 1.25rem 0}
+    .step-name{font-family:'Montserrat',sans-serif;font-size:.75rem;font-weight:700;color:var(--low)}
+    .step-item.done .step-name{color:var(--mid)}
+    .step-item.active .step-name{color:var(--gold)}
+    .sb-footer{padding:.875rem 1.25rem;border-top:1px solid rgba(203,178,107,.08)}
+    .prog-lbl{display:flex;justify-content:space-between;margin-bottom:.35rem}
+    .prog-lbl span{font-family:'Montserrat',sans-serif;font-size:.6rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--low)}
+    .prog-lbl em{font-style:normal;color:var(--gold);font-family:'Montserrat',sans-serif;font-size:.6rem;font-weight:700}
+    .prog-track{height:3px;background:rgba(245,244,242,.05);border-radius:99px;overflow:hidden}
+    .prog-fill{height:100%;background:var(--gold-grad);border-radius:99px}
+
+    /* MAIN — 2 columns: accordion + summary */
+    .main{flex:1;overflow-y:auto;background:var(--panel)}
+    .main-inner{display:flex;gap:1.25rem;padding:2rem;height:100%;align-items:flex-start}
+
+    /* Accordion panel */
+    .accordion-panel{flex:1;min-width:0}
+    .page-ey{font-family:'Montserrat',sans-serif;font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:.3rem}
+    .page-title{font-family:'Montserrat',sans-serif;font-size:1.25rem;font-weight:800;color:var(--hi);margin-bottom:1.75rem}
+    .section-hdr{font-family:'Montserrat',sans-serif;font-size:.65rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:.625rem;margin-bottom:.875rem;margin-top:1.75rem}
+    .section-hdr:first-child{margin-top:0}
+    .section-hdr::after{content:'';flex:1;height:1px;background:rgba(203,178,107,.15)}
+    .section-hdr svg{width:13px;height:13px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round}
+
+    /* Accordion group */
+    .acc{background:var(--card);border:1px solid rgba(203,178,107,.10);border-left:3px solid rgba(203,178,107,.25);border-radius:var(--radius);margin-bottom:.625rem;overflow:hidden;transition:all .15s}
+    .acc.open{border-left-color:var(--gold)}
+    .acc-hdr{display:flex;align-items:center;justify-content:space-between;padding:.8rem 1.125rem;cursor:pointer;user-select:none}
+    .acc-hdr:hover{background:rgba(203,178,107,.04)}
+    .acc-l{display:flex;align-items:center;gap:.75rem}
+    .acc-icon{width:28px;height:28px;border-radius:6px;background:rgba(203,178,107,.07);border:1px solid rgba(203,178,107,.12);display:flex;align-items:center;justify-content:center}
+    .acc-icon svg{width:13px;height:13px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round}
+    .acc-title{font-family:'Montserrat',sans-serif;font-size:.8rem;font-weight:700;color:var(--hi);letter-spacing:.02em}
+    .acc-r{display:flex;align-items:center;gap:.625rem}
+    .count-badge{font-family:'Montserrat',sans-serif;font-size:.6rem;font-weight:700;padding:2px 7px;border-radius:99px;background:rgba(203,178,107,.10);color:var(--gold);letter-spacing:.06em}
+    .count-badge.empty{background:rgba(245,244,242,.05);color:var(--low)}
+    .chevron{font-size:11px;color:var(--low);transition:transform .2s}
+    .acc:not(.open) .chevron{transform:rotate(-90deg)}
+
+    .acc-body{padding:0 1.125rem 1rem}
+    .acc:not(.open) .acc-body{display:none}
+
+    /* Item row */
+    .item-row{display:flex;align-items:center;gap:.625rem;padding:.6rem .75rem;
+      border:1px solid rgba(203,178,107,.08);border-radius:7px;background:rgba(255,255,255,.02);
+      margin-bottom:.5rem;transition:all .15s}
+    .item-row:hover{background:rgba(203,178,107,.04);border-color:rgba(203,178,107,.14)}
+    .item-desc{flex:1;font-size:.875rem;color:var(--hi)}
+    .item-val{font-family:'Montserrat',sans-serif;font-size:.875rem;font-weight:700;color:var(--hi);white-space:nowrap}
+    .item-app-pill{display:inline-block;padding:2px 8px;border-radius:99px;font-family:'Montserrat',sans-serif;font-size:.6rem;font-weight:800;letter-spacing:.06em;white-space:nowrap}
+    .pill-a1{background:rgba(203,178,107,.10);border:1px solid var(--gold-b);color:var(--gold)}
+    .pill-a2{background:rgba(99,102,241,.10);border:1px solid rgba(99,102,241,.2);color:#818cf8}
+    .pill-jt{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.18);color:#4ade80}
+    .item-del{width:22px;height:22px;border-radius:4px;border:none;background:transparent;color:rgba(220,38,38,.35);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+    .item-del:hover{background:var(--error-bg);color:#f87171}
+    .add-item-btn{display:flex;align-items:center;gap:.375rem;width:100%;padding:.5rem .75rem;border-radius:7px;border:1px dashed rgba(203,178,107,.2);background:transparent;font-family:'Montserrat',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.03em;color:rgba(203,178,107,.45);cursor:pointer;transition:all .15s;margin-top:.25rem}
+    .add-item-btn:hover{border-color:var(--gold);color:var(--gold);background:var(--gold-l)}
+    .add-item-btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.5}
+    .empty-acc{padding:.875rem .75rem;text-align:center;font-size:.8rem;color:var(--low);background:rgba(245,244,242,.02);border-radius:7px;border:1px dashed rgba(245,244,242,.07)}
+
+    /* SUMMARY PANEL */
+    .summary-panel{width:260px;flex-shrink:0;position:sticky;top:0;align-self:flex-start;
+      background:var(--card);border:1px solid rgba(203,178,107,.12);border-left:3px solid var(--gold);
+      border-radius:var(--radius);box-shadow:var(--sh);overflow:hidden}
+    .sum-header{padding:1rem 1.25rem;border-bottom:1px solid rgba(203,178,107,.08);background:var(--black)}
+    .sum-h-lbl{font-family:'Montserrat',sans-serif;font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--low);margin-bottom:.25rem}
+    .sum-net-val{font-family:'Montserrat',sans-serif;font-size:1.5rem;font-weight:800;color:#4ade80}
+    .sum-net-label{font-size:.72rem;color:var(--low);margin-top:2px}
+    .sum-body{padding:1rem 1.25rem}
+    .sum-sec{margin-bottom:1.125rem}
+    .sum-sec-lbl{font-family:'Montserrat',sans-serif;font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--low);margin-bottom:.625rem}
+    .sum-line{display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid rgba(245,244,242,.04)}
+    .sum-line:last-child{border-bottom:none}
+    .sum-cat{font-size:.8rem;color:var(--mid)}
+    .sum-amt{font-family:'Montserrat',sans-serif;font-size:.8rem;font-weight:700;color:var(--hi)}
+    .sum-total-line{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-top:1px solid rgba(203,178,107,.12);margin-top:.25rem}
+    .sum-total-lbl{font-family:'Montserrat',sans-serif;font-size:.72rem;font-weight:700;color:var(--gold)}
+    .sum-total-amt{font-family:'Montserrat',sans-serif;font-size:.875rem;font-weight:800;color:var(--gold)}
+    .sum-total-amt.neg{color:#f87171}
+    .sum-footer{padding:.875rem 1.25rem;border-top:1px solid rgba(203,178,107,.08)}
+    .completion-badge{display:flex;align-items:center;gap:.5rem;padding:.625rem .875rem;border-radius:var(--radius);background:var(--success-bg);border:1px solid rgba(22,163,74,.2)}
+    .completion-badge svg{width:14px;height:14px;stroke:#4ade80;fill:none;stroke-width:2.5;flex-shrink:0}
+    .completion-badge-text{font-family:'Montserrat',sans-serif;font-size:.72rem;font-weight:700;color:#4ade80}
+    .completion-incomplete{display:flex;align-items:center;gap:.5rem;padding:.625rem .875rem;border-radius:var(--radius);background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.18)}
+    .completion-incomplete svg{width:14px;height:14px;stroke:#fbbf24;fill:none;stroke-width:2.5;flex-shrink:0}
+    .completion-incomplete-text{font-family:'Montserrat',sans-serif;font-size:.72rem;font-weight:700;color:#fbbf24}
+
+    /* ACTIONS */
+    .actions-row{display:flex;justify-content:space-between;align-items:center;
+      margin-top:1.5rem;padding:1rem 1.25rem;background:rgba(12,11,8,.4);
+      border:1px solid rgba(203,178,107,.10);border-left:3px solid transparent;border-radius:var(--radius)}
+    .btn-outline{display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.25rem;border-radius:var(--radius);border:2px solid rgba(203,178,107,.20);background:transparent;font-family:'Montserrat',sans-serif;font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mid);cursor:pointer;transition:all .15s}
+    .btn-outline:hover{border-color:var(--gold-b);color:var(--gold);background:var(--gold-l)}
+    .btn-primary{display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.5rem;border-radius:var(--radius);border:none;background:var(--gold-grad);font-family:'Montserrat',sans-serif;font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--black);cursor:pointer;transition:all .15s}
+    .btn-primary:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 4px 18px rgba(203,178,107,.28)}
+    .btn-ghost{display:inline-flex;align-items:center;gap:.375rem;padding:.375rem .75rem;border-radius:var(--radius);border:none;background:transparent;font-family:'Montserrat',sans-serif;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--low);cursor:pointer;transition:all .15s}
+    .btn-ghost:hover{background:rgba(245,244,242,.05);color:var(--mid)}
+    .actions-r{display:flex;gap:.75rem;align-items:center}
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-l">
+    <div class="mono">HOF</div>
+    <div class="wm">House of <em>Finance</em></div>
+    <div class="sep"></div>
+    <div class="ctx">Fact Find</div>
+  </div>
+  <div class="nav-r">
+    <span style="font-size:11px;color:var(--low)">James Chen &nbsp;·&nbsp; REF #FF-2024-0892</span>
+    <span class="badge">A&amp;L · Option 2</span>
+  </div>
+</nav>
+
+<div class="shell">
+  <!-- Step sidebar -->
+  <aside class="sb">
+    <div class="sb-inner">
+      <div class="sb-ey">Application Steps</div>
+      <ul style="list-style:none">
+        <li class="step-item done"><div class="step-dot">✓</div><div class="step-content"><div class="step-name">Loan Strategy</div></div></li>
+        <li class="step-item done"><div class="step-dot">✓</div><div class="step-content"><div class="step-name">Applicants</div></div></li>
+        <li class="step-item done"><div class="step-dot">✓</div><div class="step-content"><div class="step-name">Employment</div></div></li>
+        <li class="step-item active"><div class="step-dot">4</div><div class="step-content"><div class="step-name">Assets &amp; Liabilities</div></div></li>
+        <li class="step-item"><div class="step-dot">5</div><div class="step-content"><div class="step-name">Review &amp; Submit</div></div></li>
+      </ul>
+    </div>
+    <div class="sb-footer">
+      <div class="prog-lbl"><span>Progress</span><em>75%</em></div>
+      <div class="prog-track"><div class="prog-fill" style="width:75%"></div></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="main-inner">
+
+      <!-- Accordion panel -->
+      <div class="accordion-panel">
+        <div class="page-ey">Step 4 of 5</div>
+        <h1 class="page-title">Assets &amp; Liabilities</h1>
+
+        <!-- ASSETS -->
+        <div class="section-hdr">
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Assets
+        </div>
+
+        <!-- Real Estate -->
+        <div class="acc open">
+          <div class="acc-hdr" onclick="this.closest('.acc').classList.toggle('open')">
+            <div class="acc-l">
+              <div class="acc-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></div>
+              <div class="acc-title">Real Estate</div>
+            </div>
+            <div class="acc-r"><span class="count-badge">1 item</span><span class="chevron">▾</span></div>
+          </div>
+          <div class="acc-body">
+            <div class="item-row">
+              <div class="item-desc">123 Smith Street, Bondi NSW 2026</div>
+              <span class="item-app-pill pill-jt">Joint</span>
+              <div class="item-val">$850,000</div>
+              <button class="item-del">×</button>
+            </div>
+            <button class="add-item-btn"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Real Estate</button>
+          </div>
+        </div>
+
+        <!-- Vehicles -->
+        <div class="acc open">
+          <div class="acc-hdr" onclick="this.closest('.acc').classList.toggle('open')">
+            <div class="acc-l">
+              <div class="acc-icon"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16,8 20,8 23,11 23,16 16,16 16,8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
+              <div class="acc-title">Vehicles</div>
+            </div>
+            <div class="acc-r"><span class="count-badge">1 item</span><span class="chevron">▾</span></div>
+          </div>
+          <div class="acc-body">
+            <div class="item-row">
+              <div class="item-desc">2021 Toyota LandCruiser GX</div>
+              <span class="item-app-pill pill-a1">A1 — John</span>
+              <div class="item-val">$45,000</div>
+              <button class="item-del">×</button>
+            </div>
+            <button class="add-item-btn"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Vehicle</button>
+          </div>
+        </div>
+
+        <!-- Savings -->
+        <div class="acc open">
+          <div class="acc-hdr" onclick="this.closest('.acc').classList.toggle('open')">
+            <div class="acc-l">
+              <div class="acc-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+              <div class="acc-title">Savings &amp; Cash</div>
+            </div>
+            <div class="acc-r"><span class="count-badge">1 item</span><span class="chevron">▾</span></div>
+          </div>
+          <div class="acc-body">
+            <div class="item-row">
+              <div class="item-desc">Commonwealth Bank — Joint Savings</div>
+              <span class="item-app-pill pill-jt">Joint</span>
+              <div class="item-val">$85,000</div>
+              <button class="item-del">×</button>
+            </div>
+            <button class="add-item-btn"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Savings / Cash</button>
+          </div>
+        </div>
+
+        <!-- Super -->
+        <div class="acc open">
+          <div class="acc-hdr" onclick="this.closest('.acc').classList.toggle('open')">
+            <div class="acc-l">
+              <div class="acc-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+              <div class="acc-title">Superannuation</div>
+            </div>
+            <div class="acc-r"><span class="count-badge">2 items</span><span class="chevron">▾</span></div>
+          </div>
+          <div class="acc-body">
+            <div class="item-row">
+              <div class="item-desc">Australian Retirement Trust</div>
+              <span class="item-app-pill pill-a1">A1 — John</span>
+              <div class="item-val">$132,000</div>
+              <button class="item-del">×</button>
+            </div>
+            <div class="item-row">
+              <div class="item-desc">Hostplus Super Fund</div>
+              <span class="item-app-pill pill-a2">A2 — Sarah</span>
+              <div class="item-val">$48,000</div>
+              <button class="item-del">×</button>
+            </div>
+            <button class="add-item-btn"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Superannuation</button>
+          </div>
+        </div>
+
+        <!-- Other Assets — empty -->
+        <div class="acc">
+          <div class="acc-hdr" onclick="this.closest('.acc').classList.toggle('open')">
+            <div class="acc-l">
+              <div class="acc-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div>
+              <div class="acc-title">Other Assets</div>
+            </div>
+            <div class="acc-r"><span class="count-badge empty">Empty</span><span class="chevron">▾</span></div>
+          </div>
+          <div class="acc-body">
+            <div class="empty-acc">No other assets added</div>
+            <button class="add-item-btn" style="margin-top:.5rem"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Other Asset</button>
+          </div>
+        </div>
+
+        <!-- LIABILITIES -->
+        <div class="section-hdr" style="margin-top:2rem">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          Liabilities
+        </div>
+
+        <!-- Home Loan -->
+        <div class="acc open">
+          <div class="acc-hdr" onclick="this.closest('.acc').classList.toggle('open')">
+            <div class="acc-l">
+              <div class="acc-icon"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+              <div class="acc-title">Mortgage / Home Loan</div>
+            </div>
+            <div class="acc-r"><span class="count-badge">1 item</span><span class="chevron">▾</span></div>
+          </div>
+          <div class="acc-body">
+            <div class="item-row">
+              <div class="item-desc" style="flex:2">Commonwealth Bank · Variable</div>
+              <span class="item-app-pill pill-jt">Joint</span>
+              <div class="item-val" style="color:#f87171">$680,000</div>
+              <button class="item-del">×</button>
+            </div>
+            <button class="add-item-btn"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Home Loan</button>
+          </div>
+        </div>
+
+        <!-- Credit Cards -->
+        <div class="acc open">
+          <div class="acc-hdr" onclick="this.closest('.acc').classList.toggle('open')">
+            <div class="acc-l">
+              <div class="acc-icon"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
+              <div class="acc-title">Credit Cards</div>
+            </div>
+            <div class="acc-r"><span class="count-badge">1 item</span><span class="chevron">▾</span></div>
+          </div>
+          <div class="acc-body">
+            <div class="item-row">
+              <div class="item-desc">ANZ Rewards Black · $20k limit</div>
+              <span class="item-app-pill pill-a2">A2 — Sarah</span>
+              <div class="item-val" style="color:#f87171">$15,000</div>
+              <button class="item-del">×</button>
+            </div>
+            <button class="add-item-btn"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Credit Card</button>
+          </div>
+        </div>
+
+        <!-- Vehicle Finance -->
+        <div class="acc open">
+          <div class="acc-hdr" onclick="this.closest('.acc').classList.toggle('open')">
+            <div class="acc-l">
+              <div class="acc-icon"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13"/><polygon points="16,8 20,8 23,11 23,16 16,16 16,8"/></svg></div>
+              <div class="acc-title">Vehicle Finance</div>
+            </div>
+            <div class="acc-r"><span class="count-badge">1 item</span><span class="chevron">▾</span></div>
+          </div>
+          <div class="acc-body">
+            <div class="item-row">
+              <div class="item-desc">Westpac Auto Finance · LandCruiser</div>
+              <span class="item-app-pill pill-a1">A1 — John</span>
+              <div class="item-val" style="color:#f87171">$22,000</div>
+              <button class="item-del">×</button>
+            </div>
+            <button class="add-item-btn"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Vehicle Finance</button>
+          </div>
+        </div>
+
+        <!-- Other Liabilities — empty -->
+        <div class="acc">
+          <div class="acc-hdr" onclick="this.closest('.acc').classList.toggle('open')">
+            <div class="acc-l">
+              <div class="acc-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div>
+              <div class="acc-title">Other Liabilities</div>
+            </div>
+            <div class="acc-r"><span class="count-badge empty">Empty</span><span class="chevron">▾</span></div>
+          </div>
+          <div class="acc-body">
+            <div class="empty-acc">No other liabilities added</div>
+            <button class="add-item-btn" style="margin-top:.5rem"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Other Liability</button>
+          </div>
+        </div>
+
+        <div class="actions-row">
+          <button class="btn-outline">← Employment</button>
+          <div class="actions-r">
+            <button class="btn-ghost">Save Draft</button>
+            <button class="btn-primary">Next: Review &amp; Submit →</button>
+          </div>
+        </div>
+      </div><!-- /accordion panel -->
+
+      <!-- Summary panel -->
+      <div class="summary-panel">
+        <div class="sum-header">
+          <div class="sum-h-lbl">Net Position</div>
+          <div class="sum-net-val">$443,000</div>
+          <div class="sum-net-label">Assets − Liabilities</div>
+        </div>
+        <div class="sum-body">
+          <div class="sum-sec">
+            <div class="sum-sec-lbl">Assets</div>
+            <div class="sum-line"><span class="sum-cat">Real Estate</span><span class="sum-amt">$850,000</span></div>
+            <div class="sum-line"><span class="sum-cat">Vehicles</span><span class="sum-amt">$45,000</span></div>
+            <div class="sum-line"><span class="sum-cat">Savings &amp; Cash</span><span class="sum-amt">$85,000</span></div>
+            <div class="sum-line"><span class="sum-cat">Investments</span><span class="sum-amt">$0</span></div>
+            <div class="sum-line"><span class="sum-cat">Superannuation</span><span class="sum-amt">$180,000</span></div>
+            <div class="sum-total-line">
+              <span class="sum-total-lbl">Total Assets</span>
+              <span class="sum-total-amt">$1,160,000</span>
+            </div>
+          </div>
+          <div class="sum-sec">
+            <div class="sum-sec-lbl">Liabilities</div>
+            <div class="sum-line"><span class="sum-cat">Home Loan</span><span class="sum-amt">$680,000</span></div>
+            <div class="sum-line"><span class="sum-cat">Credit Cards</span><span class="sum-amt">$15,000</span></div>
+            <div class="sum-line"><span class="sum-cat">Vehicle Finance</span><span class="sum-amt">$22,000</span></div>
+            <div class="sum-total-line">
+              <span class="sum-total-lbl">Total Liabilities</span>
+              <span class="sum-total-amt neg">$717,000</span>
+            </div>
+          </div>
+        </div>
+        <div class="sum-footer">
+          <div class="completion-badge">
+            <svg viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>
+            <div class="completion-badge-text">All sections entered</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /main-inner -->
+  </main>
+</div>
+
+</body>
+</html>

@@ -1,18 +1,20 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import './styles.css';
+import { getBrokerEmail } from './lib/utils';
+import Step0LoanStrategy from './steps/Step0-LoanStrategy';
+import Step1Applicants from './steps/Step1-Applicants';
+import Step2Employment from './steps/Step2-Employment';
+import Step3AssetsLiabilities from './steps/Step3-AssetsLiabilities';
+import Step4Review from './steps/Step4-Review';
+import WelcomeScreen from './pages/WelcomeScreen';
+import QuickFactFind from './pages/QuickFactFind';
 
 const stepVariants = {
   enter:  (dir) => ({ opacity: 0, x: dir * 30 }),
   center: { opacity: 1, x: 0 },
   exit:   (dir) => ({ opacity: 0, x: dir * -20 }),
 };
-import './styles.css';
-import { getBrokerEmail } from './utils';
-import Step0LoanStrategy from './Step0-LoanStrategy-Polished';
-import Step1Applicants from './Step1-Applicants-Polished';
-import Step2Employment from './Step2-Employment-Polished';
-import Step3AssetsLiabilities from './Step3-AssetsLiabilities-Polished';
-import Step4Review from './Step4-Review-Polished';
 
 // Safely sets a value at a nested path like "applicants[0].firstName"
 function deepSet(obj, [key, ...rest], value) {
@@ -123,6 +125,7 @@ const FactFindApp = () => {
     submittedBy: ''
   });
 
+  const [screen, setScreen] = useState('welcome'); // 'welcome' | 'full' | 'quick'
   const [theme, setTheme] = useState(() => localStorage.getItem('hof-theme') || 'light');
   const [direction, setDirection] = useState(1);
 
@@ -194,14 +197,12 @@ const FactFindApp = () => {
 
 
   // ── Submission state ──────────────────────────────────────────────────────
-  // status: 'idle' | 'checking' | 'duplicate' | 'submitting' | 'success' | 'error'
+  // status: 'idle' | 'submitting' | 'success' | 'error'
   const [submission, setSubmission] = useState({
     status: 'idle',
     message: '',
     mercuryUrl: '',
-    notionUrl: '',
-    notionTitle: '',
-    duplicates: [],
+    title: '',
   });
 
   const doSubmit = useCallback(async () => {
@@ -219,34 +220,15 @@ const FactFindApp = () => {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setSubmission({ status: 'success', message: '', mercuryUrl: data.mercuryUrl, notionUrl: data.notionUrl, notionTitle: data.title, duplicates: [] });
+      setSubmission({ status: 'success', message: '', mercuryUrl: data.mercuryUrl, title: data.title });
     } catch (err) {
       setSubmission(s => ({ ...s, status: 'error', message: err.message }));
     }
   }, [formData]);
 
   const handleSubmit = useCallback(async () => {
-    setSubmission(s => ({ ...s, status: 'checking', message: '' }));
-    try {
-      const res  = await fetch('/api/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'check', formData }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-
-      if (data.exists) {
-        // Duplicates found — ask broker what to do
-        setSubmission(s => ({ ...s, status: 'duplicate', duplicates: data.matches, message: '' }));
-      } else {
-        // No duplicates — submit immediately
-        await doSubmit();
-      }
-    } catch (err) {
-      setSubmission(s => ({ ...s, status: 'error', message: err.message }));
-    }
-  }, [formData, doSubmit]);
+    await doSubmit();
+  }, [doSubmit]);
 
   const goToNextStep = () => {
     if (currentStep < steps.length - 1) {
@@ -286,6 +268,75 @@ const FactFindApp = () => {
         return null;
     }
   };
+
+  const handleBackToStart = () => {
+    if (window.confirm('Return to the start? Any unsaved data will be lost.')) {
+      setScreen('welcome');
+      setCurrentStep(0);
+    }
+  };
+
+  const renderSidebar = () => (
+    <nav className="sidebar">
+      <div className="sidebar-header">
+        <div className="sidebar-label">
+          {screen === 'quick' ? 'Quick Fact Find' : 'Full Fact Find'}
+        </div>
+        <div className="sidebar-type-badge">
+          {screen === 'quick' ? '⚡ Quick' : '📋 Full'}
+        </div>
+      </div>
+
+      <div className="sidebar-steps">
+        {steps.map((step, index) => {
+          const isActive    = currentStep === step.id;
+          const isCompleted = currentStep > step.id;
+          const status      = isCompleted ? 'completed' : isActive ? 'active' : 'pending';
+          const isLast      = index === steps.length - 1;
+          return (
+            <React.Fragment key={step.id}>
+              <button
+                className="sidebar-step"
+                onClick={() => goToStep(step.id)}
+                style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}
+              >
+                <div className="sidebar-step-track">
+                  <div className={`sidebar-dot ${status}`}>
+                    {isCompleted ? (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    ) : index + 1}
+                  </div>
+                  {!isLast && (
+                    <div className={`sidebar-connector ${isCompleted ? 'completed' : 'pending'}`} />
+                  )}
+                </div>
+                <div className="sidebar-step-info">
+                  <div className={`sidebar-step-name ${status}`}>{step.name}</div>
+                  <div className={`sidebar-step-sub ${status}`}>
+                    {isCompleted ? 'Complete' : isActive ? 'In progress' : ''}
+                  </div>
+                </div>
+              </button>
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      <div className="sidebar-footer">
+        <div className="sidebar-progress-bar">
+          <div
+            className="sidebar-progress-fill"
+            style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+          />
+        </div>
+        <button className="sidebar-back-btn" onClick={handleBackToStart}>
+          ← Back to start
+        </button>
+      </div>
+    </nav>
+  );
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-tertiary)' }}>
@@ -330,92 +381,76 @@ const FactFindApp = () => {
         </div>
       </header>
 
-      {/* ── Step Progress Strip ───────────────────────────────────────────── */}
-      <div className="app-step-strip">
-        <div className="container">
-          <div className="app-steps-row">
-            {steps.map((step, index) => {
-              const isActive    = currentStep === step.id;
-              const isCompleted = currentStep > step.id;
-              const status      = isCompleted ? 'completed' : isActive ? 'active' : 'pending';
-              return (
-                <React.Fragment key={step.id}>
-                  <button className="app-step-btn" onClick={() => goToStep(step.id)}>
-                    <div className={`app-step-circle ${status}`}>
-                      {isCompleted ? '✓' : index + 1}
-                    </div>
-                    <span className={`app-step-label ${status}`}>{step.name}</span>
-                  </button>
-                  {index < steps.length - 1 && (
-                    <div className={`app-step-connector ${isCompleted ? 'completed' : 'pending'}`} />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </div>
-          <div className="app-progress-row">
-            <div className="app-progress-bar">
-              <div
-                className="app-progress-fill"
-                style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
-              />
+      {/* ── Welcome Screen ───────────────────────────────────────────────── */}
+      {screen === 'welcome' && (
+        <WelcomeScreen
+          onSelectFull={() => setScreen('full')}
+          onSelectQuick={() => setScreen('quick')}
+        />
+      )}
+
+      {/* ── Full Fact Find ───────────────────────────────────────────────── */}
+      {screen === 'full' && (
+        <div className="app-layout">
+          {renderSidebar()}
+          <div className="main-content">
+            <div style={{ maxWidth: '860px', margin: '0 auto', padding: '28px 24px 88px' }}>
+              <div className="sc-page-header">
+                <h2 className="sc-page-title">{steps[currentStep].name}</h2>
+                <p className="sc-page-subtitle">{steps[currentStep].subtitle}</p>
+                <div className="step-accent-bar" />
+                <SectionCountChip currentStep={currentStep} formData={formData} />
+              </div>
+              <AnimatePresence mode="wait" custom={direction}>
+                <motion.div
+                  key={currentStep}
+                  custom={direction}
+                  variants={stepVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                >
+                  {renderStepContent()}
+                </motion.div>
+              </AnimatePresence>
             </div>
-            <span className="app-progress-label">
-              STEP {currentStep + 1} OF {steps.length} · {Math.round(((currentStep + 1) / steps.length) * 100)}%
-            </span>
+
+            {/* Sticky Bottom Nav */}
+            <div className="sc-nav">
+              <div className="sc-nav-inner">
+                <button
+                  onClick={goToPreviousStep}
+                  disabled={currentStep === 0}
+                  className="btn-secondary"
+                  style={{ minWidth: '120px' }}
+                >
+                  ← Previous
+                </button>
+                <span className="sc-nav-count">{currentStep + 1} / {steps.length}</span>
+                {currentStep < steps.length - 1 ? (
+                  <button onClick={goToNextStep} className="btn-primary" style={{ minWidth: '120px' }}>
+                    Continue →
+                  </button>
+                ) : (
+                  <button onClick={handleSubmit} className="btn-success">
+                    Submit →
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* ── Main Content ─────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 16px 88px' }}>
-        {/* Step page header */}
-        <div className="sc-page-header">
-          <h2 className="sc-page-title">{steps[currentStep].name}</h2>
-          <p className="sc-page-subtitle">{steps[currentStep].subtitle}</p>
-          <div className="step-accent-bar" />
-          <SectionCountChip currentStep={currentStep} formData={formData} />
+      {/* ── Quick Fact Find ─────────────────────────────────────────────────── */}
+      {screen === 'quick' && (
+        <div className="quick-ff-page">
+          <QuickFactFind onBack={() => setScreen('welcome')} />
         </div>
-        <AnimatePresence mode="wait" custom={direction}>
-          <motion.div
-            key={currentStep}
-            custom={direction}
-            variants={stepVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-          >
-            {renderStepContent()}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+      )}
 
-      {/* ── Sticky Bottom Nav ────────────────────────────────────────────── */}
-      <div className="sc-nav">
-        <div className="sc-nav-inner">
-          <button
-            onClick={goToPreviousStep}
-            disabled={currentStep === 0}
-            className="btn-secondary"
-            style={{ minWidth: '120px' }}
-          >
-            ← Previous
-          </button>
-          <span className="sc-nav-count">{currentStep + 1} / {steps.length}</span>
-          {currentStep < steps.length - 1 ? (
-            <button onClick={goToNextStep} className="btn-primary" style={{ minWidth: '120px' }}>
-              Continue →
-            </button>
-          ) : (
-            <button onClick={handleSubmit} className="btn-success">
-              Submit →
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── Submission Overlays ───────────────────────────────────────────── */}
+      {/* ── Submission Overlays (shown regardless of screen) ────────────── */}
 
       {/* Success */}
       <AnimatePresence>
@@ -430,21 +465,12 @@ const FactFindApp = () => {
             </div>
             <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '20px', fontWeight: 700, color: 'var(--color-success)', margin: '0 0 10px' }}>Submitted Successfully!</h2>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: '0 0 24px', lineHeight: 1.6 }}>
-              <strong style={{ color: 'var(--text-primary)' }}>{submission.notionTitle}</strong> has been created in Mercury as a new lead. Teams has been notified.
+              <strong style={{ color: 'var(--text-primary)' }}>{submission.title}</strong> has been created in Mercury. Chris and Rita have been emailed a PDF summary.
             </p>
             <a href={submission.mercuryUrl} target="_blank" rel="noopener noreferrer"
               style={{ display: 'inline-block', padding: '12px 28px', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', borderRadius: '8px', fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '13px', letterSpacing: '0.06em', textDecoration: 'none', textTransform: 'uppercase', marginBottom: '12px' }}>
               Open in Mercury →
             </a>
-            {submission.notionUrl && (
-              <>
-                <br />
-                <a href={submission.notionUrl} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'inline-block', marginTop: '8px', fontSize: '12px', color: 'var(--text-secondary)', textDecoration: 'underline' }}>
-                  View Notion backup →
-                </a>
-              </>
-            )}
             <br />
             <button onClick={() => setSubmission(s => ({ ...s, status: 'idle' }))}
               style={{ marginTop: '8px', padding: '10px 20px', background: 'none', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>
@@ -455,52 +481,6 @@ const FactFindApp = () => {
       )}
       </AnimatePresence>
 
-      {/* Duplicate */}
-      <AnimatePresence>
-      {submission.status === 'duplicate' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <motion.div initial={{ scale: 0.94, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.94, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '16px', padding: '36px', maxWidth: '520px', width: '100%', boxShadow: '0 25px 60px rgba(0,0,0,0.35)' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'var(--color-warning-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: 'var(--color-warning)' }}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            </div>
-            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '18px', fontWeight: 700, color: 'var(--color-warning-dark)', margin: '0 0 8px', textAlign: 'center' }}>Existing Record Found</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 16px', textAlign: 'center' }}>
-              The following pipeline {submission.duplicates.length === 1 ? 'entry matches' : 'entries match'} this applicant name:
-            </p>
-            <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {submission.duplicates.map(d => (
-                <div key={d.id} style={{ padding: '12px 14px', background: 'var(--color-warning-light)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>{d.title}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--color-warning-dark)' }}>{d.status}</div>
-                  </div>
-                  <a href={d.url} target="_blank" rel="noopener noreferrer"
-                    style={{ fontSize: '12px', color: 'var(--color-gold)', textDecoration: 'none', fontWeight: 600, whiteSpace: 'nowrap', marginLeft: '12px' }}>
-                    View →
-                  </a>
-                </div>
-              ))}
-            </div>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 20px', textAlign: 'center' }}>
-              Would you like to submit anyway, or cancel to review?
-            </p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setSubmission(s => ({ ...s, status: 'idle' }))}
-                style={{ flex: 1, padding: '11px', background: 'none', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>
-                Cancel — Review
-              </button>
-              <button onClick={doSubmit}
-                style={{ flex: 1, padding: '11px', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontFamily: 'var(--font-heading)', fontWeight: 700, letterSpacing: '0.04em' }}>
-                Create Anyway
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-      </AnimatePresence>
 
 
       {/* Error */}

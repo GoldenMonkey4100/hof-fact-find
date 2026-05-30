@@ -162,9 +162,12 @@ const Step4Review = ({ formData, onSubmit, submission = {} }) => {
                   ? <span className="badge badge-success">✓ {(emp.totalYears || 0).toFixed(1)} yrs</span>
                   : <span className="badge badge-warning">⚠ {(emp.totalYears || 0).toFixed(1)} / 3 yrs</span>}
               </div>
-              {emp.currentEmployment?.employer && (
-                <Row label="Current Employer" value={`${emp.currentEmployment.employer} — ${emp.currentEmployment.role || ''}`} />
-              )}
+              {(() => {
+                const jobs = emp.currentJobs || (emp.currentEmployment ? [emp.currentEmployment] : []);
+                return jobs.filter(j => j.employer).map((j, ji) => (
+                  <Row key={ji} label={jobs.length > 1 ? `Job ${ji + 1}` : 'Current Employer'} value={`${j.employer}${j.role ? ' — ' + j.role : ''}`} />
+                ));
+              })()}
             </div>
           ))}
         </Section>

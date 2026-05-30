@@ -74,13 +74,13 @@ const SubStepBar = ({ step, labels, onGoTo }) => (
         <React.Fragment key={n}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', cursor: done ? 'pointer' : 'default' }}
             onClick={() => done && onGoTo(n)}>
-            <div style={{ width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', transition: 'all 0.2s', background: done ? '#10b981' : active ? 'var(--color-primary)' : 'var(--bg-secondary)', color: done || active ? 'white' : 'var(--text-tertiary)', border: done ? '2px solid #10b981' : active ? '2px solid var(--color-primary)' : '1px solid var(--border-primary)' }}>
+            <div style={{ width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', transition: 'all 0.2s', background: done ? 'var(--color-primary)' : active ? 'var(--color-primary)' : 'var(--bg-secondary)', color: done || active ? 'white' : 'var(--text-tertiary)', border: done ? '2px solid var(--color-primary)' : active ? '2px solid var(--color-primary)' : '1px solid var(--border-primary)' }}>
               {done ? '✓' : n}
             </div>
-            <span style={{ fontSize: '11px', fontWeight: active ? '600' : '400', color: active ? 'var(--color-primary)' : done ? '#10b981' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{label}</span>
+            <span style={{ fontSize: '11px', fontWeight: active ? '600' : '400', color: active ? 'var(--color-primary)' : done ? 'var(--color-primary)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{label}</span>
           </div>
           {i < labels.length - 1 && (
-            <div style={{ flex: 1, height: '2px', background: done ? '#10b981' : 'var(--border-primary)', margin: '0 8px', marginBottom: '14px', transition: 'background 0.2s' }} />
+            <div style={{ flex: 1, height: '2px', background: done ? 'var(--color-primary)' : 'var(--border-primary)', margin: '0 8px', marginBottom: '14px', transition: 'background 0.2s' }} />
           )}
         </React.Fragment>
       );
@@ -319,6 +319,15 @@ const Step2Employment = ({ formData, updateFormData }) => {
   const getApplicantType = (applicantId) =>
     (formData.applicants || []).find(a => a.id === applicantId)?.type || 'Natural Person';
 
+  const defaultJob = (overrides = {}) => ({
+    id: Date.now() + Math.random(),
+    employmentType: [], employer: '', role: '', startDate: '', abn: '',
+    entityType: '', receivingCentrelink: false, incomeVerification: null,
+    payFrequency: '', baseIncome: '', bonusIncome: '', commissions: '', hecs: '',
+    payslipUrl: '',
+    ...overrides,
+  });
+
   // ── Sync employment records ─────────────────────────────────────────────────
   useEffect(() => {
     if (!formData.applicants?.length) return;
@@ -329,18 +338,21 @@ const Step2Employment = ({ formData, updateFormData }) => {
 
       const existing = (formData.employment || []).find(r => r.applicantId === applicant.id);
       if (existing) {
-        const et = existing.currentEmployment?.employmentType;
-        return { ...existing, applicantName, currentEmployment: { ...existing.currentEmployment, employmentType: Array.isArray(et) ? et : et ? [et] : [] } };
+        // Migrate legacy currentEmployment → currentJobs[0]
+        let currentJobs = existing.currentJobs;
+        if (!currentJobs) {
+          const et = existing.currentEmployment?.employmentType;
+          const primary = { ...defaultJob(), ...existing.currentEmployment, employmentType: Array.isArray(et) ? et : et ? [et] : [] };
+          currentJobs = [primary];
+        }
+        return { ...existing, applicantName, currentJobs };
       }
       return {
         applicantId: applicant.id,
         applicantName,
-        currentEmployment: {
+        currentJobs: [defaultJob({
           employmentType: applicant.type === 'Company Borrower' ? ['Self-Employed (Company)'] : [],
-          employer: '', role: '', startDate: '', abn: '',
-          entityType: '', receivingCentrelink: false, incomeVerification: null,
-          payFrequency: '', baseIncome: '', bonusIncome: '', commissions: '', hecs: ''
-        },
+        })],
         previousEmployments: [],
         totalYears: 0,
         meetsRequirement: false
@@ -359,11 +371,13 @@ const Step2Employment = ({ formData, updateFormData }) => {
 
   const calculateTotalYears = (record) => {
     let total = 0;
-    const _etArr = Array.isArray(record.currentEmployment.employmentType) ? record.currentEmployment.employmentType : record.currentEmployment.employmentType ? [record.currentEmployment.employmentType] : [];
-    if (record.currentEmployment.startDate &&
-        !_etArr.includes('Unemployed') &&
-        !_etArr.includes('Retired')) {
-      total += calculateTenure(record.currentEmployment.startDate);
+    const jobs = record.currentJobs || (record.currentEmployment ? [record.currentEmployment] : []);
+    const primaryJob = jobs[0];
+    if (primaryJob?.startDate) {
+      const et = Array.isArray(primaryJob.employmentType) ? primaryJob.employmentType : primaryJob.employmentType ? [primaryJob.employmentType] : [];
+      if (!et.includes('Unemployed') && !et.includes('Retired')) {
+        total += calculateTenure(primaryJob.startDate);
+      }
     }
     record.previousEmployments.forEach(emp => {
       if (emp.startDate && emp.endDate) total += calculateTenure(emp.startDate, emp.endDate);
@@ -430,9 +444,31 @@ const Step2Employment = ({ formData, updateFormData }) => {
   };
 
   // ── State updaters ──────────────────────────────────────────────────────────
-  const updateCurrentEmployment = (idx, field, value) => {
+  const updateCurrentJob = (idx, jobIdx, field, value) => {
     const updated = [...employmentRecords];
-    updated[idx].currentEmployment[field] = value;
+    const jobs = [...(updated[idx].currentJobs || [])];
+    jobs[jobIdx] = { ...jobs[jobIdx], [field]: value };
+    updated[idx] = { ...updated[idx], currentJobs: jobs };
+    updated[idx].totalYears = calculateTotalYears(updated[idx]);
+    updated[idx].meetsRequirement = updated[idx].totalYears >= 3;
+    setEmploymentRecords(updated);
+    updateFormData('employment', updated);
+  };
+
+  // Keep alias for payslip extract callbacks which target job 0
+  const updateCurrentEmployment = (idx, field, value) => updateCurrentJob(idx, 0, field, value);
+
+  const addCurrentJob = (idx) => {
+    const updated = [...employmentRecords];
+    updated[idx] = { ...updated[idx], currentJobs: [...(updated[idx].currentJobs || []), defaultJob()] };
+    setEmploymentRecords(updated);
+    updateFormData('employment', updated);
+  };
+
+  const removeCurrentJob = (idx, jobIdx) => {
+    const updated = [...employmentRecords];
+    const jobs = (updated[idx].currentJobs || []).filter((_, i) => i !== jobIdx);
+    updated[idx] = { ...updated[idx], currentJobs: jobs.length ? jobs : [defaultJob()] };
     updated[idx].totalYears = calculateTotalYears(updated[idx]);
     updated[idx].meetsRequirement = updated[idx].totalYears >= 3;
     setEmploymentRecords(updated);
@@ -532,7 +568,8 @@ const Step2Employment = ({ formData, updateFormData }) => {
     const hasFile   = !!file;
     const extracting = !!ps.extracting;
     const extracted  = !!ps.data;
-    const iv        = record.currentEmployment.incomeVerification;
+    const primaryJob = (record.currentJobs || [])[0] || {};
+    const iv        = primaryJob.incomeVerification;
     const inputId   = `ps-qa-${idx}`;
 
     const ivStatusMap = {
@@ -594,7 +631,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
               : 'No verification yet'}
           </div>
           <button type="button"
-            onClick={() => { goToEmpStep(record.applicantId, 2); setVerifierExpanded(p => ({ ...p, [idx]: true })); }}
+            onClick={() => { goToEmpStep(record.applicantId, 1); setVerifierExpanded(p => ({ ...p, [idx]: true })); }}
             style={{ padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: iv ? 'var(--bg-primary)' : 'var(--color-primary)', color: iv ? 'var(--text-primary)' : 'white', border: iv ? '1px solid var(--border-primary)' : 'none', borderRadius: '6px', cursor: 'pointer' }}>
             {iv ? <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit Verification</> : 'Open Verifier'}
           </button>
@@ -698,19 +735,19 @@ const Step2Employment = ({ formData, updateFormData }) => {
           </div>
         </div>
 
-        {/* Current employment row */}
-        {record.currentEmployment.employer && record.currentEmployment.startDate && (
-          <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: record.previousEmployments.length > 0 ? '1px solid var(--border-primary)' : 'none', background: 'var(--bg-primary)' }}>
-            <span style={{ fontSize: '10px', fontWeight: '700', color: '#0369a1', background: '#dbeafe', padding: '2px 7px', borderRadius: '10px', flexShrink: 0 }}>CURRENT</span>
-            <span style={{ fontSize: '12px', fontWeight: '600', flex: 1, color: 'var(--text-primary)' }}>{record.currentEmployment.employer}</span>
+        {/* Current jobs rows */}
+        {(record.currentJobs || []).map((job, ji) => job.employer && job.startDate ? (
+          <div key={ji} style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: (ji < (record.currentJobs.length - 1) || record.previousEmployments.length > 0) ? '1px solid var(--border-primary)' : 'none', background: 'var(--bg-primary)' }}>
+            <span style={{ fontSize: '10px', fontWeight: '700', color: '#0369a1', background: '#dbeafe', padding: '2px 7px', borderRadius: '10px', flexShrink: 0 }}>{ji === 0 ? 'CURRENT' : 'CONCURRENT'}</span>
+            <span style={{ fontSize: '12px', fontWeight: '600', flex: 1, color: 'var(--text-primary)' }}>{job.employer}</span>
             <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-              {new Date(record.currentEmployment.startDate).getFullYear()}–present
+              {new Date(job.startDate).getFullYear()}–present
             </span>
             <span style={{ fontSize: '11px', fontWeight: '600', color: '#0369a1', minWidth: '40px', textAlign: 'right' }}>
-              {calculateTenure(record.currentEmployment.startDate).toFixed(1)}y
+              {calculateTenure(job.startDate).toFixed(1)}y
             </span>
           </div>
-        )}
+        ) : null)}
 
         {/* Previous employment rows */}
         {record.previousEmployments.map((prev, empIdx) => (
@@ -774,9 +811,11 @@ const Step2Employment = ({ formData, updateFormData }) => {
         const isCompanyBorrower = appType === 'Company Borrower';
         const empStep           = getEmpStep(record.applicantId);
 
+        const primaryJob = (record.currentJobs || [])[0] || {};
         const empSummary = [
-          isCompanyBorrower ? 'Company Borrower' : record.currentEmployment.employer,
-          isCompanyBorrower ? null : (() => { const et = record.currentEmployment.employmentType; return Array.isArray(et) ? (et.length ? et.join(' / ') : null) : et || null; })(),
+          isCompanyBorrower ? 'Company Borrower' : primaryJob.employer,
+          isCompanyBorrower ? null : (() => { const et = primaryJob.employmentType; return Array.isArray(et) ? (et.length ? et.join(' / ') : null) : et || null; })(),
+          record.currentJobs?.length > 1 ? `${record.currentJobs.length} jobs` : null,
           record.totalYears > 0 ? `${record.totalYears.toFixed(1)} yrs` : null,
         ].filter(Boolean).join(' · ') || null;
         const empStatus = record.meetsRequirement ? 'done' : record.totalYears > 0 ? 'partial' : 'empty';
@@ -791,11 +830,6 @@ const Step2Employment = ({ formData, updateFormData }) => {
           if (!n) return null;
           return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 2 }).format(n);
         };
-        const HECSBtn = ({ val }) => (
-          <button type="button" onClick={() => updateCurrentEmployment(index, 'hecs', val)}
-            style={{ flex: 1, padding: '7px 0', border: `1px solid ${record.currentEmployment.hecs === val ? 'var(--color-primary)' : 'var(--border-primary)'}`, background: record.currentEmployment.hecs === val ? 'var(--color-primary-light)' : 'var(--bg-primary)', color: record.currentEmployment.hecs === val ? 'var(--color-primary)' : 'var(--text-secondary)', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>{val}</button>
-        );
-
         return (
           <SmartCard
             key={record.applicantId}
@@ -810,45 +844,48 @@ const Step2Employment = ({ formData, updateFormData }) => {
           >
 
             {/* ── Company Borrower ── */}
-            {isCompanyBorrower && (
-              <div className="mb-6">
-                {renderEmploymentQuickActions(record, index)}
-                <div style={{ padding: '14px 16px', background: 'var(--bg-secondary)', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Employment Type:</span>
-                  <span className="badge badge-info" style={{ fontSize: '13px' }}>Self-Employed</span>
-                </div>
-                <div className="mb-4">
-                  <label>Entity Type</label>
-                  <select value={record.currentEmployment.entityType || ''} onChange={(e) => updateCurrentEmployment(index, 'entityType', e.target.value)}>
-                    <option value="">Select...</option>
-                    <option value="Company">Company</option>
-                    <option value="Trust">Trust</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 mb-4">
-                  <div>
-                    <label>Business / Trading Name</label>
-                    <input type="text" value={record.currentEmployment.employer} onChange={(e) => updateCurrentEmployment(index, 'employer', e.target.value)} placeholder="Trading name" />
+            {isCompanyBorrower && (() => {
+              const job0 = primaryJob;
+              return (
+                <div className="mb-6">
+                  {renderEmploymentQuickActions(record, index)}
+                  <div style={{ padding: '14px 16px', background: 'var(--bg-secondary)', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Employment Type:</span>
+                    <span className="badge badge-info" style={{ fontSize: '13px' }}>Self-Employed</span>
                   </div>
-                  <div>
-                    <ABNField idx={index} empKey="self-current" value={record.currentEmployment.abn}
-                      onChange={(v) => updateCurrentEmployment(index, 'abn', v)}
-                      onABNResult={(r) => { if (!record.currentEmployment.employer && r.tradingNames?.[0]) updateCurrentEmployment(index, 'employer', r.tradingNames[0]); }} />
+                  <div className="mb-4">
+                    <label>Entity Type</label>
+                    <select value={job0.entityType || ''} onChange={(e) => updateCurrentJob(index, 0, 'entityType', e.target.value)}>
+                      <option value="">Select...</option>
+                      <option value="Company">Company</option>
+                      <option value="Trust">Trust</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 mb-4">
+                    <div>
+                      <label>Business / Trading Name</label>
+                      <input type="text" value={job0.employer} onChange={(e) => updateCurrentJob(index, 0, 'employer', e.target.value)} placeholder="Trading name" />
+                    </div>
+                    <div>
+                      <ABNField idx={index} empKey="self-current" value={job0.abn}
+                        onChange={(v) => updateCurrentJob(index, 0, 'abn', v)}
+                        onABNResult={(r) => { if (!job0.employer && r.tradingNames?.[0]) updateCurrentJob(index, 0, 'employer', r.tradingNames[0]); }} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2">
+                    <div>
+                      <label>Role / Position</label>
+                      <input type="text" value={job0.role} onChange={(e) => updateCurrentJob(index, 0, 'role', e.target.value)} placeholder="e.g. Director" />
+                    </div>
+                    <div>
+                      <label>Business Start Date</label>
+                      <input type="date" value={job0.startDate} onChange={(e) => updateCurrentJob(index, 0, 'startDate', e.target.value)} />
+                      {job0.startDate && <div className="hint-text">{calculateTenure(job0.startDate).toFixed(1)} years</div>}
+                    </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2">
-                  <div>
-                    <label>Role / Position</label>
-                    <input type="text" value={record.currentEmployment.role} onChange={(e) => updateCurrentEmployment(index, 'role', e.target.value)} placeholder="e.g. Director" />
-                  </div>
-                  <div>
-                    <label>Business Start Date</label>
-                    <input type="date" value={record.currentEmployment.startDate} onChange={(e) => updateCurrentEmployment(index, 'startDate', e.target.value)} />
-                    {record.currentEmployment.startDate && <div className="hint-text">{calculateTenure(record.currentEmployment.startDate).toFixed(1)} years</div>}
-                  </div>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* ── Natural Person / Director Guarantor — Quick Actions + 2-step ── */}
             {!isCompanyBorrower && (
@@ -871,104 +908,150 @@ const Step2Employment = ({ formData, updateFormData }) => {
                     exit="exit"
                     transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
                   >
-                {/* Step 1: Current Employment */}
+                {/* Step 1: Current Employment — stacked job cards */}
                 {empStep === 1 && (
                   <div>
-                    <div className="mb-4">
-                      <label>Employment Type <span style={{ fontSize: '11px', fontWeight: '400', color: 'var(--text-tertiary)' }}>Select all that apply</span></label>
-                      <div className="pill-group emp-type-pills">
-                        {[
-                          'PAYG Full-Time', 'PAYG Part-Time', 'PAYG Casual', 'PAYG Contract',
-                          'Self-Employed (Sole Trader)', 'Self-Employed (Company)',
-                          'Rental Income', 'Other'
-                        ].map(t => {
-                          const etArr = Array.isArray(record.currentEmployment.employmentType) ? record.currentEmployment.employmentType : [];
-                          const isActive = etArr.includes(t);
-                          return (
-                            <button key={t} type="button"
-                              className={`pill-btn emp-type-pill${isActive ? ' pill-btn--active' : ''}`}
-                              onClick={() => {
-                                const next = isActive ? etArr.filter(x => x !== t) : [...etArr, t];
-                                updateCurrentEmployment(index, 'employmentType', next);
-                              }}>
-                              {t}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    {/* Income Verifier (opens here when triggered from quick actions) */}
+                    {verifierExpanded[index] && (
+                      <IncomeVerifierModal
+                        applicantName={record.applicantName}
+                        initialData={payslipState[index]?.data || null}
+                        onClose={() => setVerifierExpanded(p => ({ ...p, [index]: false }))}
+                        onSave={(result) => {
+                          updateCurrentJob(index, 0, 'incomeVerification', result);
+                          setVerifierExpanded(p => ({ ...p, [index]: false }));
+                        }}
+                      />
+                    )}
 
-                    <div className="grid grid-cols-2 mb-4">
-                      <div>
-                        <label>Employer Name</label>
-                        <input type="text" value={record.currentEmployment.employer} onChange={(e) => updateCurrentEmployment(index, 'employer', e.target.value)} placeholder="Company name" />
-                      </div>
-                      <div>
-                        <label>Job Title / Role</label>
-                        <input type="text" value={record.currentEmployment.role} onChange={(e) => updateCurrentEmployment(index, 'role', e.target.value)} placeholder="e.g., Senior Developer" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 mb-4">
-                      <div>
-                        <label>Start Date</label>
-                        <input type="date" value={record.currentEmployment.startDate} onChange={(e) => updateCurrentEmployment(index, 'startDate', e.target.value)} />
-                        {record.currentEmployment.startDate && <div className="hint-text">{calculateTenure(record.currentEmployment.startDate).toFixed(1)} years</div>}
-                      </div>
-                      <div>
-                        <ABNField idx={index} empKey="paye-current" value={record.currentEmployment.abn}
-                          onChange={(v) => updateCurrentEmployment(index, 'abn', v)}
-                          onABNResult={(r) => { if (!record.currentEmployment.employer && r.entityName) updateCurrentEmployment(index, 'employer', r.tradingNames?.[0] || r.entityName); }} />
-                      </div>
-                    </div>
-
-                    {/* Income Details */}
-                    <div style={{ padding: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px', marginBottom: '16px' }}>
-                      <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Income Details</h4>
-                      <div className="grid grid-cols-2 mb-3">
-                        <div>
-                          <label style={{ fontSize: '12px' }}>Pay Frequency</label>
-                          <div className="pill-group" style={{ marginTop: '6px' }}>
-                            {[['weekly', 'Weekly'], ['fortnightly', 'Fortnightly'], ['monthly', 'Monthly']].map(([val, lbl]) => (
-                              <button key={val} type="button"
-                                className={`pill-btn${record.currentEmployment.payFrequency === val ? ' pill-btn--active' : ''}`}
-                                style={{ fontSize: '12px', padding: '6px 11px' }}
-                                onClick={() => updateCurrentEmployment(index, 'payFrequency', record.currentEmployment.payFrequency === val ? '' : val)}>
-                                {lbl}
+                    {(record.currentJobs || []).map((job, jobIdx) => {
+                      const etArr = Array.isArray(job.employmentType) ? job.employmentType : [];
+                      const jobLabel = jobIdx === 0 ? 'Current Employment' : `Additional Job ${jobIdx + 1}`;
+                      const jobSummary = [job.employer, etArr.length ? etArr.join(' / ') : null].filter(Boolean).join(' · ') || null;
+                      return (
+                        <div key={job.id || jobIdx} style={{ marginBottom: '16px', border: '1px solid var(--border-primary)', borderRadius: '10px', overflow: 'hidden' }}>
+                          {/* Job card header */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-primary)' }}>
+                            <div>
+                              <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>{jobLabel}</span>
+                              {jobSummary && <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginLeft: '8px' }}>{jobSummary}</span>}
+                            </div>
+                            {jobIdx > 0 && (
+                              <button type="button" onClick={() => removeCurrentJob(index, jobIdx)}
+                                style={{ fontSize: '11px', color: 'var(--color-danger)', background: 'none', border: '1px solid var(--color-danger)', borderRadius: '5px', cursor: 'pointer', padding: '2px 10px', fontWeight: '600' }}>
+                                Remove
                               </button>
-                            ))}
+                            )}
+                          </div>
+                          {/* Job card body */}
+                          <div style={{ padding: '14px 16px', background: 'var(--bg-primary)' }}>
+                            <div className="mb-4">
+                              <label>Employment Type <span style={{ fontSize: '11px', fontWeight: '400', color: 'var(--text-tertiary)' }}>Select all that apply</span></label>
+                              <div className="pill-group emp-type-pills">
+                                {[
+                                  'PAYG Full-Time', 'PAYG Part-Time', 'PAYG Casual', 'PAYG Contract',
+                                  'Self-Employed (Sole Trader)', 'Self-Employed (Company)',
+                                  'Centrelink', 'Rental Income', 'Other'
+                                ].map(t => {
+                                  const isActive = etArr.includes(t);
+                                  return (
+                                    <button key={t} type="button"
+                                      className={`pill-btn emp-type-pill${isActive ? ' pill-btn--active' : ''}`}
+                                      onClick={() => {
+                                        const next = isActive ? etArr.filter(x => x !== t) : [...etArr, t];
+                                        updateCurrentJob(index, jobIdx, 'employmentType', next);
+                                      }}>
+                                      {t}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 mb-4">
+                              <div>
+                                <label>Employer / Source Name</label>
+                                <input type="text" value={job.employer} onChange={(e) => updateCurrentJob(index, jobIdx, 'employer', e.target.value)} placeholder="Company name or benefit type" />
+                              </div>
+                              <div>
+                                <label>Job Title / Role</label>
+                                <input type="text" value={job.role} onChange={(e) => updateCurrentJob(index, jobIdx, 'role', e.target.value)} placeholder="e.g., Senior Developer" />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 mb-4">
+                              <div>
+                                <label>Start Date</label>
+                                <input type="date" value={job.startDate} onChange={(e) => updateCurrentJob(index, jobIdx, 'startDate', e.target.value)} />
+                                {job.startDate && <div className="hint-text">{calculateTenure(job.startDate).toFixed(1)} years</div>}
+                              </div>
+                              <div>
+                                <ABNField idx={index} empKey={`paye-${jobIdx}`} value={job.abn}
+                                  onChange={(v) => updateCurrentJob(index, jobIdx, 'abn', v)}
+                                  onABNResult={(r) => { if (!job.employer && r.entityName) updateCurrentJob(index, jobIdx, 'employer', r.tradingNames?.[0] || r.entityName); }} />
+                              </div>
+                            </div>
+
+                            {/* Income Details */}
+                            <div style={{ padding: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px' }}>
+                              <h4 style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Income Details</h4>
+                              <div className="grid grid-cols-2 mb-3">
+                                <div>
+                                  <label style={{ fontSize: '12px' }}>Pay Frequency</label>
+                                  <div className="pill-group" style={{ marginTop: '6px' }}>
+                                    {[['weekly', 'Weekly'], ['fortnightly', 'Fortnightly'], ['monthly', 'Monthly']].map(([val, lbl]) => (
+                                      <button key={val} type="button"
+                                        className={`pill-btn${job.payFrequency === val ? ' pill-btn--active' : ''}`}
+                                        style={{ fontSize: '12px', padding: '6px 11px' }}
+                                        onClick={() => updateCurrentJob(index, jobIdx, 'payFrequency', job.payFrequency === val ? '' : val)}>
+                                        {lbl}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: '12px' }}>Base Income (annual)</label>
+                                  <input type="text" value={fmtInc(job.baseIncome)} placeholder="0"
+                                    onChange={(e) => updateCurrentJob(index, jobIdx, 'baseIncome', parseCurrency(e.target.value))}
+                                    style={{ fontSize: '13px' }} />
+                                  {fmtIncDisplay(job.baseIncome) && (
+                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>{fmtIncDisplay(job.baseIncome)}</div>
+                                  )}
+                                </div>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                                <div>
+                                  <label style={{ fontSize: '12px' }}>Bonus Income (annual)</label>
+                                  <input type="text" value={fmtInc(job.bonusIncome)} placeholder="0"
+                                    onChange={(e) => updateCurrentJob(index, jobIdx, 'bonusIncome', parseCurrency(e.target.value))}
+                                    style={{ fontSize: '13px' }} />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: '12px' }}>Commissions (annual)</label>
+                                  <input type="text" value={fmtInc(job.commissions)} placeholder="0"
+                                    onChange={(e) => updateCurrentJob(index, jobIdx, 'commissions', parseCurrency(e.target.value))}
+                                    style={{ fontSize: '13px' }} />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: '12px' }}>HECS Debt</label>
+                                  <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                                    {['Yes', 'No'].map(val => (
+                                      <button key={val} type="button" onClick={() => updateCurrentJob(index, jobIdx, 'hecs', val)}
+                                        style={{ flex: 1, padding: '7px 0', border: `1px solid ${job.hecs === val ? 'var(--color-primary)' : 'var(--border-primary)'}`, background: job.hecs === val ? 'var(--color-primary-light)' : 'var(--bg-primary)', color: job.hecs === val ? 'var(--color-primary)' : 'var(--text-secondary)', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>{val}</button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <label style={{ fontSize: '12px' }}>Base Income (annual)</label>
-                          <input type="text" value={fmtInc(record.currentEmployment.baseIncome)} placeholder="0"
-                            onChange={(e) => updateCurrentEmployment(index, 'baseIncome', parseCurrency(e.target.value))}
-                            style={{ fontSize: '13px' }} />
-                          {fmtIncDisplay(record.currentEmployment.baseIncome) && (
-                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>{fmtIncDisplay(record.currentEmployment.baseIncome)}</div>
-                          )}
-                        </div>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                        <div>
-                          <label style={{ fontSize: '12px' }}>Bonus Income (annual)</label>
-                          <input type="text" value={fmtInc(record.currentEmployment.bonusIncome)} placeholder="0"
-                            onChange={(e) => updateCurrentEmployment(index, 'bonusIncome', parseCurrency(e.target.value))}
-                            style={{ fontSize: '13px' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '12px' }}>Commissions (annual)</label>
-                          <input type="text" value={fmtInc(record.currentEmployment.commissions)} placeholder="0"
-                            onChange={(e) => updateCurrentEmployment(index, 'commissions', parseCurrency(e.target.value))}
-                            style={{ fontSize: '13px' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '12px' }}>HECS Debt</label>
-                          <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
-                            <HECSBtn val="Yes" /><HECSBtn val="No" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                      );
+                    })}
+
+                    {/* Add another job */}
+                    <button type="button" onClick={() => addCurrentJob(index)}
+                      style={{ width: '100%', padding: '10px', fontSize: '13px', fontWeight: '600', color: 'var(--color-primary)', background: 'none', border: '2px dashed var(--border-secondary)', borderRadius: '10px', cursor: 'pointer', marginBottom: '16px' }}>
+                      + Add another job (PAYG + Centrelink, multiple employers, etc.)
+                    </button>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                       <motion.button type="button" className="btn-primary"
@@ -987,20 +1070,10 @@ const Step2Employment = ({ formData, updateFormData }) => {
                     {/* Payslip preview (if uploaded via Quick Actions) */}
                     {renderPayslipStep2(record, index)}
 
-                    {/* Income Verifier */}
-                    {verifierExpanded[index] ? (
-                      <IncomeVerifierModal
-                        applicantName={record.applicantName}
-                        initialData={payslipState[index]?.data || null}
-                        onClose={() => setVerifierExpanded(p => ({ ...p, [index]: false }))}
-                        onSave={(result) => {
-                          updateCurrentEmployment(index, 'incomeVerification', result);
-                          setVerifierExpanded(p => ({ ...p, [index]: false }));
-                        }}
-                      />
-                    ) : record.currentEmployment.incomeVerification ? (
+                    {/* Income verification summary (primary job) */}
+                    {!verifierExpanded[index] && primaryJob.incomeVerification ? (
                       (() => {
-                        const v = record.currentEmployment.incomeVerification;
+                        const v = primaryJob.incomeVerification;
                         const statusColors = { consistent: '#166534', ytd_higher: '#0369a1', ytd_lower: '#9a3412', incomplete: '#64748b' };
                         const statusLabels = { consistent: '✓ Consistent', ytd_higher: 'YTD Higher', ytd_lower: 'YTD Lower — flagged', incomplete: '—' };
                         return (

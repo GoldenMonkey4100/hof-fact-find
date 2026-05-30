@@ -203,18 +203,18 @@ const SubStepBar = ({ step, labels, onGoTo }) => (
             <div style={{
               width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '12px', fontWeight: '700', transition: 'all 0.2s',
-              background: done ? '#10b981' : active ? 'var(--color-primary)' : 'var(--bg-secondary)',
+              background: done ? 'var(--color-primary)' : active ? 'var(--color-primary)' : 'var(--bg-secondary)',
               color: done || active ? 'white' : 'var(--text-tertiary)',
-              border: done ? '2px solid #10b981' : active ? '2px solid var(--color-primary)' : '1px solid var(--border-primary)',
+              border: done ? '2px solid var(--color-primary)' : active ? '2px solid var(--color-primary)' : '1px solid var(--border-primary)',
             }}>
               {done ? '✓' : n}
             </div>
-            <span style={{ fontSize: '11px', fontWeight: active ? '600' : '400', color: active ? 'var(--color-primary)' : done ? '#10b981' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '11px', fontWeight: active ? '600' : '400', color: active ? 'var(--color-primary)' : done ? 'var(--color-primary)' : 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
               {label}
             </span>
           </div>
           {i < labels.length - 1 && (
-            <div style={{ flex: 1, height: '2px', background: done ? '#10b981' : 'var(--border-primary)', margin: '0 8px', marginBottom: '14px', transition: 'background 0.2s' }} />
+            <div style={{ flex: 1, height: '2px', background: done ? 'var(--color-primary)' : 'var(--border-primary)', margin: '0 8px', marginBottom: '14px', transition: 'background 0.2s' }} />
           )}
         </React.Fragment>
       );
@@ -629,9 +629,9 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
           <button type="button" onClick={() => toggleSecCalc(security.id)} style={{
             display: 'flex', alignItems: 'center', gap: '5px',
             padding: '4px 10px', fontSize: '12px', fontWeight: '600', borderRadius: '6px', cursor: 'pointer',
-            border: calcOpen ? '1px solid #6366f1' : '1px solid var(--border-primary)',
-            background: calcOpen ? '#eef2ff' : 'var(--bg-secondary)',
-            color: calcOpen ? '#4338ca' : 'var(--text-secondary)',
+            border: calcOpen ? '1px solid var(--color-primary)' : '1px solid var(--border-primary)',
+            background: calcOpen ? 'var(--color-gold-light)' : 'var(--bg-secondary)',
+            color: calcOpen ? 'var(--color-primary)' : 'var(--text-secondary)',
           }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
             Calculator
@@ -676,10 +676,10 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
               />
             </div>
 
-            {/* ── Property Ownership — under address ── */}
+            {/* ── Property Ownership — compact chip row ── */}
             <div className="mb-4">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <label style={{ margin: 0 }}>Property Ownership</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ margin: 0, fontSize: '12px' }}>Property Ownership</label>
                 {ownershipRows.length > 1 && (
                   <button type="button"
                     onClick={() => {
@@ -688,63 +688,56 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                       const rem = 100 - base * n;
                       saveOwnershipRows(ownershipRows.map((r, i) => ({ ...r, percentage: i === 0 ? base + rem : base })));
                     }}
-                    style={{ fontSize: '12px', padding: '4px 12px', border: '1px solid var(--border-primary)', borderRadius: '6px', background: 'var(--bg-secondary)', cursor: 'pointer', color: 'var(--text-secondary)', fontWeight: '600' }}>
-                    = Equal Split
+                    style={{ fontSize: '11px', padding: '2px 8px', border: '1px solid var(--border-primary)', borderRadius: '5px', background: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', fontWeight: '600' }}>
+                    = Equal split
                   </button>
                 )}
               </div>
 
               {ownershipRows.length === 0 ? (
-                <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', padding: '6px 0' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
                   Set the number of applicants above — ownership will be pre-allocated automatically.
                 </div>
               ) : (
                 <>
-                  {/* Header row */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 4px 6px', fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    <span>Name</span>
-                    <span>Ownership %</span>
-                  </div>
-                  <div style={{ border: '1px solid var(--border-primary)', borderRadius: '8px', overflow: 'hidden', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
                     {ownershipRows.map((row, i) => (
-                      <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', borderBottom: i < ownershipRows.length - 1 ? '1px solid var(--border-primary)' : 'none', background: 'var(--bg-primary)' }}>
-                        {/* Name */}
-                        <div style={{ flex: 1 }}>
-                          {row.type === 'applicant' ? (
-                            <div>
-                              <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{row.name}</div>
-                              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '1px' }}>Applicant {i + 1}</div>
-                            </div>
-                          ) : (
-                            <input type="text" value={row.name} placeholder="Owner / entity name"
-                              onChange={(e) => { const rows = [...ownershipRows]; rows[i] = { ...rows[i], name: e.target.value }; saveOwnershipRows(rows); }}
-                              style={{ fontSize: '13px', padding: '5px 8px', border: '1px solid var(--border-primary)', borderRadius: '6px', outline: 'none', width: '100%' }} />
-                          )}
-                        </div>
-                        {/* Percentage input */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                          <input type="number" value={row.percentage} min="0" max="100" className="no-spin"
-                            onChange={(e) => { const rows = [...ownershipRows]; rows[i] = { ...rows[i], percentage: Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)) }; saveOwnershipRows(rows); }}
-                            style={{ width: '64px', padding: '6px 8px', border: '1px solid var(--border-primary)', borderRadius: '6px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', background: 'var(--bg-primary)' }} />
-                          <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>%</span>
-                          {row.type !== 'applicant' && (
-                            <button type="button" onClick={() => saveOwnershipRows(ownershipRows.filter((_, j) => j !== i))}
-                              style={{ fontSize: '13px', color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', lineHeight: 1 }}>✕</button>
-                          )}
-                        </div>
+                      <div key={row.id} style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        padding: '5px 10px', borderRadius: '8px',
+                        border: row.type === 'applicant' ? '1px solid var(--border-primary)' : '1.5px dashed var(--border-secondary)',
+                        background: row.type === 'applicant' ? 'var(--bg-secondary)' : 'var(--bg-primary)',
+                      }}>
+                        {row.type === 'applicant' ? (
+                          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{row.name}</span>
+                        ) : (
+                          <input type="text" value={row.name} placeholder="Owner / entity"
+                            onChange={(e) => { const rows = [...ownershipRows]; rows[i] = { ...rows[i], name: e.target.value }; saveOwnershipRows(rows); }}
+                            style={{ fontSize: '12px', border: 'none', outline: 'none', background: 'transparent', width: '100px', color: 'var(--text-primary)', fontWeight: '600' }} />
+                        )}
+                        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '0 1px' }}>·</span>
+                        <input type="number" value={row.percentage} min="0" max="100" className="no-spin"
+                          onChange={(e) => { const rows = [...ownershipRows]; rows[i] = { ...rows[i], percentage: Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)) }; saveOwnershipRows(rows); }}
+                          style={{ width: '38px', border: 'none', outline: 'none', background: 'transparent', textAlign: 'center', fontSize: '12px', fontWeight: '700', color: 'var(--color-primary)', padding: 0 }} />
+                        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>%</span>
+                        {row.type !== 'applicant' && (
+                          <button type="button" onClick={() => saveOwnershipRows(ownershipRows.filter((_, j) => j !== i))}
+                            style={{ fontSize: '11px', color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 2px', lineHeight: 1 }}>✕</button>
+                        )}
                       </div>
                     ))}
+                    <button type="button"
+                      onClick={() => saveOwnershipRows([...ownershipRows, { id: `other-${Date.now()}`, type: 'other', name: '', percentage: 0 }])}
+                      style={{ fontSize: '11px', color: 'var(--color-primary)', background: 'none', border: '1.5px dashed var(--border-secondary)', borderRadius: '8px', cursor: 'pointer', padding: '5px 10px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                      + Add owner
+                    </button>
                   </div>
-                  {/* Validation */}
-                  <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '10px', color: totalOk ? 'var(--color-success-dark)' : '#dc2626', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{totalOk ? '✓ Ownership totals 100%' : `⚠ Total is ${totalPct.toFixed(1)}% — must equal 100%`}</span>
-                    {!totalOk && <span>{totalPct > 100 ? `−${(totalPct - 100).toFixed(1)}% over` : `+${(100 - totalPct).toFixed(1)}% remaining`}</span>}
-                  </div>
-                  <button type="button"
-                    onClick={() => saveOwnershipRows([...ownershipRows, { id: `other-${Date.now()}`, type: 'other', name: '', percentage: 0 }])}
-                    style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'none', border: '2px dashed var(--border-secondary)', borderRadius: '8px', cursor: 'pointer', padding: '10px 14px', width: '100%', fontWeight: '600' }}>
-                    + Add owner · company · trust · other person
-                  </button>
+                  {!totalOk && (
+                    <div style={{ fontSize: '11px', fontWeight: '600', marginTop: '6px', color: '#dc2626', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>⚠ Total is {totalPct.toFixed(1)}% — must equal 100%</span>
+                      <span>{totalPct > 100 ? `−${(totalPct - 100).toFixed(1)}% over` : `+${(100 - totalPct).toFixed(1)}% remaining`}</span>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -761,19 +754,19 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
                     <button key={type} type="button" onClick={() => toggleTransactionType(index, type, true)}
                       style={{
                         padding: '10px 14px', borderRadius: '10px', cursor: 'pointer',
-                        border: active ? '2px solid var(--color-success)' : '1px solid var(--border-primary)',
-                        background: active ? 'var(--bg-success-surface)' : 'var(--bg-primary)',
+                        border: active ? '2px solid var(--color-primary)' : '1px solid var(--border-primary)',
+                        background: active ? 'var(--color-gold-light)' : 'var(--bg-primary)',
                         transition: 'all 0.15s',
                         display: 'flex', alignItems: 'center', gap: '10px',
                       }}>
                       <div style={{
                         width: '32px', height: '32px', borderRadius: '8px', flexShrink: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: active ? 'rgba(16,185,129,0.10)' : 'var(--color-gold-light)',
-                        border: `1px solid ${active ? 'rgba(16,185,129,0.30)' : 'var(--color-gold-border)'}`,
-                        color: active ? 'var(--color-success)' : 'var(--color-gold)',
+                        background: active ? 'rgba(203,178,107,0.15)' : 'var(--color-gold-light)',
+                        border: `1px solid ${active ? 'var(--color-primary)' : 'var(--color-gold-border)'}`,
+                        color: 'var(--color-primary)',
                       }}>{icon}</div>
-                      <span style={{ fontSize: '14px', fontWeight: '600', color: active ? 'var(--text-success-emphasis)' : 'var(--text-primary)' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: active ? 'var(--color-primary)' : 'var(--text-primary)' }}>
                         {type}
                       </span>
                     </button>

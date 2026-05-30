@@ -1835,7 +1835,7 @@ label {
 
 .acc-header:hover { background: var(--bg-secondary); }
 
-.acc-icon  { font-size: 15px; flex-shrink: 0; }
+.acc-icon  { font-size: 15px; flex-shrink: 0; display: flex; align-items: center; color: var(--text-secondary); }
 .acc-label { font-size: 13px; font-weight: 600; color: var(--text-primary); flex: 1; }
 .acc-count { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; background: var(--color-gold-light); color: var(--color-gold); border: 1px solid var(--color-gold-border); }
 .acc-total { font-size: 13px; font-weight: 600; margin-left: auto; }

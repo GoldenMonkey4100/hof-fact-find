@@ -2,22 +2,33 @@ import React, { useState } from 'react';
 import '../styles.css';
 import { formatCurrency, parseCurrency, formatCurrencyDisplay } from '../lib/utils';
 
+// ── SVG icons ─────────────────────────────────────────────────────────────────
+const IconBuilding   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>;
+const IconCar        = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17H3a2 2 0 01-2-2V9a2 2 0 012-2h1l2-4h10l2 4h1a2 2 0 012 2v6a2 2 0 01-2 2h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg>;
+const IconWallet     = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-5"/><path d="M16 12h5v5h-5z"/><circle cx="18.5" cy="14.5" r="1"/></svg>;
+const IconShield     = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+const IconLayers     = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>;
+const IconHome       = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
+const IconCreditCard = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>;
+const IconDollar     = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>;
+const IconMore       = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>;
+
 // ── Section definitions ──────────────────────────────────────────────────────
 
 const ASSET_SECTIONS = [
-  { key: 'real-estate',  label: 'Real Estate',       icon: '🏢', types: ['Investment Property'],                                               addType: 'Investment Property' },
-  { key: 'vehicles',     label: 'Vehicles',           icon: '🚗', types: ['Vehicle'],                                                           addType: 'Vehicle'            },
-  { key: 'savings',      label: 'Savings & Accounts', icon: '💰', types: ['Savings Account', 'Transaction Account', 'Term Deposit', 'Shares'],  addType: 'Savings Account'    },
-  { key: 'super',        label: 'Superannuation',     icon: '🏛', types: ['Superannuation'],                                                    addType: 'Superannuation'     },
-  { key: 'other-assets', label: 'Other Assets',       icon: '📋', types: [],                                                                    addType: 'Other'              },
+  { key: 'real-estate',  label: 'Real Estate',       icon: <IconBuilding />, types: ['Investment Property'],                                               addType: 'Investment Property' },
+  { key: 'vehicles',     label: 'Vehicles',           icon: <IconCar />,      types: ['Vehicle'],                                                           addType: 'Vehicle'            },
+  { key: 'savings',      label: 'Savings & Accounts', icon: <IconWallet />,   types: ['Savings Account', 'Transaction Account', 'Term Deposit', 'Shares'],  addType: 'Savings Account'    },
+  { key: 'super',        label: 'Superannuation',     icon: <IconShield />,   types: ['Superannuation'],                                                    addType: 'Superannuation'     },
+  { key: 'other-assets', label: 'Other Assets',       icon: <IconLayers />,   types: [],                                                                    addType: 'Other'              },
 ];
 
 const LIABILITY_SECTIONS = [
-  { key: 'home-loans',      label: 'Home Loans',      icon: '🏠', types: ['Home Loan'],      addType: 'Home Loan'      },
-  { key: 'credit-cards',    label: 'Credit Cards',    icon: '💳', types: ['Credit Card'],    addType: 'Credit Card'    },
-  { key: 'vehicle-fin',     label: 'Vehicle Finance', icon: '🚗', types: ['Car Loan'],       addType: 'Car Loan'       },
-  { key: 'personal-loans',  label: 'Personal Loans',  icon: '💸', types: ['Personal Loan'],  addType: 'Personal Loan'  },
-  { key: 'other-liabs',     label: 'Other',           icon: '📋', types: [],                 addType: 'Other'          },
+  { key: 'home-loans',      label: 'Home Loans',      icon: <IconHome />,       types: ['Home Loan'],      addType: 'Home Loan'      },
+  { key: 'credit-cards',    label: 'Credit Cards',    icon: <IconCreditCard />, types: ['Credit Card'],    addType: 'Credit Card'    },
+  { key: 'vehicle-fin',     label: 'Vehicle Finance', icon: <IconCar />,        types: ['Car Loan'],       addType: 'Car Loan'       },
+  { key: 'personal-loans',  label: 'Personal Loans',  icon: <IconDollar />,     types: ['Personal Loan'],  addType: 'Personal Loan'  },
+  { key: 'other-liabs',     label: 'Other',           icon: <IconMore />,       types: [],                 addType: 'Other'          },
 ];
 
 const KNOWN_ASSET_TYPES = ASSET_SECTIONS.filter(s => s.types.length).flatMap(s => s.types);
@@ -240,6 +251,23 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
           <div><label>Model</label><input type="text" value={asset.vehicleModel || ''} onChange={(e) => updateAsset(appIdx, assetIdx, 'vehicleModel', e.target.value)} placeholder="e.g. Camry" /></div>
         </div>
       )}
+      {allApplicants.length > 1 && (
+        <div className="mb-3">
+          <label>Ownership</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+            {['joint', ...allApplicants.map(a => String(a.id))].map(val => {
+              const label = val === 'joint' ? 'Joint' : (allApplicants.find(a => String(a.id) === val)?.firstName || `Applicant`);
+              const active = (asset.ownership || 'joint') === val;
+              return (
+                <button key={val} type="button" onClick={() => updateAsset(appIdx, assetIdx, 'ownership', val)}
+                  style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: active ? '1.5px solid var(--color-primary)' : '1px solid var(--border-primary)', background: active ? 'var(--color-gold-light)' : 'var(--bg-primary)', color: active ? 'var(--color-primary)' : 'var(--text-secondary)', transition: 'all 0.15s' }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -264,7 +292,7 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
       {liability.linkedAssetId && (
         <div className="mb-3"><span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Home Loan — auto-linked from Investment Property</span></div>
       )}
-      <div className="grid grid-cols-2">
+      <div className="grid grid-cols-2 mb-3">
         <div><label>Outstanding Amount</label>
           <input type="text" value={formatCurrency(liability.amount)}
             onChange={(e) => updateLiability(appIdx, liabIdx, 'amount', parseCurrency(e.target.value))}
@@ -277,6 +305,23 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
             placeholder="2,000" />
         </div>
       </div>
+      {allApplicants.length > 1 && (
+        <div className="mb-3">
+          <label>Liability belongs to</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+            {['joint', ...allApplicants.map(a => String(a.id))].map(val => {
+              const label = val === 'joint' ? 'Joint' : (allApplicants.find(a => String(a.id) === val)?.firstName || `Applicant`);
+              const active = (liability.ownership || 'joint') === val;
+              return (
+                <button key={val} type="button" onClick={() => updateLiability(appIdx, liabIdx, 'ownership', val)}
+                  style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: active ? '1.5px solid var(--color-primary)' : '1px solid var(--border-primary)', background: active ? 'var(--color-gold-light)' : 'var(--bg-primary)', color: active ? 'var(--color-primary)' : 'var(--text-secondary)', transition: 'all 0.15s' }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -406,7 +451,7 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
           {assetRows.length
             ? assetRows.map(s => (
                 <div key={s.key} className="net-line">
-                  <span>{s.icon} {s.label}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>{s.icon} {s.label}</span>
                   <span>{formatCurrencyDisplay(s.total.toString())}</span>
                 </div>
               ))
@@ -422,7 +467,7 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
           {liabRows.length
             ? liabRows.map(s => (
                 <div key={s.key} className="net-line">
-                  <span>{s.icon} {s.label}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>{s.icon} {s.label}</span>
                   <span>{formatCurrencyDisplay(s.total.toString())}</span>
                 </div>
               ))

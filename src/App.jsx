@@ -394,7 +394,7 @@ const FactFindApp = () => {
         <div className="app-layout">
           {renderSidebar()}
           <div className="main-content">
-            <div style={{ maxWidth: '860px', margin: '0 auto', padding: '28px 24px 88px' }}>
+            <div style={{ padding: '28px 32px 88px' }}>
               <div className="sc-page-header">
                 <h2 className="sc-page-title">{steps[currentStep].name}</h2>
                 <p className="sc-page-subtitle">{steps[currentStep].subtitle}</p>

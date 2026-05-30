@@ -240,22 +240,25 @@ const buildNotePadText = (formData, docPassword, docProxies) => {
     lines.push(sec('EMPLOYMENT'));
     employment.forEach((emp, i) => {
       lines.push('');
-      const ce   = emp.currentEmployment || {};
       const name = emp.applicantName || `Applicant ${i + 1}`;
-      const etLabel = Array.isArray(ce.employmentType) ? ce.employmentType.join(' / ') : (ce.employmentType || 'Employment');
-      lines.push(`${name} — ${etLabel}`);
-      [
-        p('Employer', ce.employer),
-        p('Title',    ce.role),
-        p('Start',    ce.startDate),
-        ce.baseIncome ? p('Base Income', [fmtCurrency(ce.baseIncome), 'p.a.', ce.payFrequency && `(paid ${ce.payFrequency})`].filter(Boolean).join(' ')) : null,
-        ce.bonusIncome ? p('Bonus',       fmtCurrency(ce.bonusIncome)) : null,
-        ce.commissions ? p('Commissions', fmtCurrency(ce.commissions)) : null,
-        ce.hecs        ? p('HECS/HELP',   ce.hecs)                     : null,
-      ].filter(Boolean).forEach(l => lines.push(l));
-      if (ce.incomeVerification?.m2Annual) {
-        lines.push(p('Verified', `${fmtCurrency(String(ce.incomeVerification.m2Annual))} annualised${ce.incomeVerification.status === 'verified' ? ' ✓' : ''}`));
-      }
+      // Support both currentJobs[] (new) and currentEmployment (legacy)
+      const jobs = emp.currentJobs || (emp.currentEmployment ? [emp.currentEmployment] : []);
+      jobs.forEach((ce, ji) => {
+        const etLabel = Array.isArray(ce.employmentType) ? ce.employmentType.join(' / ') : (ce.employmentType || 'Employment');
+        lines.push(`${name}${jobs.length > 1 ? ` — Job ${ji + 1}` : ''} — ${etLabel}`);
+        [
+          p('Employer', ce.employer),
+          p('Title',    ce.role),
+          p('Start',    ce.startDate),
+          ce.baseIncome ? p('Base Income', [fmtCurrency(ce.baseIncome), 'p.a.', ce.payFrequency && `(paid ${ce.payFrequency})`].filter(Boolean).join(' ')) : null,
+          ce.bonusIncome ? p('Bonus',       fmtCurrency(ce.bonusIncome)) : null,
+          ce.commissions ? p('Commissions', fmtCurrency(ce.commissions)) : null,
+          ce.hecs        ? p('HECS/HELP',   ce.hecs)                     : null,
+        ].filter(Boolean).forEach(l => lines.push(l));
+        if (ce.incomeVerification?.m2Annual) {
+          lines.push(p('Verified', `${fmtCurrency(String(ce.incomeVerification.m2Annual))} annualised${ce.incomeVerification.status === 'verified' ? ' ✓' : ''}`));
+        }
+      });
       L(emp.previousEmployments).forEach((prev, pi) => {
         lines.push(p(`Previous ${pi + 1}`, `${prev.employer || prev.employerName || '—'} | ${prev.startDate || '?'} → ${prev.endDate || '?'}`));
       });
@@ -266,13 +269,19 @@ const buildNotePadText = (formData, docPassword, docProxies) => {
   }
 
   // Assets
-  const allAssets = applicants.flatMap(app => L(app.assets).filter(a => parseCurrency(a.value) > 0));
+  const ownerLabel = (ownership, applicants) => {
+    if (!ownership || ownership === 'joint' || applicants.length < 2) return '';
+    const app = applicants.find(a => String(a.id) === String(ownership));
+    return app ? ` [${app.firstName || 'Applicant'}]` : '';
+  };
+  const allAssets = applicants.flatMap((app, ai) => L(app.assets).filter(a => parseCurrency(a.value) > 0).map(a => ({ ...a, _appName: app.firstName || `Applicant ${ai + 1}` })));
   if (allAssets.length > 0) {
     lines.push(sec('ASSETS'));
     lines.push('');
     allAssets.forEach(a => {
       const institution = a.bank || a.provider || a.lender || '';
-      const detail      = [a.description || a.type || '—', institution].filter(Boolean).join(' / ');
+      const own  = ownerLabel(a.ownership, applicants);
+      const detail = [a.description || a.type || '—', institution, own].filter(Boolean).join(' / ');
       lines.push(`  ${detail.padEnd(38)} ${fmtCurrency(a.value)}`);
     });
     lines.push(`  ${'─'.repeat(50)}`);
@@ -280,14 +289,15 @@ const buildNotePadText = (formData, docPassword, docProxies) => {
   }
 
   // Liabilities
-  const allLiabilities = applicants.flatMap(app => L(app.liabilities).filter(l => parseCurrency(l.amount || l.balance) > 0));
+  const allLiabilities = applicants.flatMap((app, ai) => L(app.liabilities).filter(l => parseCurrency(l.amount || l.balance) > 0).map(l => ({ ...l, _appName: app.firstName || `Applicant ${ai + 1}` })));
   if (allLiabilities.length > 0) {
     lines.push(sec('LIABILITIES'));
     lines.push('');
     allLiabilities.forEach(l => {
       const institution = l.lender || l.institution || '';
       const limitStr    = l.limit ? ` — limit ${fmtCurrency(l.limit)}` : '';
-      const detail      = [l.description || l.type || '—', institution ? institution + limitStr : ''].filter(Boolean).join(' / ');
+      const own  = ownerLabel(l.ownership, applicants);
+      const detail = [l.description || l.type || '—', institution ? institution + limitStr : '', own].filter(Boolean).join(' / ');
       lines.push(`  ${detail.padEnd(38)} ${fmtCurrency(l.amount || l.balance)}`);
     });
     lines.push(`  ${'─'.repeat(50)}`);

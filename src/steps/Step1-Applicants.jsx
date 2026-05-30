@@ -1205,7 +1205,7 @@ const Step1Applicants = ({ formData, updateFormData }) => {
           {/* Sub-step bar */}
           <SubStepBar
             step={step}
-            labels={isCo ? ['ABN & Identity', 'Contact & Reg'] : ['Personal Details', 'Address & Relationship']}
+            labels={isCo ? ['ABN & Identity', 'Contact & Reg'] : ['Personal Details', 'Address']}
             onGoTo={(n) => goToStep(applicant.id, n)}
           />
 
@@ -1493,6 +1493,30 @@ const Step1Applicants = ({ formData, updateFormData }) => {
                     </div>
                   )}
 
+                  {isNP && index > 0 && (() => {
+                    const priorApplicants = applicants.slice(0, index);
+                    const RELS = ['Spouse', 'De Facto Partner', 'Parent', 'Sibling', 'Child', 'Business Partner', 'Other'];
+                    return priorApplicants.map((prior, pi) => {
+                      const rels = applicant.relationships || {};
+                      const currentVal = rels[prior.id] || (pi === 0 ? applicant.relationshipToApplicant1 : '') || '';
+                      const priorName = prior.firstName || `Applicant ${pi + 1}`;
+                      return (
+                        <div key={prior.id} className="mb-4">
+                          <label>Relationship to {priorName}</label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                            {RELS.map(opt => (
+                              <button key={opt} type="button"
+                                className={`pill-btn${currentVal === opt ? ' pill-btn--active' : ''}`}
+                                onClick={() => updateApplicant(index, 'relationships', { ...rels, [prior.id]: currentVal === opt ? '' : opt })}>
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                     <motion.button type="button" className="btn-primary"
                       onClick={() => goToStep(applicant.id, 2)}
@@ -1508,21 +1532,6 @@ const Step1Applicants = ({ formData, updateFormData }) => {
               {step === 2 && (
                 <div>
                   {renderAddressHistory(applicant, index)}
-
-                  {isNP && index > 0 && (
-                    <div className="mb-4">
-                      <label>Relationship to Applicant 1</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        {['Spouse', 'De Facto Partner', 'Parent', 'Sibling', 'Child', 'Business Partner', 'Other'].map(opt => (
-                          <button key={opt} type="button"
-                            className={`pill-btn${applicant.relationshipToApplicant1 === opt ? ' pill-btn--active' : ''}`}
-                            onClick={() => updateApplicant(index, 'relationshipToApplicant1', applicant.relationshipToApplicant1 === opt ? '' : opt)}>
-                            {opt}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: '8px' }}>
                     <motion.button type="button"

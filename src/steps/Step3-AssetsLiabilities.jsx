@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import '../styles.css';
 import { formatCurrency, parseCurrency, formatCurrencyDisplay } from '../lib/utils';
+import AddressAutocomplete from '../components/AddressAutocomplete';
 
 // ── SVG icons ─────────────────────────────────────────────────────────────────
 const IconBuilding   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>;
@@ -79,15 +80,11 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
     const asset = { ...assets[assetIdx], [field]: value };
     assets[assetIdx] = asset;
     let liabilities = [...(updated[appIdx].liabilities || [])];
-    if (asset.type === 'Investment Property' && ['mortgageOwing', 'address', 'lender'].includes(field)) {
+    if (asset.type === 'Investment Property' && ['mortgageOwing', 'address', 'lender'].includes(field) && !asset.unencumbered) {
       const linkedIdx = liabilities.findIndex(l => l.linkedAssetId === asset.id);
-      const amt = parseFloat(parseCurrency(asset.mortgageOwing || '0')) || 0;
       const desc = `Mortgage — ${asset.address || 'Investment Property'}${asset.lender ? ` (${asset.lender})` : ''}`;
-      if (amt > 0) {
-        if (linkedIdx >= 0) liabilities[linkedIdx] = { ...liabilities[linkedIdx], description: desc, amount: asset.mortgageOwing };
-        else liabilities = [...liabilities, { id: Date.now(), type: 'Home Loan', description: desc, amount: asset.mortgageOwing, repayment: '', linkedAssetId: asset.id }];
-      } else if (linkedIdx >= 0) {
-        liabilities = liabilities.filter((_, i) => i !== linkedIdx);
+      if (linkedIdx >= 0) {
+        liabilities[linkedIdx] = { ...liabilities[linkedIdx], description: desc, ...(field === 'mortgageOwing' ? { amount: asset.mortgageOwing } : {}) };
       }
     }
     updated[appIdx] = { ...updated[appIdx], assets, liabilities };
@@ -107,7 +104,12 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
     const app = formData.applicants[appIdx];
     const newAsset = { id: Date.now(), type: '', description: '', value: '', ...preset };
     const updated = [...formData.applicants];
-    updated[appIdx] = { ...app, assets: [...(app.assets || []), newAsset] };
+    let liabilities = [...(app.liabilities || [])];
+    if (newAsset.type === 'Investment Property') {
+      const linkedLiab = { id: Date.now() + 1, type: 'Home Loan', description: `Mortgage — Investment Property`, amount: '', repayment: '', linkedAssetId: newAsset.id };
+      liabilities = [...liabilities, linkedLiab];
+    }
+    updated[appIdx] = { ...app, assets: [...(app.assets || []), newAsset], liabilities };
     updateFormData('applicants', updated);
     setTimeout(() => setExpandedItems(p => ({ ...p, [ikey('assets', appIdx, newAsset.id)]: true })), 50);
   };
@@ -201,31 +203,53 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
       {asset.type === 'Investment Property' && (
         <>
           <div className="mb-3"><label>Property Address</label>
-            <input type="text" value={asset.address || ''} onChange={(e) => updateAsset(appIdx, assetIdx, 'address', e.target.value)} placeholder="123 Main St, Sydney NSW 2000" />
+            <AddressAutocomplete
+              value={asset.address || ''}
+              onChange={(val) => updateAsset(appIdx, assetIdx, 'address', val)}
+              placeholder="123 Main St, Sydney NSW 2000"
+            />
+          </div>
+          <div className="mb-3">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: 0 }}>
+              <input type="checkbox" checked={!!asset.unencumbered}
+                onChange={(e) => {
+                  updateAsset(appIdx, assetIdx, 'unencumbered', e.target.checked);
+                  if (e.target.checked) {
+                    const updated = [...formData.applicants];
+                    updated[appIdx] = { ...updated[appIdx], liabilities: (updated[appIdx].liabilities || []).filter(l => l.linkedAssetId !== asset.id) };
+                    updateFormData('applicants', updated);
+                  } else {
+                    const updated = [...formData.applicants];
+                    const liabs = updated[appIdx].liabilities || [];
+                    if (!liabs.some(l => l.linkedAssetId === asset.id)) {
+                      updated[appIdx] = { ...updated[appIdx], liabilities: [...liabs, { id: Date.now(), type: 'Home Loan', description: `Mortgage — ${asset.address || 'Investment Property'}`, amount: '', repayment: '', linkedAssetId: asset.id }] };
+                      updateFormData('applicants', updated);
+                    }
+                  }
+                }} />
+              Unencumbered (no mortgage — property owned outright)
+            </label>
           </div>
           <div className="grid grid-cols-2 mb-3">
             <div><label>Property Value</label>
               <input type="text" value={formatCurrency(asset.value)} onChange={(e) => updateAsset(appIdx, assetIdx, 'value', parseCurrency(e.target.value))} placeholder="750,000" />
             </div>
-            <div><label>Ownership %</label>
-              <input type="number" value={asset.ownershipPercentage || ''} onChange={(e) => updateAsset(appIdx, assetIdx, 'ownershipPercentage', e.target.value)} placeholder="100" min="1" max="100" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 mb-3">
             <div><label>Weekly Rental Income</label>
               <input type="text" value={formatCurrency(asset.rentalIncome || '')} onChange={(e) => updateAsset(appIdx, assetIdx, 'rentalIncome', parseCurrency(e.target.value))} placeholder="500" />
             </div>
-            <div><label>Mortgage Owing</label>
-              <input type="text" value={formatCurrency(asset.mortgageOwing || '')} onChange={(e) => updateAsset(appIdx, assetIdx, 'mortgageOwing', parseCurrency(e.target.value))} placeholder="400,000" />
-            </div>
           </div>
-          {(parseFloat(parseCurrency(asset.mortgageOwing || '0')) || 0) > 0 && (
-            <div className="mb-3"><label>Lender</label>
-              <input type="text" value={asset.lender || ''} onChange={(e) => updateAsset(appIdx, assetIdx, 'lender', e.target.value)} placeholder="CBA, ANZ, etc." />
+          {!asset.unencumbered && (
+            <div className="grid grid-cols-2 mb-3">
+              <div><label>Mortgage Owing</label>
+                <input type="text" value={formatCurrency(asset.mortgageOwing || '')} onChange={(e) => updateAsset(appIdx, assetIdx, 'mortgageOwing', parseCurrency(e.target.value))} placeholder="400,000" />
+              </div>
+              <div><label>Lender</label>
+                <input type="text" value={asset.lender || ''} onChange={(e) => updateAsset(appIdx, assetIdx, 'lender', e.target.value)} placeholder="CBA, ANZ, etc." />
+              </div>
             </div>
           )}
-          {(parseFloat(parseCurrency(asset.mortgageOwing || '0')) || 0) > 0 && (
-            <div style={{ fontSize: '12px', color: 'var(--color-success-dark)', marginBottom: '8px' }}>✓ Mortgage liability auto-linked</div>
+          {!asset.unencumbered && (
+            <div style={{ fontSize: '12px', color: 'var(--color-success-dark)', marginBottom: '8px' }}>✓ Home Loan auto-linked</div>
           )}
         </>
       )}
@@ -251,23 +275,37 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
           <div><label>Model</label><input type="text" value={asset.vehicleModel || ''} onChange={(e) => updateAsset(appIdx, assetIdx, 'vehicleModel', e.target.value)} placeholder="e.g. Camry" /></div>
         </div>
       )}
-      {allApplicants.length > 1 && (
-        <div className="mb-3">
-          <label>Ownership</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
-            {['joint', ...allApplicants.map(a => String(a.id))].map(val => {
-              const label = val === 'joint' ? 'Joint' : (allApplicants.find(a => String(a.id) === val)?.firstName || `Applicant`);
-              const active = (asset.ownership || 'joint') === val;
-              return (
-                <button key={val} type="button" onClick={() => updateAsset(appIdx, assetIdx, 'ownership', val)}
-                  style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: active ? '1.5px solid var(--color-primary)' : '1px solid var(--border-primary)', background: active ? 'var(--color-gold-light)' : 'var(--bg-primary)', color: active ? 'var(--color-primary)' : 'var(--text-secondary)', transition: 'all 0.15s' }}>
-                  {label}
-                </button>
-              );
-            })}
+      {allApplicants.length > 1 && (() => {
+        const chips = asset.ownershipChips || allApplicants.map(a => ({ applicantId: String(a.id), percentage: Math.round(100 / allApplicants.length) }));
+        const total = chips.reduce((s, c) => s + (parseFloat(c.percentage) || 0), 0);
+        const totalOk = Math.abs(total - 100) < 1;
+        return (
+          <div className="mb-3">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ marginBottom: 0 }}>Ownership</label>
+              <button type="button" onClick={() => {
+                const eq = Math.round(100 / chips.length);
+                updateAsset(appIdx, assetIdx, 'ownershipChips', chips.map((c, i) => ({ ...c, percentage: i === chips.length - 1 ? 100 - eq * (chips.length - 1) : eq })));
+              }} style={{ fontSize: '11px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}>= Equal</button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+              {chips.map((chip, ci) => {
+                const ap = allApplicants.find(a => String(a.id) === chip.applicantId);
+                return (
+                  <div key={chip.applicantId} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '8px', border: '1px solid var(--border-primary)', background: 'var(--bg-secondary)' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{ap?.firstName || `Applicant ${ci + 1}`}</span>
+                    <input type="number" min="0" max="100" value={chip.percentage}
+                      onChange={(e) => updateAsset(appIdx, assetIdx, 'ownershipChips', chips.map((c, i) => i === ci ? { ...c, percentage: e.target.value } : c))}
+                      style={{ width: '48px', fontSize: '12px', padding: '2px 4px', textAlign: 'center', border: '1px solid var(--border-primary)', borderRadius: '4px', background: 'var(--bg-primary)', MozAppearance: 'textfield' }} />
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>%</span>
+                  </div>
+                );
+              })}
+            </div>
+            {!totalOk && <div style={{ fontSize: '11px', color: 'var(--color-warning-dark)', marginTop: '4px' }}>⚠ Must total 100% (currently {total.toFixed(0)}%)</div>}
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 
@@ -305,23 +343,37 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
             placeholder="2,000" />
         </div>
       </div>
-      {allApplicants.length > 1 && (
-        <div className="mb-3">
-          <label>Liability belongs to</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
-            {['joint', ...allApplicants.map(a => String(a.id))].map(val => {
-              const label = val === 'joint' ? 'Joint' : (allApplicants.find(a => String(a.id) === val)?.firstName || `Applicant`);
-              const active = (liability.ownership || 'joint') === val;
-              return (
-                <button key={val} type="button" onClick={() => updateLiability(appIdx, liabIdx, 'ownership', val)}
-                  style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: active ? '1.5px solid var(--color-primary)' : '1px solid var(--border-primary)', background: active ? 'var(--color-gold-light)' : 'var(--bg-primary)', color: active ? 'var(--color-primary)' : 'var(--text-secondary)', transition: 'all 0.15s' }}>
-                  {label}
-                </button>
-              );
-            })}
+      {allApplicants.length > 1 && (() => {
+        const chips = liability.ownershipChips || allApplicants.map(a => ({ applicantId: String(a.id), percentage: Math.round(100 / allApplicants.length) }));
+        const total = chips.reduce((s, c) => s + (parseFloat(c.percentage) || 0), 0);
+        const totalOk = Math.abs(total - 100) < 1;
+        return (
+          <div className="mb-3">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ marginBottom: 0 }}>Ownership</label>
+              <button type="button" onClick={() => {
+                const eq = Math.round(100 / chips.length);
+                updateLiability(appIdx, liabIdx, 'ownershipChips', chips.map((c, i) => ({ ...c, percentage: i === chips.length - 1 ? 100 - eq * (chips.length - 1) : eq })));
+              }} style={{ fontSize: '11px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}>= Equal</button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+              {chips.map((chip, ci) => {
+                const ap = allApplicants.find(a => String(a.id) === chip.applicantId);
+                return (
+                  <div key={chip.applicantId} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '8px', border: '1px solid var(--border-primary)', background: 'var(--bg-secondary)' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{ap?.firstName || `Applicant ${ci + 1}`}</span>
+                    <input type="number" min="0" max="100" value={chip.percentage}
+                      onChange={(e) => updateLiability(appIdx, liabIdx, 'ownershipChips', chips.map((c, i) => i === ci ? { ...c, percentage: e.target.value } : c))}
+                      style={{ width: '48px', fontSize: '12px', padding: '2px 4px', textAlign: 'center', border: '1px solid var(--border-primary)', borderRadius: '4px', background: 'var(--bg-primary)', MozAppearance: 'textfield' }} />
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>%</span>
+                  </div>
+                );
+              })}
+            </div>
+            {!totalOk && <div style={{ fontSize: '11px', color: 'var(--color-warning-dark)', marginTop: '4px' }}>⚠ Must total 100% (currently {total.toFixed(0)}%)</div>}
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 

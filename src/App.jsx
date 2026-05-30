@@ -282,9 +282,6 @@ const FactFindApp = () => {
         <div className="sidebar-label">
           {screen === 'quick' ? 'Quick Fact Find' : 'Full Fact Find'}
         </div>
-        <div className="sidebar-type-badge">
-          {screen === 'quick' ? '⚡ Quick' : '📋 Full'}
-        </div>
       </div>
 
       <div className="sidebar-steps">

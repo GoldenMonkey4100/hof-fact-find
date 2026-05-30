@@ -500,29 +500,58 @@ const Step2Employment = ({ formData, updateFormData }) => {
     updateFormData('employment', updated);
   };
 
-  // ── Payslip helpers ─────────────────────────────────────────────────────────
-  const updatePayslip = (idx, patch) =>
-    setPayslipState(prev => ({ ...prev, [idx]: { ...(prev[idx] || {}), ...patch } }));
+  // ── Type-driven job management ──────────────────────────────────────────────
+  const EMP_TYPES = [
+    'PAYG Full-Time', 'PAYG Part-Time', 'PAYG Casual', 'PAYG Contract',
+    'Self-Employed (Sole Trader)', 'Self-Employed (Company)',
+    'Centrelink', 'Rental Income', 'Other',
+  ];
 
-  const setPayslipFile = (idx, file) => {
-    const old = payslipState[idx]?.previewUrl;
+  const toggleEmploymentType = (idx, type) => {
+    const updated = [...employmentRecords];
+    const jobs = [...(updated[idx].currentJobs || [defaultJob()])];
+    const existingJobIdx = jobs.findIndex(j => (j.employmentType || []).includes(type));
+    if (existingJobIdx >= 0) {
+      if (jobs.length === 1) {
+        jobs[0] = { ...jobs[0], employmentType: jobs[0].employmentType.filter(t => t !== type) };
+      } else {
+        jobs.splice(existingJobIdx, 1);
+      }
+    } else {
+      jobs.push(defaultJob({ employmentType: [type] }));
+    }
+    updated[idx] = { ...updated[idx], currentJobs: jobs };
+    updated[idx].totalYears = calculateTotalYears(updated[idx]);
+    updated[idx].meetsRequirement = updated[idx].totalYears >= 3;
+    setEmploymentRecords(updated);
+    updateFormData('employment', updated);
+  };
+
+  // ── Payslip helpers (keyed by "idx-jobIdx") ──────────────────────────────────
+  const psKey = (idx, jobIdx) => `${idx}-${jobIdx}`;
+
+  const updatePayslip = (key, patch) =>
+    setPayslipState(prev => ({ ...prev, [key]: { ...(prev[key] || {}), ...patch } }));
+
+  const setPayslipFile = (key, file) => {
+    const old = payslipState[key]?.previewUrl;
     if (old) URL.revokeObjectURL(old);
     const previewUrl = file ? URL.createObjectURL(file) : null;
-    updatePayslip(idx, { files: file ? [file] : [], previewUrl, data: null, error: null, previewOpen: !!file });
+    updatePayslip(key, { files: file ? [file] : [], previewUrl, data: null, error: null, previewOpen: !!file });
   };
 
-  const handlePayslipDrop = (idx, e) => {
+  const handlePayslipDrop = (key, e) => {
     e.preventDefault();
-    updatePayslip(idx, { dragging: false });
+    updatePayslip(key, { dragging: false });
     const file = e.dataTransfer.files[0];
-    if (file) setPayslipFile(idx, file);
+    if (file) setPayslipFile(key, file);
   };
 
-  const handlePayslipExtract = async (idx) => {
-    const ps = payslipState[idx] || {};
+  const handlePayslipExtract = async (key, idx, jobIdx) => {
+    const ps = payslipState[key] || {};
     const file = ps.files?.[0];
     if (!file) return;
-    updatePayslip(idx, { extracting: true, error: null });
+    updatePayslip(key, { extracting: true, error: null });
     try {
       const base64    = await fileToBase64(file);
       const mediaType = normalizeMediaType(file);
@@ -531,46 +560,47 @@ const Step2Employment = ({ formData, updateFormData }) => {
         body: JSON.stringify({ images: [{ base64, mediaType }] })
       });
       const data = await res.json();
-      if (data.error) { updatePayslip(idx, { extracting: false, error: data.error }); return; }
-      updatePayslip(idx, { extracting: false, data });
+      if (data.error) { updatePayslip(key, { extracting: false, error: data.error }); return; }
+      updatePayslip(key, { extracting: false, data });
 
       try {
         const ext = file.name.split('.').pop() || 'pdf';
         const blobRes = await fetch('/api/upload-blob', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ base64, filename: `payslip-${idx}-${Date.now()}.${ext}`, contentType: normalizeMediaType(file) }),
+          body: JSON.stringify({ base64, filename: `payslip-${key}-${Date.now()}.${ext}`, contentType: normalizeMediaType(file) }),
         });
         const blobData = await blobRes.json();
-        if (blobData.url) updateCurrentEmployment(idx, 'payslipUrl', blobData.url);
+        if (blobData.url) updateCurrentJob(idx, jobIdx, 'payslipUrl', blobData.url);
       } catch (e) {
         console.warn('[Payslip Blob upload] failed:', e.message);
       }
 
-      if (data.employerName)  updateCurrentEmployment(idx, 'employer',    data.employerName);
-      if (data.employerABN)   updateCurrentEmployment(idx, 'abn',         data.employerABN);
-      if (data.jobTitle)      updateCurrentEmployment(idx, 'role',        data.jobTitle);
-      if (data.payFrequency && data.payFrequency !== 'unknown') updateCurrentEmployment(idx, 'payFrequency', data.payFrequency);
+      if (data.employerName)  updateCurrentJob(idx, jobIdx, 'employer',    data.employerName);
+      if (data.employerABN)   updateCurrentJob(idx, jobIdx, 'abn',         data.employerABN);
+      if (data.jobTitle)      updateCurrentJob(idx, jobIdx, 'role',        data.jobTitle);
+      if (data.payFrequency && data.payFrequency !== 'unknown') updateCurrentJob(idx, jobIdx, 'payFrequency', data.payFrequency);
       if (data.grossPay) {
         const freq = data.payFrequency || 'fortnightly';
         const annualised = Math.round(parseFloat(data.grossPay) * (PERIODS[freq] || 26));
-        updateCurrentEmployment(idx, 'baseIncome', String(annualised));
+        updateCurrentJob(idx, jobIdx, 'baseIncome', String(annualised));
       }
-      if (data.taxAnalysis?.flag === 'higher_than_expected') updateCurrentEmployment(idx, 'hecs', 'Yes');
+      if (data.taxAnalysis?.flag === 'higher_than_expected') updateCurrentJob(idx, jobIdx, 'hecs', 'Yes');
     } catch (err) {
-      updatePayslip(idx, { extracting: false, error: err.message });
+      updatePayslip(key, { extracting: false, error: err.message });
     }
   };
 
-  // ── Quick Actions (Payslip tile + Income Verifier tile) ─────────────────────
-  const renderEmploymentQuickActions = (record, idx) => {
-    const ps        = payslipState[idx] || {};
+  // ── Per-job Payslip + Verifier tiles ─────────────────────────────────────────
+  const renderJobQuickActions = (record, idx, job, jobIdx) => {
+    const key       = psKey(idx, jobIdx);
+    const vKey      = key;
+    const ps        = payslipState[key] || {};
     const file      = ps.files?.[0];
     const hasFile   = !!file;
     const extracting = !!ps.extracting;
     const extracted  = !!ps.data;
-    const primaryJob = (record.currentJobs || [])[0] || {};
-    const iv        = primaryJob.incomeVerification;
-    const inputId   = `ps-qa-${idx}`;
+    const iv        = job.incomeVerification;
+    const inputId   = `ps-qa-${key}`;
 
     const ivStatusMap = {
       consistent: { label: '✓ Consistent', bg: '#f0fdf4', border: '#86efac', color: '#16a34a' },
@@ -586,7 +616,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
     });
 
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', marginBottom: '16px' }}>
 
         {/* Payslip tile */}
         <div style={tile(extracted ? { background: 'var(--bg-success-surface)', borderColor: 'var(--border-success)' } : {})}>
@@ -604,11 +634,11 @@ const Step2Employment = ({ formData, updateFormData }) => {
           </div>
           <div style={{ display: 'flex', gap: '6px' }}>
             <input id={inputId} type="file" accept="image/*,.pdf,application/pdf" style={{ display: 'none' }}
-              onChange={(e) => { if (e.target.files[0]) setPayslipFile(idx, e.target.files[0]); }} />
+              onChange={(e) => { if (e.target.files[0]) setPayslipFile(key, e.target.files[0]); }} />
             <label htmlFor={inputId} style={{ flex: 1, padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '6px', cursor: 'pointer', textAlign: 'center', color: 'var(--text-primary)' }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> {hasFile ? 'Replace' : 'Upload'}
             </label>
-            <button type="button" disabled={!hasFile || extracting} onClick={() => handlePayslipExtract(idx)}
+            <button type="button" disabled={!hasFile || extracting} onClick={() => handlePayslipExtract(key, idx, jobIdx)}
               style={{ flex: 1, padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: hasFile && !extracting ? '#0369a1' : '#e2e8f0', color: hasFile && !extracting ? 'white' : '#9ca3af', border: 'none', borderRadius: '6px', cursor: hasFile && !extracting ? 'pointer' : 'not-allowed' }}>
               {extracting ? '…' : 'Extract'}
             </button>
@@ -631,7 +661,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
               : 'No verification yet'}
           </div>
           <button type="button"
-            onClick={() => { goToEmpStep(record.applicantId, 1); setVerifierExpanded(p => ({ ...p, [idx]: true })); }}
+            onClick={() => setVerifierExpanded(p => ({ ...p, [vKey]: true }))}
             style={{ padding: '6px 8px', fontSize: '11px', fontWeight: '600', background: iv ? 'var(--bg-primary)' : 'var(--color-primary)', color: iv ? 'var(--text-primary)' : 'white', border: iv ? '1px solid var(--border-primary)' : 'none', borderRadius: '6px', cursor: 'pointer' }}>
             {iv ? <><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit Verification</> : 'Open Verifier'}
           </button>
@@ -641,9 +671,9 @@ const Step2Employment = ({ formData, updateFormData }) => {
     );
   };
 
-  // ── Payslip Step 2 section (preview + extracted summary) ────────────────────
+  // ── Payslip preview section (primary job, step 2) ────────────────────────────
   const renderPayslipStep2 = (record, idx) => {
-    const ps          = payslipState[idx] || {};
+    const ps          = payslipState[psKey(idx, 0)] || {};
     const file        = ps.files?.[0];
     const hasFile     = !!file;
     const isPDF       = file?.type === 'application/pdf';
@@ -658,7 +688,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: 'var(--color-gold)' }}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             {file.name.length > 30 ? file.name.slice(0, 30) + '…' : file.name}
           </span>
-          <button type="button" onClick={() => updatePayslip(idx, { previewOpen: !isPreviewOpen })}
+          <button type="button" onClick={() => updatePayslip(psKey(idx, 0), { previewOpen: !isPreviewOpen })}
             style={{ fontSize: '12px', fontWeight: '600', color: isPreviewOpen ? 'var(--text-secondary)' : 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
             {isPreviewOpen ? '▲ Hide' : <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> View payslip</>}
           </button>
@@ -848,7 +878,7 @@ const Step2Employment = ({ formData, updateFormData }) => {
               const job0 = primaryJob;
               return (
                 <div className="mb-6">
-                  {renderEmploymentQuickActions(record, index)}
+                  {renderJobQuickActions(record, index, job0, 0)}
                   <div style={{ padding: '14px 16px', background: 'var(--bg-secondary)', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Employment Type:</span>
                     <span className="badge badge-info" style={{ fontSize: '13px' }}>Self-Employed</span>
@@ -887,11 +917,9 @@ const Step2Employment = ({ formData, updateFormData }) => {
               );
             })()}
 
-            {/* ── Natural Person / Director Guarantor — Quick Actions + 2-step ── */}
+            {/* ── Natural Person / Director Guarantor — 2-step ── */}
             {!isCompanyBorrower && (
               <>
-                {renderEmploymentQuickActions(record, index)}
-
                 <SubStepBar
                   step={empStep}
                   labels={['Employment & Income', 'Employment History']}
@@ -908,35 +936,53 @@ const Step2Employment = ({ formData, updateFormData }) => {
                     exit="exit"
                     transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
                   >
-                {/* Step 1: Current Employment — stacked job cards */}
+                {/* Step 1: Current Employment — type-driven job cards */}
                 {empStep === 1 && (
                   <div>
-                    {/* Income Verifier (opens here when triggered from quick actions) */}
-                    {verifierExpanded[index] && (
-                      <IncomeVerifierModal
-                        applicantName={record.applicantName}
-                        initialData={payslipState[index]?.data || null}
-                        onClose={() => setVerifierExpanded(p => ({ ...p, [index]: false }))}
-                        onSave={(result) => {
-                          updateCurrentJob(index, 0, 'incomeVerification', result);
-                          setVerifierExpanded(p => ({ ...p, [index]: false }));
-                        }}
-                      />
-                    )}
+                    {/* Employment type pills — each selected type = one job card */}
+                    <div className="mb-4">
+                      <label>Employment Type <span style={{ fontSize: '11px', fontWeight: '400', color: 'var(--text-tertiary)' }}>Select all income sources — each creates a job card</span></label>
+                      <div className="pill-group emp-type-pills" style={{ marginTop: '8px' }}>
+                        {EMP_TYPES.map(t => {
+                          const isActive = (record.currentJobs || []).some(j => (j.employmentType || []).includes(t));
+                          return (
+                            <button key={t} type="button"
+                              className={`pill-btn emp-type-pill${isActive ? ' pill-btn--active' : ''}`}
+                              onClick={() => toggleEmploymentType(index, t)}>
+                              {t}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
 
                     {(record.currentJobs || []).map((job, jobIdx) => {
                       const etArr = Array.isArray(job.employmentType) ? job.employmentType : [];
-                      const jobLabel = jobIdx === 0 ? 'Current Employment' : `Additional Job ${jobIdx + 1}`;
-                      const jobSummary = [job.employer, etArr.length ? etArr.join(' / ') : null].filter(Boolean).join(' · ') || null;
+                      const vKey  = psKey(index, jobIdx);
+                      if (etArr.length === 0 && (record.currentJobs || []).length === 1) return null;
+                      const jobLabel = etArr.length ? etArr.join(' / ') : `Job ${jobIdx + 1}`;
+                      const jobSummary = job.employer || null;
                       return (
                         <div key={job.id || jobIdx} style={{ marginBottom: '16px', border: '1px solid var(--border-primary)', borderRadius: '10px', overflow: 'hidden' }}>
+                          {/* Income Verifier modal per job */}
+                          {verifierExpanded[vKey] && (
+                            <IncomeVerifierModal
+                              applicantName={`${record.applicantName} — ${jobLabel}`}
+                              initialData={payslipState[vKey]?.data || null}
+                              onClose={() => setVerifierExpanded(p => ({ ...p, [vKey]: false }))}
+                              onSave={(result) => {
+                                updateCurrentJob(index, jobIdx, 'incomeVerification', result);
+                                setVerifierExpanded(p => ({ ...p, [vKey]: false }));
+                              }}
+                            />
+                          )}
                           {/* Job card header */}
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-primary)' }}>
                             <div>
                               <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>{jobLabel}</span>
                               {jobSummary && <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginLeft: '8px' }}>{jobSummary}</span>}
                             </div>
-                            {jobIdx > 0 && (
+                            {(record.currentJobs || []).length > 1 && (
                               <button type="button" onClick={() => removeCurrentJob(index, jobIdx)}
                                 style={{ fontSize: '11px', color: 'var(--color-danger)', background: 'none', border: '1px solid var(--color-danger)', borderRadius: '5px', cursor: 'pointer', padding: '2px 10px', fontWeight: '600' }}>
                                 Remove
@@ -945,28 +991,8 @@ const Step2Employment = ({ formData, updateFormData }) => {
                           </div>
                           {/* Job card body */}
                           <div style={{ padding: '14px 16px', background: 'var(--bg-primary)' }}>
-                            <div className="mb-4">
-                              <label>Employment Type <span style={{ fontSize: '11px', fontWeight: '400', color: 'var(--text-tertiary)' }}>Select all that apply</span></label>
-                              <div className="pill-group emp-type-pills">
-                                {[
-                                  'PAYG Full-Time', 'PAYG Part-Time', 'PAYG Casual', 'PAYG Contract',
-                                  'Self-Employed (Sole Trader)', 'Self-Employed (Company)',
-                                  'Centrelink', 'Rental Income', 'Other'
-                                ].map(t => {
-                                  const isActive = etArr.includes(t);
-                                  return (
-                                    <button key={t} type="button"
-                                      className={`pill-btn emp-type-pill${isActive ? ' pill-btn--active' : ''}`}
-                                      onClick={() => {
-                                        const next = isActive ? etArr.filter(x => x !== t) : [...etArr, t];
-                                        updateCurrentJob(index, jobIdx, 'employmentType', next);
-                                      }}>
-                                      {t}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
+                            {/* Payslip + Income Verifier per job */}
+                            {renderJobQuickActions(record, index, job, jobIdx)}
 
                             <div className="grid grid-cols-2 mb-4">
                               <div>
@@ -1046,12 +1072,6 @@ const Step2Employment = ({ formData, updateFormData }) => {
                         </div>
                       );
                     })}
-
-                    {/* Add another job */}
-                    <button type="button" onClick={() => addCurrentJob(index)}
-                      style={{ width: '100%', padding: '10px', fontSize: '13px', fontWeight: '600', color: 'var(--color-primary)', background: 'none', border: '2px dashed var(--border-secondary)', borderRadius: '10px', cursor: 'pointer', marginBottom: '16px' }}>
-                      + Add another job (PAYG + Centrelink, multiple employers, etc.)
-                    </button>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
                       <motion.button type="button" className="btn-primary"

@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import '../styles.css';
-import { BROKER_EMAILS } from '../lib/utils';
-
 const LOAN_PURPOSES = ['Purchase', 'Refinance', 'Construction', 'Other'];
 
 const AU_STATES = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
@@ -18,7 +16,7 @@ const LEAD_SOURCES = [
   'Top Notch Accounting','Trump Lawyers','Website',
 ];
 
-const BROKERS = Object.keys(BROKER_EMAILS);
+const BROKERS = ['Laith Hana', 'Mehdi Amirilayeghi', 'Yousif Jirjis'];
 
 const emptyApplicant = () => ({
   firstName: '', lastName: '', mobile: '', email: '',

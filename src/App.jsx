@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useUser, SignIn } from '@clerk/clerk-react';
 import './styles.css';
-import { getBrokerEmail } from './lib/utils';
 import Step0LoanStrategy from './steps/Step0-LoanStrategy';
 import Step1Applicants from './steps/Step1-Applicants';
 import Step2Employment from './steps/Step2-Employment';
@@ -9,6 +9,7 @@ import Step3AssetsLiabilities from './steps/Step3-AssetsLiabilities';
 import Step4Review from './steps/Step4-Review';
 import WelcomeScreen from './pages/WelcomeScreen';
 import QuickFactFind from './pages/QuickFactFind';
+import Dashboard from './pages/Dashboard';
 
 const stepVariants = {
   enter:  (dir) => ({ opacity: 0, x: dir * 30 }),
@@ -50,6 +51,10 @@ function SectionCountChip({ currentStep, formData }) {
 }
 
 const FactFindApp = () => {
+  const { isSignedIn, isLoaded, user } = useUser();
+  const brokerEmail = user?.primaryEmailAddress?.emailAddress || '';
+  const brokerName  = user?.fullName || brokerEmail;
+
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({
     // Step 0 - Loan Strategy
@@ -125,14 +130,49 @@ const FactFindApp = () => {
     submittedBy: ''
   });
 
-  const [screen, setScreen] = useState('welcome'); // 'welcome' | 'full' | 'quick'
+  const [screen, setScreen] = useState('dashboard'); // 'dashboard' | 'welcome' | 'full' | 'quick'
   const [theme, setTheme] = useState(() => localStorage.getItem('hof-theme') || 'light');
   const [direction, setDirection] = useState(1);
+  const [factFindId, setFactFindId] = useState(() => sessionStorage.getItem('hof_ff_id') || null);
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
+  const saveTimerRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('hof-theme', theme);
   }, [theme]);
+
+  // Seed broker identity from Clerk on first load
+  useEffect(() => {
+    if (isSignedIn && brokerEmail && !formData.brokerEmail) {
+      setFormData(prev => ({ ...prev, brokerName, brokerEmail }));
+    }
+  }, [isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-save draft to Supabase (debounced 2s after any formData change)
+  useEffect(() => {
+    if (screen !== 'full') return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      setSaveStatus('saving');
+      try {
+        const res = await fetch('/api/fact-finds', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'save', brokerEmail, id: factFindId, formData }),
+        });
+        const data = await res.json();
+        if (data.id && data.id !== factFindId) {
+          setFactFindId(data.id);
+          sessionStorage.setItem('hof_ff_id', data.id);
+        }
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      } catch {
+        setSaveStatus('idle');
+      }
+    }, 2000);
+    return () => clearTimeout(saveTimerRef.current);
+  }, [formData, screen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Seed applicants immediately when count/type changes so Step 0 ownership is live
   useEffect(() => {
@@ -216,7 +256,7 @@ const FactFindApp = () => {
       const res  = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'submit', formData: submissionData }),
+        body: JSON.stringify({ action: 'submit', formData: submissionData, factFindId }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -270,8 +310,8 @@ const FactFindApp = () => {
   };
 
   const handleBackToStart = () => {
-    if (window.confirm('Return to the start? Any unsaved data will be lost.')) {
-      setScreen('welcome');
+    if (window.confirm('Return to dashboard? Your draft has been auto-saved.')) {
+      setScreen('dashboard');
       setCurrentStep(0);
     }
   };
@@ -328,12 +368,56 @@ const FactFindApp = () => {
             style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
           />
         </div>
+        {saveStatus !== 'idle' && (
+          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '8px', textAlign: 'center' }}>
+            {saveStatus === 'saving' ? 'Saving…' : '✓ Saved'}
+          </div>
+        )}
         <button className="sidebar-back-btn" onClick={handleBackToStart}>
           ← Back to start
         </button>
       </div>
     </nav>
   );
+
+  if (!isLoaded) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-tertiary)' }}>
+      <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Loading…</div>
+    </div>
+  );
+
+  if (!isSignedIn) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-tertiary)' }}>
+      <SignIn />
+    </div>
+  );
+
+  const handleNewFactFind = () => {
+    setFormData(prev => ({
+      ...prev,
+      brokerName,
+      brokerEmail,
+      clientType: '', leadSource: '', numApplicants: 1, numGuarantors: 0,
+      securities: [{ id: 1, address: '', propertyValue: '', loanAmount: '', lvr: '', primaryTransactionTypes: [], secondaryTransactionTypes: [], intendedOccupancy: '', applicationType: '', loanTerm: '', loanType: '', repaymentType: '', interestOnlyPeriod: '', fixedRatePeriod: '', split1Amount: '', split1Type: '', split1RateType: '', split1FixedYears: '', split1IOYears: '', split2Amount: '', split2Type: '', split2RateType: '', split2FixedYears: '', split2IOYears: '', currentLoanBalance: '', cashoutAmount: '', purchaseCompletionMethods: [], state: '', isFirstHomeBuyer: false, isNewHome: false, purchaseCompletionAmounts: {}, purchaseCompletionOther: '', equityPropertyIndex: '', giftRelationship: '', hasOffset: false, hasRedraw: false }],
+      lenderPreference: [], lenderPreferenceOtherNote: '', priority: 'Medium', brokerNotes: '',
+      applicants: [], employment: [],
+      assets: { realProperty: [], savings: [], superannuation: [], shares: [], vehicles: [] },
+      liabilities: { creditCards: [], personalLoans: [], hecs: [], otherLiabilities: [] },
+      submittedAt: null, submittedBy: '',
+    }));
+    setFactFindId(null);
+    sessionStorage.removeItem('hof_ff_id');
+    setCurrentStep(0);
+    setScreen('welcome');
+  };
+
+  const handleResume = (savedFormData, id) => {
+    setFormData(savedFormData);
+    setFactFindId(id);
+    sessionStorage.setItem('hof_ff_id', id);
+    setCurrentStep(0);
+    setScreen('full');
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-tertiary)' }}>
@@ -377,6 +461,16 @@ const FactFindApp = () => {
           </div>
         </div>
       </header>
+
+      {/* ── Dashboard ────────────────────────────────────────────────────── */}
+      {screen === 'dashboard' && (
+        <Dashboard
+          brokerEmail={brokerEmail}
+          brokerName={brokerName}
+          onNewFactFind={handleNewFactFind}
+          onResume={handleResume}
+        />
+      )}
 
       {/* ── Welcome Screen ───────────────────────────────────────────────── */}
       {screen === 'welcome' && (

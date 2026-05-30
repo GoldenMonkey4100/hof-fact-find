@@ -1,12 +1,3 @@
-export const BROKER_EMAILS = {
-  'Laith Hana': 'Laith@houseoffinance.com.au',
-  'Mehdi Amirilayeghi': 'Mehdi@houseoffinance.com.au',
-  'Yousif Jirjis': 'Yousif@houseoffinance.com.au'
-};
-
-export const getBrokerEmail = (brokerName) => {
-  return BROKER_EMAILS[brokerName] || '';
-};
 
 export const formatCurrency = (value) => {
   if (!value) return '';

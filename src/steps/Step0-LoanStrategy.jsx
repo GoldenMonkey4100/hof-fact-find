@@ -7,7 +7,7 @@ const subStepVariants = {
   center: { opacity: 1, x: 0 },
   exit:   (dir) => ({ opacity: 0, x: dir * -16 }),
 };
-import { getBrokerEmail, formatCurrency, parseCurrency, calculateLVR, calculatePropertyValue, calculateLoanAmount, formatCurrencyDisplay } from '../lib/utils';
+import { formatCurrency, parseCurrency, calculateLVR, calculatePropertyValue, calculateLoanAmount, formatCurrencyDisplay } from '../lib/utils';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import SmartCard from '../components/SmartCard';
 
@@ -523,11 +523,6 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
     updateFormData('securities', securities);
   };
 
-  const handleBrokerChange = (e) => {
-    const brokerName = e.target.value;
-    updateFormData('brokerName', brokerName);
-    updateFormData('brokerEmail', getBrokerEmail(brokerName));
-  };
 
   const handlePropertyValueChange = (index, value) => {
     const parsed = parseCurrency(value);
@@ -1387,18 +1382,10 @@ const Step0LoanStrategy = ({ formData, updateFormData }) => {
 
         <div className="grid grid-cols-3 mb-4">
           <div>
-            <label>Broker Name</label>
-            <div className="pill-group">
-              {['Laith Hana', 'Mehdi Amirilayeghi', 'Yousif Jirjis'].map(name => (
-                <button key={name} type="button"
-                  className={`pill-btn${formData.brokerName === name ? ' pill-btn--active' : ''}`}
-                  onClick={() => {
-                    updateFormData('brokerName', name);
-                    updateFormData('brokerEmail', getBrokerEmail(name));
-                  }}>
-                  {name}
-                </button>
-              ))}
+            <label>Broker</label>
+            <div style={{ padding: '9px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px', fontSize: '13px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Logged in as</span>
+              <span style={{ fontWeight: '600' }}>{formData.brokerName || '—'}</span>
             </div>
           </div>
           <div>

@@ -690,6 +690,32 @@ export default async function handler(req, res) {
         console.error('[teams] notification failed:', err.message);
       });
 
+      // 8. Mark fact find as submitted in Supabase (non-fatal)
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
+        try {
+          const { createClient } = await import('@supabase/supabase-js');
+          const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+          const factFindId = req.body.factFindId;
+          const upsertPayload = {
+            broker_email: formData.brokerEmail,
+            broker_name: formData.brokerName || null,
+            status: 'submitted',
+            form_data: formData,
+            mercury_url: mercuryUrl,
+            mercury_title: opportunityName,
+            client_name: [formData.applicants?.[0]?.firstName, formData.applicants?.[0]?.lastName].filter(Boolean).join(' ') || null,
+            updated_at: new Date().toISOString(),
+          };
+          if (factFindId) {
+            await sb.from('fact_finds').update(upsertPayload).eq('id', factFindId);
+          } else {
+            await sb.from('fact_finds').insert(upsertPayload);
+          }
+        } catch (err) {
+          console.error('[supabase] upsert failed:', err.message);
+        }
+      }
+
       return res.status(200).json({ success: true, mercuryUrl, title: opportunityName });
     }
 

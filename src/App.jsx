@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useUser, useClerk } from '@clerk/clerk-react';
+import { useUser, useClerk } from '@clerk/react';
 import './styles.css';
 import Step0LoanStrategy from './steps/Step0-LoanStrategy';
 import Step1Applicants from './steps/Step1-Applicants';

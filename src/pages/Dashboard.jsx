@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useClerk } from '@clerk/clerk-react';
+import { useClerk } from '@clerk/react';
 
 const relativeTime = (iso) => {
   const diff = Date.now() - new Date(iso).getTime();

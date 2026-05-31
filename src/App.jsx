@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useUser, SignIn } from '@clerk/clerk-react';
+import { useUser, useClerk } from '@clerk/clerk-react';
 import './styles.css';
 import Step0LoanStrategy from './steps/Step0-LoanStrategy';
 import Step1Applicants from './steps/Step1-Applicants';
@@ -47,6 +47,16 @@ function SectionCountChip({ currentStep, formData }) {
       </svg>
       {messages[currentStep]}
     </span>
+  );
+}
+
+function AutoRedirectToSignIn() {
+  const { redirectToSignIn } = useClerk();
+  useEffect(() => { redirectToSignIn({ redirectUrl: window.location.href }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-tertiary)' }}>
+      <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Signing in…</div>
+    </div>
   );
 }
 
@@ -386,11 +396,7 @@ const FactFindApp = () => {
     </div>
   );
 
-  if (!isSignedIn) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-tertiary)' }}>
-      <SignIn />
-    </div>
-  );
+  if (!isSignedIn) return <AutoRedirectToSignIn />;
 
   const handleNewFactFind = () => {
     setFormData(prev => ({

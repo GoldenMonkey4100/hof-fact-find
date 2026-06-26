@@ -431,12 +431,12 @@ const FactFindApp = () => {
       {/* ── App Header ───────────────────────────────────────────────────── */}
       <header className="app-header">
         <div className="container">
-          <div className="app-logo">
+          <a href="https://hof-hub.vercel.app" className="app-logo" style={{ textDecoration: 'none' }}>
             <div className="app-logo-mark">HOF</div>
             <span className="app-logo-text">
               HOUSE <span>OF</span> FINANCE
             </span>
-          </div>
+          </a>
           <div className="app-header-meta">
             <a
               href="https://hof-hub.vercel.app"
@@ -569,7 +569,7 @@ const FactFindApp = () => {
               Open in Mercury →
             </a>
             <br />
-            <button onClick={() => setSubmission(s => ({ ...s, status: 'idle' }))}
+            <button onClick={() => { setSubmission(s => ({ ...s, status: 'idle' })); setScreen('dashboard'); }}
               style={{ marginTop: '8px', padding: '10px 20px', background: 'none', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>
               Close
             </button>

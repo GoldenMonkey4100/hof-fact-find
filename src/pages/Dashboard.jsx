@@ -111,11 +111,12 @@ const Dashboard = ({ brokerEmail, brokerName, onNewFactFind, onResume }) => {
     <div style={{ minHeight: '100vh', background: 'var(--bg-tertiary)' }}>
       {/* Header */}
       <div style={{ background: '#12110D', borderBottom: '1px solid rgba(203,178,107,0.2)', padding: '14px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <a href="https://hof-hub.vercel.app" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
           <div style={{ fontFamily: 'var(--font-heading)', fontSize: '13px', fontWeight: '800', letterSpacing: '0.12em', color: 'var(--color-primary)', textTransform: 'uppercase' }}>HOF</div>
           <span style={{ fontSize: '13px', color: 'rgba(245,244,242,0.5)' }}>Broker Fact Find</span>
-        </div>
+        </a>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <a href="https://hof-hub.vercel.app" style={{ fontSize: '12px', color: 'rgba(203,178,107,0.75)', textDecoration: 'none', border: '1px solid rgba(203,178,107,0.2)', borderRadius: '6px', padding: '5px 10px' }}>← Staff Portal</a>
           <span style={{ fontSize: '13px', color: 'rgba(245,244,242,0.7)' }}>{brokerName || brokerEmail}</span>
           <button onClick={() => signOut()} style={{ fontSize: '12px', color: 'rgba(245,244,242,0.5)', background: 'none', border: '1px solid rgba(245,244,242,0.15)', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer' }}>
             Sign out

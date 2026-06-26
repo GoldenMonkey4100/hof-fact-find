@@ -400,6 +400,36 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
           </svg>
         </button>
 
+        {/* Add button always visible — no need to open accordion first */}
+        {allApplicants.length > 0 && (
+          <div className="acc-add-row">
+            {!multiApp ? (
+              <button type="button" className="acc-add-btn"
+                onClick={() => {
+                  if (!isOpen) toggleSection(section.key);
+                  listKey === 'assets' ? addAsset(0, { type: section.addType }) : addLiability(0, { type: section.addType });
+                }}>
+                + Add {section.label}
+              </button>
+            ) : (
+              allApplicants.map((app, appIdx) => {
+                const c = OWNER_COLORS[appIdx % OWNER_COLORS.length];
+                const name = app.firstName || app.companyName || `Applicant ${appIdx + 1}`;
+                return (
+                  <button key={appIdx} type="button" className="acc-add-btn acc-add-btn--owner"
+                    style={{ borderColor: c.border, color: c.color, background: c.bg }}
+                    onClick={() => {
+                      if (!isOpen) toggleSection(section.key);
+                      listKey === 'assets' ? addAsset(appIdx, { type: section.addType }) : addLiability(appIdx, { type: section.addType });
+                    }}>
+                    + Add for {name}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
+
         {isOpen && (
           <div className="acc-body">
             {items.length === 0 && (
@@ -451,29 +481,6 @@ const Step3AssetsLiabilities = ({ formData, updateFormData }) => {
               );
             })}
 
-            {/* Add button(s) */}
-            {allApplicants.length > 0 && (
-              <div className="acc-add-row">
-                {!multiApp ? (
-                  <button type="button" className="acc-add-btn"
-                    onClick={() => listKey === 'assets' ? addAsset(0, { type: section.addType }) : addLiability(0, { type: section.addType })}>
-                    + Add {section.label}
-                  </button>
-                ) : (
-                  allApplicants.map((app, appIdx) => {
-                    const c = OWNER_COLORS[appIdx % OWNER_COLORS.length];
-                    const name = app.firstName || app.companyName || `Applicant ${appIdx + 1}`;
-                    return (
-                      <button key={appIdx} type="button" className="acc-add-btn acc-add-btn--owner"
-                        style={{ borderColor: c.border, color: c.color, background: c.bg }}
-                        onClick={() => listKey === 'assets' ? addAsset(appIdx, { type: section.addType }) : addLiability(appIdx, { type: section.addType })}>
-                        + Add for {name}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            )}
           </div>
         )}
       </div>

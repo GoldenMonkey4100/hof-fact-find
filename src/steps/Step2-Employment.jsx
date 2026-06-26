@@ -518,7 +518,12 @@ const Step2Employment = ({ formData, updateFormData }) => {
         jobs.splice(existingJobIdx, 1);
       }
     } else {
-      jobs.push(defaultJob({ employmentType: [type] }));
+      // If only one blank job exists, assign the type to it instead of creating a second tab
+      if (jobs.length === 1 && (jobs[0].employmentType || []).length === 0) {
+        jobs[0] = { ...jobs[0], employmentType: [type] };
+      } else {
+        jobs.push(defaultJob({ employmentType: [type] }));
+      }
     }
     updated[idx] = { ...updated[idx], currentJobs: jobs };
     updated[idx].totalYears = calculateTotalYears(updated[idx]);

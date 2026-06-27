@@ -196,6 +196,10 @@ const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange }) => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [loggingIn, setLoggingIn] = useState(false);
+  const [changingPwd, setChangingPwd] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwdSuccess, setPwdSuccess] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -212,37 +216,112 @@ const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange }) => {
     } catch { setLoginError('Sign in failed. Please try again.'); } finally { setLoggingIn(false); }
   };
 
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    if (newPassword !== confirmPassword) { setLoginError('New passwords do not match.'); return; }
+    if (newPassword.length < 6) { setLoginError('New password must be at least 6 characters.'); return; }
+    setLoggingIn(true);
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'change-password', email: email.trim(), currentPassword: password, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) { setLoginError(data.error || 'Failed to update password.'); return; }
+      setPwdSuccess(true);
+    } catch { setLoginError('An error occurred. Please try again.'); } finally { setLoggingIn(false); }
+  };
+
+  const resetToLogin = () => {
+    setChangingPwd(false);
+    setNewPassword('');
+    setConfirmPassword('');
+    setLoginError('');
+    setPwdSuccess(false);
+  };
+
   // Login form — shown when no user is identified
   if (!user) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
         <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '12px', padding: '40px', maxWidth: '400px', width: '100%' }}>
           <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'var(--color-gold-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: 'var(--color-primary)', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '11px', letterSpacing: '0.1em' }}>HOF</div>
-          <h2 style={{ fontSize: '20px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 6px', textAlign: 'center' }}>Sign in</h2>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 24px', textAlign: 'center' }}>Use your House of Finance email and password</p>
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>Email</label>
-              <input
-                type="email" value={email} onChange={e => { setEmail(e.target.value); setLoginError(''); }}
-                placeholder="your@houseoffinance.com.au" autoComplete="email" autoFocus required
-                style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', boxSizing: 'border-box' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>Password</label>
-              <input
-                type="password" value={password} onChange={e => { setPassword(e.target.value); setLoginError(''); }}
-                placeholder="••••••••" autoComplete="current-password" required
-                style={{ width: '100%', padding: '9px 12px', border: loginError ? '1px solid #dc2626' : '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', boxSizing: 'border-box' }}
-              />
-            </div>
-            {loginError && <div style={{ fontSize: '12px', color: '#dc2626' }}>{loginError}</div>}
-            <button type="submit" disabled={loggingIn}
-              style={{ padding: '11px 22px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: loggingIn ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-heading)', marginTop: '4px', opacity: loggingIn ? 0.7 : 1 }}>
-              {loggingIn ? 'Signing in…' : 'Sign in →'}
-            </button>
-          </form>
+
+          {pwdSuccess ? (
+            <>
+              <h2 style={{ fontSize: '20px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 10px', textAlign: 'center' }}>Password updated</h2>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 20px', textAlign: 'center' }}>Your password has been changed. Sign in with your new password.</p>
+              <button onClick={resetToLogin}
+                style={{ width: '100%', padding: '11px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'var(--font-heading)' }}>
+                Back to sign in →
+              </button>
+            </>
+          ) : changingPwd ? (
+            <>
+              <h2 style={{ fontSize: '20px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 6px', textAlign: 'center' }}>Set your password</h2>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 24px', textAlign: 'center' }}>Enter your current password, then choose a new one.</p>
+              <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>Email</label>
+                  <input type="email" value={email} onChange={e => { setEmail(e.target.value); setLoginError(''); }} placeholder="your@houseoffinance.com.au" autoComplete="email" required
+                    style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>Current password</label>
+                  <input type="password" value={password} onChange={e => { setPassword(e.target.value); setLoginError(''); }} placeholder="••••••••" autoComplete="current-password" required
+                    style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>New password</label>
+                  <input type="password" value={newPassword} onChange={e => { setNewPassword(e.target.value); setLoginError(''); }} placeholder="Min 6 characters" autoComplete="new-password" required
+                    style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>Confirm new password</label>
+                  <input type="password" value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setLoginError(''); }} placeholder="••••••••" autoComplete="new-password" required
+                    style={{ width: '100%', padding: '9px 12px', border: loginError ? '1px solid #dc2626' : '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', boxSizing: 'border-box' }} />
+                </div>
+                {loginError && <div style={{ fontSize: '12px', color: '#dc2626' }}>{loginError}</div>}
+                <button type="submit" disabled={loggingIn}
+                  style={{ padding: '11px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: loggingIn ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-heading)', marginTop: '4px', opacity: loggingIn ? 0.7 : 1 }}>
+                  {loggingIn ? 'Saving…' : 'Set new password →'}
+                </button>
+                <button type="button" onClick={resetToLogin}
+                  style={{ padding: '9px', background: 'none', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>
+                  ← Back to sign in
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <h2 style={{ fontSize: '20px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 6px', textAlign: 'center' }}>Sign in</h2>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 24px', textAlign: 'center' }}>Use your House of Finance email and password</p>
+              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>Email</label>
+                  <input type="email" value={email} onChange={e => { setEmail(e.target.value); setLoginError(''); }}
+                    placeholder="your@houseoffinance.com.au" autoComplete="email" autoFocus required
+                    style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>Password</label>
+                  <input type="password" value={password} onChange={e => { setPassword(e.target.value); setLoginError(''); }}
+                    placeholder="••••••••" autoComplete="current-password" required
+                    style={{ width: '100%', padding: '9px 12px', border: loginError ? '1px solid #dc2626' : '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', boxSizing: 'border-box' }} />
+                </div>
+                {loginError && <div style={{ fontSize: '12px', color: '#dc2626' }}>{loginError}</div>}
+                <button type="submit" disabled={loggingIn}
+                  style={{ padding: '11px 22px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: loggingIn ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-heading)', marginTop: '4px', opacity: loggingIn ? 0.7 : 1 }}>
+                  {loggingIn ? 'Signing in…' : 'Sign in →'}
+                </button>
+                <button type="button" onClick={() => { setChangingPwd(true); setLoginError(''); }}
+                  style={{ padding: '8px', background: 'none', color: 'var(--text-tertiary)', border: 'none', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>
+                  First time? Set your password
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </div>
     );

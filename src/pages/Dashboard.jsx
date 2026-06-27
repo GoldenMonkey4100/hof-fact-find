@@ -24,7 +24,7 @@ const getStoredBroker = () => {
   try { return JSON.parse(localStorage.getItem('hof_broker') || 'null'); } catch { return null; }
 };
 
-const Dashboard = ({ onNewFactFind, onResume }) => {
+const Dashboard = ({ onSelectFull, onSelectQuick, onResume }) => {
   const [broker, setBroker]       = useState(getStoredBroker);
   const [pickerVal, setPickerVal] = useState('');
   const [items, setItems]         = useState([]);
@@ -115,19 +115,10 @@ const Dashboard = ({ onNewFactFind, onResume }) => {
               </button>
             </>
           ) : (
-            <>
-              {item.mercury_url && (
-                <a href={item.mercury_url} target="_blank" rel="noopener noreferrer"
-                  style={{ padding: '7px 14px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  Mercury
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                </a>
-              )}
-              <button type="button" onClick={() => handleResume(item.id)}
-                style={{ padding: '7px 14px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', cursor: 'pointer' }}>
-                View
-              </button>
-            </>
+            <button type="button" onClick={() => handleResume(item.id)}
+              style={{ padding: '7px 14px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', cursor: 'pointer' }}>
+              View
+            </button>
           )}
         </div>
       </div>
@@ -184,10 +175,16 @@ const Dashboard = ({ onNewFactFind, onResume }) => {
                 <h1 style={{ fontSize: '24px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px' }}>My Fact Finds</h1>
                 <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>Your submitted and in-progress fact finds</p>
               </div>
-              <button type="button" onClick={onNewFactFind}
-                style={{ padding: '10px 22px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'var(--font-heading)', letterSpacing: '0.04em' }}>
-                + New Fact Find
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button type="button" onClick={onSelectQuick}
+                  style={{ padding: '9px 18px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  ⚡ Quick Fact Find
+                </button>
+                <button type="button" onClick={onSelectFull}
+                  style={{ padding: '9px 18px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'var(--font-heading)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  📋 Full Fact Find
+                </button>
+              </div>
             </div>
 
             {loading && (

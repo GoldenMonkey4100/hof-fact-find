@@ -389,7 +389,17 @@ const FactFindApp = () => {
     setFactFindId(null);
     sessionStorage.removeItem('hof_ff_id');
     setCurrentStep(0);
-    setScreen('welcome');
+    setScreen('full');
+  };
+
+  const handleNewQuickFactFind = () => {
+    const b = (() => { try { return JSON.parse(localStorage.getItem('hof_broker') || 'null'); } catch { return null; } })();
+    setFormData(prev => ({
+      ...prev,
+      brokerName: b?.name  || '',
+      brokerEmail: b?.email || '',
+    }));
+    setScreen('quick');
   };
 
   const handleResume = (savedFormData, id) => {
@@ -446,16 +456,9 @@ const FactFindApp = () => {
       {/* ── Dashboard ────────────────────────────────────────────────────── */}
       {screen === 'dashboard' && (
         <Dashboard
-          onNewFactFind={handleNewFactFind}
+          onSelectFull={handleNewFactFind}
+          onSelectQuick={handleNewQuickFactFind}
           onResume={handleResume}
-        />
-      )}
-
-      {/* ── Welcome Screen ───────────────────────────────────────────────── */}
-      {screen === 'welcome' && (
-        <WelcomeScreen
-          onSelectFull={() => setScreen('full')}
-          onSelectQuick={() => setScreen('quick')}
         />
       )}
 

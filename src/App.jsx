@@ -312,6 +312,16 @@ const FactFindApp = () => {
 
   const handleBackToStart = () => {
     if (window.confirm('Return to dashboard? Your draft has been auto-saved.')) {
+      // Restore admin session if we were editing a fact find as a broker
+      const adminRestore = localStorage.getItem('hof_admin_restore');
+      if (adminRestore) {
+        try {
+          const admin = JSON.parse(adminRestore);
+          localStorage.setItem('hof_user', adminRestore);
+          localStorage.removeItem('hof_admin_restore');
+          setActiveUser(admin);
+        } catch { /* ignore */ }
+      }
       setScreen('dashboard');
       setCurrentStep(0);
     }
@@ -408,7 +418,13 @@ const FactFindApp = () => {
     setScreen('quick');
   };
 
-  const handleResume = (savedFormData, id) => {
+  const handleResume = (savedFormData, id, asUser) => {
+    if (asUser) {
+      // Admin editing as broker — save admin session for restoration on back
+      localStorage.setItem('hof_admin_restore', JSON.stringify(activeUser));
+      localStorage.setItem('hof_user', JSON.stringify(asUser));
+      setActiveUser(asUser);
+    }
     setFormData(savedFormData);
     setFactFindId(id);
     sessionStorage.setItem('hof_ff_id', id);
@@ -493,6 +509,7 @@ const FactFindApp = () => {
           onSelectQuick={handleNewQuickFactFind}
           onResume={handleResume}
           onUserChange={setActiveUser}
+          onResumeAs={(formData, id, brokerUser) => handleResume(formData, id, brokerUser)}
         />
       )}
 

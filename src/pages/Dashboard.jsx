@@ -169,7 +169,7 @@ const BrokerDashboard = ({ user, onSelectFull, onSelectQuick, onResume }) => {
 };
 
 // ── Root Dashboard — single source of truth for user identity ─────────────────
-const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange }) => {
+const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange, onResumeAs }) => {
   const [user, setUser]     = useState(getStoredUser);
   const [email, setEmail]   = useState('');
   const [password, setPassword] = useState('');
@@ -330,7 +330,7 @@ const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange }) => {
 
   // Route by role — "Not you?" is handled by parent App.jsx header button
   if (user.role === 'admin') {
-    return <AdminDashboard user={user} />;
+    return <AdminDashboard user={user} onEditAsBroker={onResumeAs} />;
   }
   if (user.role === 'analyst') {
     return <AnalystDashboard user={user} onChangeUser={clearUser} />;

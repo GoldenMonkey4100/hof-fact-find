@@ -159,7 +159,7 @@ const PipelineRow = ({ item, onView, onUpdate }) => {
 };
 
 // ── Detail View (read-only) ───────────────────────────────────────────────────
-const DetailView = ({ item, detail, onBack, onUpdate }) => {
+const DetailView = ({ item, detail, onBack, onUpdate, onEditAsBroker }) => {
   const fd   = detail || {};
   const secs = fd.securities  || [];
   const apps = fd.applicants  || [];
@@ -276,6 +276,14 @@ const DetailView = ({ item, detail, onBack, onUpdate }) => {
             </button>
           </div>
 
+          {onEditAsBroker && (
+            <button
+              onClick={() => onEditAsBroker(detail, item.id, { name: item.broker_name || 'Broker', email: item.broker_email, role: 'broker' })}
+              style={{ width: '100%', padding: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', cursor: 'pointer', textAlign: 'center' }}>
+              ✏ Edit fact find as {item.broker_name || 'broker'}
+            </button>
+          )}
+
           {item.mercury_url && (
             <a href={item.mercury_url} target="_blank" rel="noopener noreferrer"
               style={{ display: 'block', padding: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', textDecoration: 'none', textAlign: 'center' }}>
@@ -339,7 +347,7 @@ const PasswordResetPanel = ({ adminEmail }) => {
 };
 
 // ── AdminDashboard ────────────────────────────────────────────────────────────
-const AdminDashboard = ({ user }) => {
+const AdminDashboard = ({ user, onEditAsBroker }) => {
   const [items, setItems]       = useState([]);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
@@ -388,6 +396,7 @@ const AdminDashboard = ({ user }) => {
         detail={detail}
         onBack={() => { setSelected(null); setDetail(null); }}
         onUpdate={handleUpdate}
+        onEditAsBroker={onEditAsBroker}
       />
     );
   }

@@ -1,12 +1,8 @@
 import React, { useState, useEffect } from 'react';
-
-const BROKERS = [
-  { name: 'Laith Hana',              email: 'laith@houseoffinance.com.au' },
-  { name: 'Mehdi Amirilayeghi',      email: 'mehdi@houseoffinance.com.au' },
-  { name: 'Yousif Jirjis',           email: 'yousif@houseoffinance.com.au' },
-  { name: 'Chris Tenaglia',          email: 'chris@houseoffinance.com.au' },
-  { name: 'Rita Khaya',              email: 'rita@houseoffinance.com.au' },
-];
+import { ROLE_LABELS, getStoredUser } from '../lib/utils';
+import AnalystDashboard from './AnalystDashboard';
+import ProcessorDashboard from './ProcessorDashboard';
+import AdminDashboard from './AdminDashboard';
 
 const relativeTime = (iso) => {
   const diff = Date.now() - new Date(iso).getTime();
@@ -20,75 +16,69 @@ const relativeTime = (iso) => {
   return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-const getStoredBroker = () => {
-  try { return JSON.parse(localStorage.getItem('hof_broker') || 'null'); } catch { return null; }
+const STATUS_META = {
+  draft:             { label: 'Draft',            bg: 'var(--color-gold-light)', color: 'var(--color-primary)' },
+  pending_review:    { label: 'With Credit Team', bg: '#fef3c7',                color: '#92400e' },
+  in_review:         { label: 'In Analysis',      bg: '#dbeafe',                color: '#1e40af' },
+  pending_lodgement: { label: 'Ready to Lodge',   bg: '#ede9fe',                color: '#5b21b6' },
+  lodged:            { label: 'Lodged',            bg: '#ccfbf1',                color: '#0f766e' },
+  approved:          { label: 'Approved',          bg: '#dcfce7',                color: '#16a34a' },
+  submitted:         { label: 'Submitted',         bg: '#dcfce7',                color: '#16a34a' },
 };
 
-const Dashboard = ({ onSelectFull, onSelectQuick, onResume }) => {
-  const [broker, setBroker]       = useState(getStoredBroker);
-  const [pickerVal, setPickerVal] = useState('');
-  const [items, setItems]         = useState([]);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState(null);
-  const [deleting, setDeleting]   = useState(null);
+const StatusBadge = ({ status }) => {
+  const meta = STATUS_META[status] || { label: status, bg: '#f3f4f6', color: '#6b7280' };
+  return (
+    <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 10px', borderRadius: '10px', background: meta.bg, color: meta.color, whiteSpace: 'nowrap', flexShrink: 0 }}>
+      {meta.label}
+    </span>
+  );
+};
 
-  const load = async (email) => {
-    if (!email) return;
-    setLoading(true);
-    setError(null);
+// User state lives entirely in the parent Dashboard — BrokerDashboard receives it as props
+const BrokerDashboard = ({ user, onSelectFull, onSelectQuick, onResume }) => {
+  const [items, setItems]       = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState(null);
+  const [deleting, setDeleting] = useState(null);
+
+  const load = async () => {
+    setLoading(true); setError(null);
     try {
       const res  = await fetch('/api/fact-finds', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'list', brokerEmail: email }),
+        body: JSON.stringify({ action: 'list', brokerEmail: user.email }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setItems(data.items || []);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setError(e.message); } finally { setLoading(false); }
   };
 
-  useEffect(() => { if (broker) load(broker.email); }, [broker]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleSelectBroker = () => {
-    const found = BROKERS.find(b => b.email === pickerVal);
-    if (!found) return;
-    localStorage.setItem('hof_broker', JSON.stringify(found));
-    setBroker(found);
-  };
-
-  const handleChangeBroker = () => {
-    localStorage.removeItem('hof_broker');
-    setBroker(null);
-    setItems([]);
-    setPickerVal('');
-  };
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this draft? This cannot be undone.')) return;
     setDeleting(id);
     await fetch('/api/fact-finds', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'delete', brokerEmail: broker.email, id }),
+      body: JSON.stringify({ action: 'delete', brokerEmail: user.email, id }),
     });
     setDeleting(null);
-    await load(broker.email);
+    await load();
   };
 
   const handleResume = async (id) => {
     const res  = await fetch('/api/fact-finds', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'get', brokerEmail: broker.email, id }),
+      body: JSON.stringify({ action: 'get', brokerEmail: user.email, id }),
     });
     const data = await res.json();
     if (data.item) onResume(data.item.form_data, id);
   };
 
   const drafts    = items.filter(i => i.status === 'draft');
-  const submitted = items.filter(i => i.status === 'submitted');
+  const submitted = items.filter(i => i.status !== 'draft');
 
   const Card = ({ item }) => {
     const isDraft = item.status === 'draft';
@@ -99,9 +89,7 @@ const Dashboard = ({ onSelectFull, onSelectQuick, onResume }) => {
           <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{relativeTime(item.updated_at)}</div>
         </div>
-        <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 10px', borderRadius: '10px', background: isDraft ? 'var(--color-gold-light)' : '#dcfce7', color: isDraft ? 'var(--color-primary)' : '#16a34a', whiteSpace: 'nowrap', flexShrink: 0 }}>
-          {isDraft ? 'Draft' : 'Submitted'}
-        </span>
+        <StatusBadge status={item.status} />
         <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
           {isDraft ? (
             <>
@@ -127,104 +115,157 @@ const Dashboard = ({ onSelectFull, onSelectQuick, onResume }) => {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-tertiary)' }}>
-      {/* Header */}
-      <div style={{ background: '#12110D', borderBottom: '1px solid rgba(203,178,107,0.2)', padding: '14px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <a href="https://hof-hub.vercel.app" style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-          <div style={{ fontFamily: 'var(--font-heading)', fontSize: '13px', fontWeight: '800', letterSpacing: '0.12em', color: 'var(--color-primary)', textTransform: 'uppercase' }}>HOF</div>
-          <span style={{ fontSize: '13px', color: 'rgba(245,244,242,0.5)' }}>Broker Fact Find</span>
-        </a>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <a href="https://hof-hub.vercel.app" style={{ fontSize: '12px', color: 'rgba(203,178,107,0.75)', textDecoration: 'none', border: '1px solid rgba(203,178,107,0.2)', borderRadius: '6px', padding: '5px 10px' }}>← Staff Portal</a>
-          {broker && (
-            <>
-              <span style={{ fontSize: '13px', color: 'rgba(245,244,242,0.7)' }}>{broker.name}</span>
-              <button onClick={handleChangeBroker} style={{ fontSize: '12px', color: 'rgba(245,244,242,0.5)', background: 'none', border: '1px solid rgba(245,244,242,0.15)', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer' }}>
-                Not you?
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
       <div style={{ maxWidth: '860px', margin: '0 auto', padding: '40px 24px' }}>
-
-        {/* Broker picker */}
-        {!broker && (
-          <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '12px', padding: '32px', marginBottom: '32px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '18px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 8px' }}>Who are you?</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 20px' }}>Select your name to load your fact finds.</p>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <select value={pickerVal} onChange={e => setPickerVal(e.target.value)}
-                style={{ padding: '9px 14px', border: '1px solid var(--border-primary)', borderRadius: '8px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', minWidth: '200px' }}>
-                <option value="">Select broker…</option>
-                {BROKERS.map(b => <option key={b.email} value={b.email}>{b.name}</option>)}
-              </select>
-              <button type="button" onClick={handleSelectBroker} disabled={!pickerVal}
-                style={{ padding: '9px 22px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: pickerVal ? 'pointer' : 'not-allowed', opacity: pickerVal ? 1 : 0.5 }}>
-                Continue →
-              </button>
-            </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+          <div>
+            <h1 style={{ fontSize: '24px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px' }}>My Fact Finds</h1>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>Your submitted and in-progress fact finds</p>
           </div>
-        )}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button type="button" onClick={onSelectQuick}
+              style={{ padding: '9px 18px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              Quick Fact Find
+            </button>
+            <button type="button" onClick={onSelectFull}
+              style={{ padding: '9px 18px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'var(--font-heading)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+              Full Fact Find
+            </button>
+          </div>
+        </div>
 
-        {broker && (
+        {loading && <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '14px' }}>Loading…</div>}
+        {error && <div style={{ padding: '16px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', color: '#991b1b', fontSize: '13px', marginBottom: '16px' }}>⚠ {error}</div>}
+
+        {!loading && !error && (
           <>
-            {/* Page title */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
-              <div>
-                <h1 style={{ fontSize: '24px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px' }}>My Fact Finds</h1>
-                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>Your submitted and in-progress fact finds</p>
+            <div style={{ marginBottom: '32px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
+                In Progress ({drafts.length})
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="button" onClick={onSelectQuick}
-                  style={{ padding: '9px 18px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                  Quick Fact Find
-                </button>
-                <button type="button" onClick={onSelectFull}
-                  style={{ padding: '9px 18px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'var(--font-heading)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
-                  Full Fact Find
-                </button>
-              </div>
+              {drafts.length === 0 ? (
+                <div style={{ padding: '32px', textAlign: 'center', background: 'var(--bg-secondary)', border: '2px dashed var(--border-primary)', borderRadius: '10px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                  No drafts — click "Full Fact Find" to start one.
+                </div>
+              ) : drafts.map(item => <Card key={item.id} item={item} />)}
             </div>
 
-            {loading && (
-              <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '14px' }}>Loading…</div>
-            )}
-            {error && (
-              <div style={{ padding: '16px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', color: '#991b1b', fontSize: '13px', marginBottom: '16px' }}>⚠ {error}</div>
-            )}
-
-            {!loading && !error && (
-              <>
-                <div style={{ marginBottom: '32px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
-                    In Progress ({drafts.length})
-                  </div>
-                  {drafts.length === 0 ? (
-                    <div style={{ padding: '32px', textAlign: 'center', background: 'var(--bg-secondary)', border: '2px dashed var(--border-primary)', borderRadius: '10px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-                      No drafts — click "New Fact Find" to start one.
-                    </div>
-                  ) : drafts.map(item => <Card key={item.id} item={item} />)}
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
+                Submitted ({submitted.length})
+              </div>
+              {submitted.length === 0 ? (
+                <div style={{ padding: '32px', textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '10px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                  No submissions yet.
                 </div>
-
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
-                    Submitted ({submitted.length})
-                  </div>
-                  {submitted.length === 0 ? (
-                    <div style={{ padding: '32px', textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '10px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-                      No submissions yet.
-                    </div>
-                  ) : submitted.map(item => <Card key={item.id} item={item} />)}
-                </div>
-              </>
-            )}
+              ) : submitted.map(item => <Card key={item.id} item={item} />)}
+            </div>
           </>
         )}
       </div>
     </div>
+  );
+};
+
+// ── Root Dashboard — single source of truth for user identity ─────────────────
+const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange }) => {
+  const [user, setUser]     = useState(getStoredUser);
+  const [email, setEmail]   = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  const resolveUser = (found) => {
+    localStorage.setItem('hof_user', JSON.stringify(found));
+    setUser(found);
+    if (onUserChange) onUserChange(found);
+  };
+
+  const clearUser = () => {
+    localStorage.removeItem('hof_user');
+    setUser(null);
+    setEmail('');
+    setPassword('');
+    setLoginError('');
+    if (onUserChange) onUserChange(null);
+  };
+
+  // Notify parent of initial stored user on mount
+  useEffect(() => {
+    if (user && onUserChange) onUserChange(user);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [loggingIn, setLoggingIn] = useState(false);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoggingIn(true);
+    setLoginError('');
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login', email: email.trim(), password }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) { setLoginError(data.error || 'Incorrect email or password.'); return; }
+      resolveUser(data.user);
+    } catch { setLoginError('Sign in failed. Please try again.'); } finally { setLoggingIn(false); }
+  };
+
+  // Login form — shown when no user is identified
+  if (!user) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '12px', padding: '40px', maxWidth: '400px', width: '100%' }}>
+          <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'var(--color-gold-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: 'var(--color-primary)', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '11px', letterSpacing: '0.1em' }}>HOF</div>
+          <h2 style={{ fontSize: '20px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 6px', textAlign: 'center' }}>Sign in</h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 24px', textAlign: 'center' }}>Use your House of Finance email and password</p>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>Email</label>
+              <input
+                type="email" value={email} onChange={e => { setEmail(e.target.value); setLoginError(''); }}
+                placeholder="your@houseoffinance.com.au" autoComplete="email" autoFocus required
+                style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>Password</label>
+              <input
+                type="password" value={password} onChange={e => { setPassword(e.target.value); setLoginError(''); }}
+                placeholder="••••••••" autoComplete="current-password" required
+                style={{ width: '100%', padding: '9px 12px', border: loginError ? '1px solid #dc2626' : '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', boxSizing: 'border-box' }}
+              />
+            </div>
+            {loginError && <div style={{ fontSize: '12px', color: '#dc2626' }}>{loginError}</div>}
+            <button type="submit" disabled={loggingIn}
+              style={{ padding: '11px 22px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: loggingIn ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-heading)', marginTop: '4px', opacity: loggingIn ? 0.7 : 1 }}>
+              {loggingIn ? 'Signing in…' : 'Sign in →'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Route by role — "Not you?" is handled by parent App.jsx header button
+  if (user.role === 'admin') {
+    return <AdminDashboard user={user} />;
+  }
+  if (user.role === 'analyst') {
+    return <AnalystDashboard user={user} onChangeUser={clearUser} />;
+  }
+  if (user.role === 'processor') {
+    return <ProcessorDashboard user={user} onChangeUser={clearUser} />;
+  }
+
+  return (
+    <BrokerDashboard
+      user={user}
+      onSelectFull={onSelectFull}
+      onSelectQuick={onSelectQuick}
+      onResume={onResume}
+    />
   );
 };
 

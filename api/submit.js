@@ -580,6 +580,110 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, mercuryUrl, title: opportunityName });
     }
 
+    // ── Internal handoff (broker → credit team, no Mercury) ──────────────────
+    if (action === 'internal-submit') {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+      const supabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_KEY);
+
+      const { factFindId, formData: fd } = req.body || {};
+      if (!factFindId) return res.status(400).json({ error: 'factFindId required' });
+
+      const applicants = fd?.applicants || [];
+      const first = applicants[0];
+      const clientName = first ? [first.firstName, first.lastName].filter(Boolean).join(' ') || null : null;
+      const opportunityName = (applicants.filter(a => a.firstName || a.lastName)
+        .map(a => `${a.firstName || ''} ${a.lastName || ''}`.trim())
+        .filter(Boolean).join(' / ')) || 'New Fact Find';
+
+      await supabase.from('fact_finds').update({
+        status: 'pending_review',
+        client_name: clientName,
+        form_data: fd,
+        updated_at: new Date().toISOString(),
+      }).eq('id', factFindId);
+
+      // Teams notification (non-fatal)
+      const webhookUrl = process.env.TEAMS_WEBHOOK_URL;
+      if (webhookUrl) {
+        const card = {
+          type: 'message',
+          attachments: [{
+            contentType: 'application/vnd.microsoft.card.adaptive',
+            content: {
+              '$schema': 'http://adaptivecards.io/schemas/adaptive-card.json',
+              type: 'AdaptiveCard',
+              version: '1.5',
+              body: [
+                { type: 'TextBlock', size: 'Large', weight: 'Bolder', text: '📋 New Fact Find — Ready for Review', color: 'Accent' },
+                {
+                  type: 'FactSet',
+                  facts: [
+                    { title: 'Client',      value: opportunityName },
+                    { title: 'Broker',      value: fd?.brokerName || '—' },
+                    { title: 'Priority',    value: fd?.priority || '—' },
+                    { title: 'Lender Pref', value: (fd?.lenderPreference || []).join(', ') || '—' },
+                  ],
+                },
+              ],
+            },
+          }],
+        };
+        await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(card) })
+          .catch(err => console.error('[teams] internal-submit card failed:', err.message));
+      }
+
+      // Email blast to all analysts (non-fatal)
+      try {
+        const transporter = nodemailer.createTransport({
+          host:   process.env.SMTP_HOST || 'smtp.office365.com',
+          port:   parseInt(process.env.SMTP_PORT || '587'),
+          secure: false,
+          auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+          tls:  { ciphers: 'SSLv3' },
+        });
+        const analystAddresses = [
+          'rita@houseoffinance.com.au',
+          'danny@houseoffinance.com.au',
+          'sushma@houseoffinance.com.au',
+          'jeanpierre@houseoffinance.com.au',
+          'carla@houseoffinance.com.au',
+        ].join(', ');
+        const totalLoan = (fd?.securities || []).reduce((s, sec) => s + (parseFloat(String(sec.loanAmount || '').replace(/[$,\s]/g, '')) || 0), 0);
+        const loanFmt = totalLoan ? '$' + totalLoan.toLocaleString('en-AU') : '—';
+        const notesExcerpt = fd?.brokerNotes ? fd.brokerNotes.slice(0, 200) + (fd.brokerNotes.length > 200 ? '…' : '') : null;
+        const html = `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+            <div style="background:#12110D;padding:20px 24px">
+              <h1 style="color:#CBB26B;margin:0;font-size:20px">House of Finance</h1>
+              <p style="color:#999;margin:4px 0 0;font-size:12px">Credit Analysis Queue — New Submission</p>
+            </div>
+            <div style="padding:24px;background:#fff">
+              <h2 style="color:#12110D;font-size:16px;margin:0 0 16px">${opportunityName}</h2>
+              <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
+                <tr><td style="padding:6px 0;color:#666;font-size:13px;width:140px">Broker</td><td style="padding:6px 0;color:#111;font-size:13px;font-weight:600">${fd?.brokerName || '—'}</td></tr>
+                <tr><td style="padding:6px 0;color:#666;font-size:13px">Loan Amount</td><td style="padding:6px 0;color:#111;font-size:13px;font-weight:600">${loanFmt}</td></tr>
+                <tr><td style="padding:6px 0;color:#666;font-size:13px">Priority</td><td style="padding:6px 0;color:#111;font-size:13px;font-weight:600">${fd?.priority || '—'}</td></tr>
+                <tr><td style="padding:6px 0;color:#666;font-size:13px">Lender Pref</td><td style="padding:6px 0;color:#111;font-size:13px">${(fd?.lenderPreference || []).join(', ') || '—'}</td></tr>
+                ${notesExcerpt ? `<tr><td style="padding:6px 0;color:#666;font-size:13px;vertical-align:top">Broker Notes</td><td style="padding:6px 0;color:#555;font-size:13px">${notesExcerpt}</td></tr>` : ''}
+              </table>
+              <a href="https://hof-fact-find.vercel.app" style="background:#CBB26B;color:#12110D;padding:10px 20px;text-decoration:none;border-radius:4px;font-weight:bold;font-size:13px;display:inline-block">Open Credit Analysis Queue →</a>
+              <p style="color:#aaa;font-size:11px;margin:24px 0 0">Submitted via HOF Fact Find · ${new Date().toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+            </div>
+          </div>`;
+        await transporter.sendMail({
+          from:    `"House of Finance" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+          to:      analystAddresses,
+          subject: `[HOF] New fact find: ${opportunityName} — submitted by ${fd?.brokerName || 'Broker'}`,
+          html,
+        });
+      } catch (err) {
+        console.error('[email] analyst blast failed:', err.message);
+      }
+
+      return res.status(200).json({ success: true, title: opportunityName });
+    }
+
     // ── Full submission ───────────────────────────────────────────────────────
     if (action === 'submit') {
       const secret      = process.env.DOCUMENT_SIGNING_SECRET;

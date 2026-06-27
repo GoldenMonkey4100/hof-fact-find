@@ -1,4 +1,48 @@
 
+// Auth is server-side via api/auth.js + hof_users Supabase table.
+// PEOPLE is used for display names, role labels, and email lookups only.
+export const PEOPLE = [
+  // Admins
+  { name: 'Chris',                email: 'chris@houseoffinance.com.au',        role: 'admin'     },
+  { name: 'Rita Khaya',           email: 'rita@houseoffinance.com.au',         role: 'admin'     },
+  // Brokers
+  { name: 'Laith Hana',           email: 'laith@houseoffinance.com.au',        role: 'broker'    },
+  { name: 'Mehdi Amirilayeghi',   email: 'mehdi@houseoffinance.com.au',        role: 'broker'    },
+  { name: 'Yousif Jirjis',        email: 'yousif@houseoffinance.com.au',       role: 'broker'    },
+  // Credit Analysts
+  { name: 'Danny Hanna',          email: 'danny@houseoffinance.com.au',        role: 'analyst'   },
+  { name: 'Sushma BK',            email: 'sushma@houseoffinance.com.au',       role: 'analyst'   },
+  { name: 'Jean-Pierre Sakr',     email: 'jeanpierre@houseoffinance.com.au',   role: 'analyst'   },
+  { name: 'Carla Cartativo',      email: 'carla@houseoffinance.com.au',        role: 'analyst'   },
+  // Loan Processors
+  { name: 'Christian Pantaliano', email: 'christian@houseoffinance.com.au',    role: 'processor' },
+  { name: 'Kyrollos',             email: 'kyrollos@houseoffinance.com.au',     role: 'processor' },
+  { name: 'Joseph Salem',         email: 'joseph@houseoffinance.com.au',       role: 'processor' },
+  { name: 'Bernard Feliciano',    email: 'bernard@houseoffinance.com.au',      role: 'processor' },
+];
+
+export const ROLE_LABELS = {
+  admin:     'Admin',
+  broker:    'Broker',
+  analyst:   'Credit Analyst',
+  processor: 'Loan Processor',
+};
+
+export const getStoredUser = () => {
+  try {
+    // Migrate legacy hof_broker key
+    const legacy = localStorage.getItem('hof_broker');
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      const match = PEOPLE.find(p => p.email === parsed.email) || { ...parsed, role: 'broker' };
+      localStorage.setItem('hof_user', JSON.stringify(match));
+      localStorage.removeItem('hof_broker');
+      return match;
+    }
+    return JSON.parse(localStorage.getItem('hof_user') || 'null');
+  } catch { return null; }
+};
+
 export const formatCurrency = (value) => {
   if (!value) return '';
   const numericValue = value.toString().replace(/[^0-9]/g, '');

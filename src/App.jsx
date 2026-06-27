@@ -9,6 +9,7 @@ import Step4Review from './steps/Step4-Review';
 import WelcomeScreen from './pages/WelcomeScreen';
 import QuickFactFind from './pages/QuickFactFind';
 import Dashboard from './pages/Dashboard';
+import { getStoredUser, ROLE_LABELS } from './lib/utils';
 
 const stepVariants = {
   enter:  (dir) => ({ opacity: 0, x: dir * 30 }),
@@ -50,9 +51,9 @@ function SectionCountChip({ currentStep, formData }) {
 }
 
 const FactFindApp = () => {
-  const storedBroker = (() => { try { return JSON.parse(localStorage.getItem('hof_broker') || 'null'); } catch { return null; } })();
-  const brokerEmail = storedBroker?.email || '';
-  const brokerName  = storedBroker?.name  || '';
+  const storedUser  = getStoredUser();
+  const brokerEmail = storedUser?.email || '';
+  const brokerName  = storedUser?.name  || '';
 
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({
@@ -129,8 +130,16 @@ const FactFindApp = () => {
     submittedBy: ''
   });
 
-  const [screen, setScreen] = useState('dashboard'); // 'dashboard' | 'welcome' | 'full' | 'quick'
+  const [screen, setScreen] = useState('dashboard'); // 'dashboard' | 'full' | 'quick'
+  const [activeUser, setActiveUser] = useState(getStoredUser);
   const [theme, setTheme] = useState(() => localStorage.getItem('hof-theme') || 'light');
+  const [showChangePwd, setShowChangePwd] = useState(false);
+  const [pwdCurrent, setPwdCurrent] = useState('');
+  const [pwdNew, setPwdNew] = useState('');
+  const [pwdConfirm, setPwdConfirm] = useState('');
+  const [pwdError, setPwdError] = useState('');
+  const [pwdSuccess, setPwdSuccess] = useState(false);
+  const [pwdSaving, setPwdSaving] = useState(false);
   const [direction, setDirection] = useState(1);
   const [factFindId, setFactFindId] = useState(() => sessionStorage.getItem('hof_ff_id') || null);
   const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
@@ -248,11 +257,11 @@ const FactFindApp = () => {
       const res  = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'submit', formData: submissionData, factFindId }),
+        body: JSON.stringify({ action: 'internal-submit', formData: submissionData, factFindId }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setSubmission({ status: 'success', message: '', mercuryUrl: data.mercuryUrl, title: data.title });
+      setSubmission({ status: 'success', message: '', title: data.title });
     } catch (err) {
       setSubmission(s => ({ ...s, status: 'error', message: err.message }));
     }
@@ -365,15 +374,12 @@ const FactFindApp = () => {
             {saveStatus === 'saving' ? 'Saving…' : '✓ Saved'}
           </div>
         )}
-        <button className="sidebar-back-btn" onClick={handleBackToStart}>
-          ← My Fact Finds
-        </button>
       </div>
     </nav>
   );
 
   const handleNewFactFind = () => {
-    const b = (() => { try { return JSON.parse(localStorage.getItem('hof_broker') || 'null'); } catch { return null; } })();
+    const b = getStoredUser();
     setFormData(prev => ({
       ...prev,
       brokerName: b?.name  || '',
@@ -393,7 +399,7 @@ const FactFindApp = () => {
   };
 
   const handleNewQuickFactFind = () => {
-    const b = (() => { try { return JSON.parse(localStorage.getItem('hof_broker') || 'null'); } catch { return null; } })();
+    const b = getStoredUser();
     setFormData(prev => ({
       ...prev,
       brokerName: b?.name  || '',
@@ -429,7 +435,34 @@ const FactFindApp = () => {
             >
               ← Staff Portal
             </a>
+            {screen !== 'dashboard' && (
+              <button
+                onClick={handleBackToStart}
+                style={{ fontSize: '0.8125rem', color: 'rgba(203,178,107,0.75)', background: 'none', border: '1px solid rgba(203,178,107,0.3)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', marginRight: '0.75rem' }}
+              >
+                ← My Fact Finds
+              </button>
+            )}
             <span className="app-header-tagline">Broker Fact Find</span>
+            {screen === 'dashboard' && activeUser && (
+              <>
+                <span style={{ fontSize: '0.8125rem', color: 'rgba(245,244,242,0.7)' }}>
+                  {activeUser.name} · <span style={{ color: 'rgba(203,178,107,0.8)' }}>{ROLE_LABELS[activeUser.role] || activeUser.role}</span>
+                </span>
+                <button
+                  onClick={() => { setShowChangePwd(true); setPwdCurrent(''); setPwdNew(''); setPwdConfirm(''); setPwdError(''); setPwdSuccess(false); }}
+                  style={{ fontSize: '0.75rem', color: 'rgba(203,178,107,0.7)', background: 'none', border: '1px solid rgba(203,178,107,0.25)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}
+                >
+                  Change password
+                </button>
+                <button
+                  onClick={() => { localStorage.removeItem('hof_user'); setActiveUser(null); }}
+                  style={{ fontSize: '0.75rem', color: 'rgba(245,244,242,0.45)', background: 'none', border: '1px solid rgba(245,244,242,0.15)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}
+                >
+                  Not you?
+                </button>
+              </>
+            )}
             <button
               className="theme-toggle"
               onClick={toggleTheme}
@@ -459,6 +492,7 @@ const FactFindApp = () => {
           onSelectFull={handleNewFactFind}
           onSelectQuick={handleNewQuickFactFind}
           onResume={handleResume}
+          onUserChange={setActiveUser}
         />
       )}
 
@@ -519,7 +553,7 @@ const FactFindApp = () => {
       {/* ── Quick Fact Find ─────────────────────────────────────────────────── */}
       {screen === 'quick' && (
         <div className="quick-ff-page">
-          <QuickFactFind onBack={() => setScreen('welcome')} />
+          <QuickFactFind onBack={() => setScreen('dashboard')} />
         </div>
       )}
 
@@ -536,18 +570,13 @@ const FactFindApp = () => {
             <div style={{ width: '60px', height: '60px', borderRadius: '14px', background: 'var(--color-success-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', color: 'var(--color-success)' }}>
               <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             </div>
-            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '20px', fontWeight: 700, color: 'var(--color-success)', margin: '0 0 10px' }}>Submitted Successfully!</h2>
+            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '20px', fontWeight: 700, color: 'var(--color-success)', margin: '0 0 10px' }}>Submitted to Credit Team!</h2>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: '0 0 24px', lineHeight: 1.6 }}>
-              <strong style={{ color: 'var(--text-primary)' }}>{submission.title}</strong> has been created in Mercury. Chris and Rita have been emailed a PDF summary.
+              <strong style={{ color: 'var(--text-primary)' }}>{submission.title}</strong> has been handed to the credit team. Your analyst will review and be in touch.
             </p>
-            <a href={submission.mercuryUrl} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'inline-block', padding: '12px 28px', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', borderRadius: '8px', fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '13px', letterSpacing: '0.06em', textDecoration: 'none', textTransform: 'uppercase', marginBottom: '12px' }}>
-              Open in Mercury →
-            </a>
-            <br />
             <button onClick={() => { setSubmission(s => ({ ...s, status: 'idle' })); setScreen('dashboard'); }}
-              style={{ marginTop: '8px', padding: '10px 20px', background: 'none', border: '1px solid var(--border-primary)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>
-              Close
+              style={{ padding: '12px 28px', background: 'var(--btn-primary-bg)', color: 'var(--btn-primary-fg)', border: 'none', borderRadius: '8px', fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '13px', letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer', marginBottom: '12px' }}>
+              Back to My Fact Finds
             </button>
           </motion.div>
         </motion.div>
@@ -555,6 +584,64 @@ const FactFindApp = () => {
       </AnimatePresence>
 
 
+
+      {/* Change Password Modal */}
+      {showChangePwd && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9998, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowChangePwd(false); }}>
+          <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '14px', padding: '36px', maxWidth: '400px', width: '100%', boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ margin: '0 0 6px', fontFamily: 'var(--font-heading)', fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>Change Password</h3>
+            <p style={{ margin: '0 0 20px', fontSize: '13px', color: 'var(--text-secondary)' }}>Set a new password for {activeUser?.email}</p>
+            {pwdSuccess ? (
+              <div style={{ padding: '16px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: '8px', color: '#16a34a', fontSize: '13px', textAlign: 'center' }}>
+                Password updated successfully.
+                <br />
+                <button onClick={() => setShowChangePwd(false)} style={{ marginTop: '12px', padding: '8px 20px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Done</button>
+              </div>
+            ) : (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setPwdError('');
+                if (pwdNew !== pwdConfirm) { setPwdError('New passwords do not match.'); return; }
+                if (pwdNew.length < 6) { setPwdError('New password must be at least 6 characters.'); return; }
+                setPwdSaving(true);
+                try {
+                  const res = await fetch('/api/auth', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'change-password', email: activeUser?.email, currentPassword: pwdCurrent, newPassword: pwdNew }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok || data.error) { setPwdError(data.error || 'Failed to update password.'); return; }
+                  setPwdSuccess(true);
+                } catch { setPwdError('An error occurred. Please try again.'); } finally { setPwdSaving(false); }
+              }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {[
+                  { label: 'Current password', value: pwdCurrent, setter: setPwdCurrent },
+                  { label: 'New password', value: pwdNew, setter: setPwdNew },
+                  { label: 'Confirm new password', value: pwdConfirm, setter: setPwdConfirm },
+                ].map(({ label, value, setter }) => (
+                  <div key={label}>
+                    <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>{label}</label>
+                    <input type="password" value={value} onChange={e => { setter(e.target.value); setPwdError(''); }} required
+                      style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', boxSizing: 'border-box' }} />
+                  </div>
+                ))}
+                {pwdError && <div style={{ fontSize: '12px', color: '#dc2626' }}>{pwdError}</div>}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  <button type="button" onClick={() => setShowChangePwd(false)}
+                    style={{ flex: 1, padding: '10px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '13px', cursor: 'pointer' }}>
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={pwdSaving}
+                    style={{ flex: 1, padding: '10px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '7px', fontSize: '13px', fontWeight: '700', cursor: pwdSaving ? 'not-allowed' : 'pointer', opacity: pwdSaving ? 0.7 : 1 }}>
+                    {pwdSaving ? 'Saving…' : 'Update password'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Error */}
       <AnimatePresence>

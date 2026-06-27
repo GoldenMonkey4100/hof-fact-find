@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useClerk } from '@clerk/clerk-react';
+
+const BROKERS = [
+  { name: 'Laith Hana',              email: 'laith@houseoffinance.com.au' },
+  { name: 'Mehdi Amirilayeghi',      email: 'mehdi@houseoffinance.com.au' },
+  { name: 'Yousif Jirjis',           email: 'yousif@houseoffinance.com.au' },
+  { name: 'Chris Tenaglia',          email: 'chris@houseoffinance.com.au' },
+  { name: 'Rita Khaya',              email: 'rita@houseoffinance.com.au' },
+];
 
 const relativeTime = (iso) => {
   const diff = Date.now() - new Date(iso).getTime();
@@ -13,20 +20,26 @@ const relativeTime = (iso) => {
   return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-const Dashboard = ({ brokerEmail, brokerName, onNewFactFind, onResume }) => {
-  const { signOut } = useClerk();
-  const [items, setItems]     = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
-  const [deleting, setDeleting] = useState(null);
+const getStoredBroker = () => {
+  try { return JSON.parse(localStorage.getItem('hof_broker') || 'null'); } catch { return null; }
+};
 
-  const load = async () => {
+const Dashboard = ({ onNewFactFind, onResume }) => {
+  const [broker, setBroker]       = useState(getStoredBroker);
+  const [pickerVal, setPickerVal] = useState('');
+  const [items, setItems]         = useState([]);
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState(null);
+  const [deleting, setDeleting]   = useState(null);
+
+  const load = async (email) => {
+    if (!email) return;
     setLoading(true);
     setError(null);
     try {
       const res  = await fetch('/api/fact-finds', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'list', brokerEmail }),
+        body: JSON.stringify({ action: 'list', brokerEmail: email }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -38,23 +51,37 @@ const Dashboard = ({ brokerEmail, brokerName, onNewFactFind, onResume }) => {
     }
   };
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (broker) load(broker.email); }, [broker]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSelectBroker = () => {
+    const found = BROKERS.find(b => b.email === pickerVal);
+    if (!found) return;
+    localStorage.setItem('hof_broker', JSON.stringify(found));
+    setBroker(found);
+  };
+
+  const handleChangeBroker = () => {
+    localStorage.removeItem('hof_broker');
+    setBroker(null);
+    setItems([]);
+    setPickerVal('');
+  };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this draft? This cannot be undone.')) return;
     setDeleting(id);
     await fetch('/api/fact-finds', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'delete', brokerEmail, id }),
+      body: JSON.stringify({ action: 'delete', brokerEmail: broker.email, id }),
     });
     setDeleting(null);
-    await load();
+    await load(broker.email);
   };
 
   const handleResume = async (id) => {
     const res  = await fetch('/api/fact-finds', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'get', brokerEmail, id }),
+      body: JSON.stringify({ action: 'get', brokerEmail: broker.email, id }),
     });
     const data = await res.json();
     if (data.item) onResume(data.item.form_data, id);
@@ -64,8 +91,8 @@ const Dashboard = ({ brokerEmail, brokerName, onNewFactFind, onResume }) => {
   const submitted = items.filter(i => i.status === 'submitted');
 
   const Card = ({ item }) => {
-    const isDraft   = item.status === 'draft';
-    const name      = item.client_name || `Unnamed — started ${new Date(item.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`;
+    const isDraft = item.status === 'draft';
+    const name    = item.client_name || `Unnamed — started ${new Date(item.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`;
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '10px', marginBottom: '8px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -117,58 +144,84 @@ const Dashboard = ({ brokerEmail, brokerName, onNewFactFind, onResume }) => {
         </a>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <a href="https://hof-hub.vercel.app" style={{ fontSize: '12px', color: 'rgba(203,178,107,0.75)', textDecoration: 'none', border: '1px solid rgba(203,178,107,0.2)', borderRadius: '6px', padding: '5px 10px' }}>← Staff Portal</a>
-          <span style={{ fontSize: '13px', color: 'rgba(245,244,242,0.7)' }}>{brokerName || brokerEmail}</span>
-          <button onClick={() => signOut()} style={{ fontSize: '12px', color: 'rgba(245,244,242,0.5)', background: 'none', border: '1px solid rgba(245,244,242,0.15)', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer' }}>
-            Sign out
-          </button>
+          {broker && (
+            <>
+              <span style={{ fontSize: '13px', color: 'rgba(245,244,242,0.7)' }}>{broker.name}</span>
+              <button onClick={handleChangeBroker} style={{ fontSize: '12px', color: 'rgba(245,244,242,0.5)', background: 'none', border: '1px solid rgba(245,244,242,0.15)', borderRadius: '6px', padding: '5px 12px', cursor: 'pointer' }}>
+                Not you?
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       <div style={{ maxWidth: '860px', margin: '0 auto', padding: '40px 24px' }}>
-        {/* Page title */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
-          <div>
-            <h1 style={{ fontSize: '24px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px' }}>My Fact Finds</h1>
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>Your submitted and in-progress fact finds</p>
+
+        {/* Broker picker */}
+        {!broker && (
+          <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '12px', padding: '32px', marginBottom: '32px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '18px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 8px' }}>Who are you?</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 20px' }}>Select your name to load your fact finds.</p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <select value={pickerVal} onChange={e => setPickerVal(e.target.value)}
+                style={{ padding: '9px 14px', border: '1px solid var(--border-primary)', borderRadius: '8px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', minWidth: '200px' }}>
+                <option value="">Select broker…</option>
+                {BROKERS.map(b => <option key={b.email} value={b.email}>{b.name}</option>)}
+              </select>
+              <button type="button" onClick={handleSelectBroker} disabled={!pickerVal}
+                style={{ padding: '9px 22px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: pickerVal ? 'pointer' : 'not-allowed', opacity: pickerVal ? 1 : 0.5 }}>
+                Continue →
+              </button>
+            </div>
           </div>
-          <button type="button" onClick={onNewFactFind}
-            style={{ padding: '10px 22px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'var(--font-heading)', letterSpacing: '0.04em' }}>
-            + New Fact Find
-          </button>
-        </div>
-
-        {loading && (
-          <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '14px' }}>Loading…</div>
-        )}
-        {error && (
-          <div style={{ padding: '16px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', color: '#991b1b', fontSize: '13px', marginBottom: '16px' }}>⚠ {error}</div>
         )}
 
-        {!loading && !error && (
+        {broker && (
           <>
-            {/* In Progress */}
-            <div style={{ marginBottom: '32px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
-                In Progress ({drafts.length})
+            {/* Page title */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+              <div>
+                <h1 style={{ fontSize: '24px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px' }}>My Fact Finds</h1>
+                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>Your submitted and in-progress fact finds</p>
               </div>
-              {drafts.length === 0 ? (
-                <div style={{ padding: '32px', textAlign: 'center', background: 'var(--bg-secondary)', border: '2px dashed var(--border-primary)', borderRadius: '10px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-                  No drafts — click "New Fact Find" to start one.
-                </div>
-              ) : drafts.map(item => <Card key={item.id} item={item} />)}
+              <button type="button" onClick={onNewFactFind}
+                style={{ padding: '10px 22px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', fontFamily: 'var(--font-heading)', letterSpacing: '0.04em' }}>
+                + New Fact Find
+              </button>
             </div>
 
-            {/* Submitted */}
-            <div>
-              <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
-                Submitted ({submitted.length})
-              </div>
-              {submitted.length === 0 ? (
-                <div style={{ padding: '32px', textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '10px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-                  No submissions yet.
+            {loading && (
+              <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '14px' }}>Loading…</div>
+            )}
+            {error && (
+              <div style={{ padding: '16px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', color: '#991b1b', fontSize: '13px', marginBottom: '16px' }}>⚠ {error}</div>
+            )}
+
+            {!loading && !error && (
+              <>
+                <div style={{ marginBottom: '32px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
+                    In Progress ({drafts.length})
+                  </div>
+                  {drafts.length === 0 ? (
+                    <div style={{ padding: '32px', textAlign: 'center', background: 'var(--bg-secondary)', border: '2px dashed var(--border-primary)', borderRadius: '10px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                      No drafts — click "New Fact Find" to start one.
+                    </div>
+                  ) : drafts.map(item => <Card key={item.id} item={item} />)}
                 </div>
-              ) : submitted.map(item => <Card key={item.id} item={item} />)}
-            </div>
+
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
+                    Submitted ({submitted.length})
+                  </div>
+                  {submitted.length === 0 ? (
+                    <div style={{ padding: '32px', textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '10px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                      No submissions yet.
+                    </div>
+                  ) : submitted.map(item => <Card key={item.id} item={item} />)}
+                </div>
+              </>
+            )}
           </>
         )}
       </div>

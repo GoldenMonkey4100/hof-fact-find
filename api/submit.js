@@ -694,7 +694,8 @@ export default async function handler(req, res) {
       if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY) {
         try {
           const { createClient } = await import('@supabase/supabase-js');
-          const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+          const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+          const sb = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_KEY);
           const factFindId = req.body.factFindId;
           const upsertPayload = {
             broker_email: formData.brokerEmail,

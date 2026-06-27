@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useUser, useClerk } from '@clerk/clerk-react';
 import './styles.css';
 import Step0LoanStrategy from './steps/Step0-LoanStrategy';
 import Step1Applicants from './steps/Step1-Applicants';
@@ -50,20 +49,10 @@ function SectionCountChip({ currentStep, formData }) {
   );
 }
 
-function AutoRedirectToSignIn() {
-  const { redirectToSignIn } = useClerk();
-  useEffect(() => { redirectToSignIn({ redirectUrl: window.location.href }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-tertiary)' }}>
-      <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Signing in…</div>
-    </div>
-  );
-}
-
 const FactFindApp = () => {
-  const { isSignedIn, isLoaded, user } = useUser();
-  const brokerEmail = user?.primaryEmailAddress?.emailAddress || '';
-  const brokerName  = user?.fullName || brokerEmail;
+  const storedBroker = (() => { try { return JSON.parse(localStorage.getItem('hof_broker') || 'null'); } catch { return null; } })();
+  const brokerEmail = storedBroker?.email || '';
+  const brokerName  = storedBroker?.name  || '';
 
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({
@@ -151,13 +140,6 @@ const FactFindApp = () => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('hof-theme', theme);
   }, [theme]);
-
-  // Seed broker identity from Clerk on first load
-  useEffect(() => {
-    if (isSignedIn && brokerEmail && !formData.brokerEmail) {
-      setFormData(prev => ({ ...prev, brokerName, brokerEmail }));
-    }
-  }, [isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-save draft to Supabase (debounced 2s after any formData change)
   useEffect(() => {
@@ -390,19 +372,12 @@ const FactFindApp = () => {
     </nav>
   );
 
-  if (!isLoaded) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--bg-tertiary)' }}>
-      <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Loading…</div>
-    </div>
-  );
-
-  if (!isSignedIn) return <AutoRedirectToSignIn />;
-
   const handleNewFactFind = () => {
+    const b = (() => { try { return JSON.parse(localStorage.getItem('hof_broker') || 'null'); } catch { return null; } })();
     setFormData(prev => ({
       ...prev,
-      brokerName,
-      brokerEmail,
+      brokerName: b?.name  || '',
+      brokerEmail: b?.email || '',
       clientType: '', leadSource: '', numApplicants: 1, numGuarantors: 0,
       securities: [{ id: 1, address: '', propertyValue: '', loanAmount: '', lvr: '', primaryTransactionTypes: [], secondaryTransactionTypes: [], intendedOccupancy: '', applicationType: '', loanTerm: '', loanType: '', repaymentType: '', interestOnlyPeriod: '', fixedRatePeriod: '', split1Amount: '', split1Type: '', split1RateType: '', split1FixedYears: '', split1IOYears: '', split2Amount: '', split2Type: '', split2RateType: '', split2FixedYears: '', split2IOYears: '', currentLoanBalance: '', cashoutAmount: '', purchaseCompletionMethods: [], state: '', isFirstHomeBuyer: false, isNewHome: false, purchaseCompletionAmounts: {}, purchaseCompletionOther: '', equityPropertyIndex: '', giftRelationship: '', hasOffset: false, hasRedraw: false }],
       lenderPreference: [], lenderPreferenceOtherNote: '', priority: 'Medium', brokerNotes: '',
@@ -471,8 +446,6 @@ const FactFindApp = () => {
       {/* ── Dashboard ────────────────────────────────────────────────────── */}
       {screen === 'dashboard' && (
         <Dashboard
-          brokerEmail={brokerEmail}
-          brokerName={brokerName}
           onNewFactFind={handleNewFactFind}
           onResume={handleResume}
         />

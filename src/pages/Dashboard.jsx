@@ -271,6 +271,7 @@ const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange }) => {
                   <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>Current password</label>
                   <input type="password" value={password} onChange={e => { setPassword(e.target.value); setLoginError(''); }} placeholder="••••••••" autoComplete="current-password" required
                     style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border-primary)', borderRadius: '7px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', boxSizing: 'border-box' }} />
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>First time? Your temporary password is <strong>changeme</strong></div>
                 </div>
                 <div>
                   <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>New password</label>

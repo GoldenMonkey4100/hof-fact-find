@@ -366,7 +366,7 @@ const FactFindApp = () => {
           </div>
         )}
         <button className="sidebar-back-btn" onClick={handleBackToStart}>
-          ← Back to start
+          ← My Fact Finds
         </button>
       </div>
     </nav>

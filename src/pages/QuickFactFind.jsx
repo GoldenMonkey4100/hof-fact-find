@@ -87,7 +87,7 @@ const QuickFactFind = ({ onBack }) => {
           </a>
         )}
         <button type="button" className="btn-secondary" onClick={onBack} style={{ marginTop: '12px', display: 'block', width: '100%' }}>
-          ← Back to Start
+          ← My Fact Finds
         </button>
       </div>
     );
@@ -232,7 +232,7 @@ const QuickFactFind = ({ onBack }) => {
         {/* ── Actions ───────────────────────────────────────────── */}
         <div className="quick-actions">
           <button type="button" className="btn-secondary" onClick={onBack}>
-            ← Back
+            ← My Fact Finds
           </button>
           <motion.button
             type="submit"

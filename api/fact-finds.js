@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   const { action, brokerEmail, userEmail, id, formData, creditAnalysis, assignedProcessor } = req.body || {};
 
   // Queue/admin actions don't require brokerEmail
-  const queueActions = ['list-queue', 'save-analysis', 'send-to-processor', 'update-status', 'list-all', 'admin-update'];
+  const queueActions = ['list-queue', 'save-analysis', 'send-to-processor', 'update-status', 'list-all', 'admin-update', 'get', 'admin-delete'];
   if (!brokerEmail && !queueActions.includes(action)) {
     return res.status(400).json({ error: 'brokerEmail required' });
   }

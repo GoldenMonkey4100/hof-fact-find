@@ -17,13 +17,13 @@ const relativeTime = (iso) => {
 };
 
 const STATUS_META = {
-  draft:             { label: 'Draft',            bg: 'var(--color-gold-light)', color: 'var(--color-primary)' },
-  pending_review:    { label: 'With Credit Team', bg: '#fef3c7',                color: '#92400e' },
-  in_review:         { label: 'In Analysis',      bg: '#dbeafe',                color: '#1e40af' },
-  pending_lodgement: { label: 'Ready to Lodge',   bg: '#ede9fe',                color: '#5b21b6' },
-  lodged:            { label: 'Lodged',            bg: '#ccfbf1',                color: '#0f766e' },
-  approved:          { label: 'Approved',          bg: '#dcfce7',                color: '#16a34a' },
-  submitted:         { label: 'Submitted',         bg: '#dcfce7',                color: '#16a34a' },
+  draft:             { label: 'Draft',             bg: 'var(--color-gold-light)', color: 'var(--color-primary)' },
+  pending_review:    { label: 'Credit Analysis',   bg: '#fef3c7',                color: '#92400e' },
+  in_review:         { label: 'Credit Analysis',   bg: '#dbeafe',                color: '#1e40af' },
+  pending_lodgement: { label: 'Loan Processing',   bg: '#ede9fe',                color: '#5b21b6' },
+  pending_qa:        { label: 'Quality Assurance', bg: '#e0f2fe',                color: '#0369a1' },
+  lodged:            { label: 'Lodged',             bg: '#ccfbf1',                color: '#0f766e' },
+  submitted:         { label: 'Submitted',          bg: '#dcfce7',                color: '#16a34a' },
 };
 
 const StatusBadge = ({ status }) => {
@@ -169,7 +169,7 @@ const BrokerDashboard = ({ user, onSelectFull, onSelectQuick, onResume }) => {
 };
 
 // ── Root Dashboard — single source of truth for user identity ─────────────────
-const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange, onResumeAs, onStartQA }) => {
+const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange, onResumeAs, onStartQA, activeUser: controlledUser, onViewReports }) => {
   const [user, setUser]     = useState(getStoredUser);
   const [email, setEmail]   = useState('');
   const [password, setPassword] = useState('');
@@ -194,6 +194,16 @@ const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange, onResu
   useEffect(() => {
     if (user && onUserChange) onUserChange(user);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync logout when parent clears activeUser
+  useEffect(() => {
+    if (controlledUser === null && user !== null) {
+      setUser(null);
+      setEmail('');
+      setPassword('');
+      setLoginError('');
+    }
+  }, [controlledUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [loggingIn, setLoggingIn] = useState(false);
   const [changingPwd, setChangingPwd] = useState(false);
@@ -330,7 +340,7 @@ const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange, onResu
 
   // Route by role — "Not you?" is handled by parent App.jsx header button
   if (user.role === 'admin') {
-    return <AdminDashboard user={user} onEditAsBroker={onResumeAs} onStartQA={onStartQA} />;
+    return <AdminDashboard user={user} onEditAsBroker={onResumeAs} onStartQA={onStartQA} onViewReports={onViewReports} />;
   }
   if (user.role === 'analyst') {
     return <AnalystDashboard user={user} onChangeUser={clearUser} onStartQA={onStartQA} />;

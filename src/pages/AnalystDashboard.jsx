@@ -13,10 +13,10 @@ const relativeTime = (iso) => {
 };
 
 const STATUS_META = {
-  pending_review:    { label: 'Pending Review',    bg: '#fef3c7', color: '#92400e' },
-  in_review:         { label: 'In Review',         bg: '#dbeafe', color: '#1e40af' },
-  pending_lodgement: { label: 'Pending QA',        bg: '#ede9fe', color: '#5b21b6' },
-  lodged:            { label: 'Lodged',             bg: '#d1fae5', color: '#065f46' },
+  pending_review: { label: 'Pending Review',    bg: '#fef3c7', color: '#92400e' },
+  in_review:      { label: 'In Review',         bg: '#dbeafe', color: '#1e40af' },
+  pending_qa:     { label: 'Quality Assurance', bg: '#e0f2fe', color: '#0369a1' },
+  lodged:         { label: 'Lodged',            bg: '#d1fae5', color: '#065f46' },
 };
 
 const PRIORITY_META = {
@@ -31,17 +31,18 @@ const annualise = (income, freq) => {
   if (freq === 'Weekly')      return n * 52;
   if (freq === 'Fortnightly') return n * 26;
   if (freq === 'Monthly')     return n * 12;
-  return n; // Annually or unknown
+  return n;
 };
 
 const fmt = (n) => n > 0 ? `$${Math.round(n).toLocaleString()}` : '—';
 
 const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
-  const [items, setItems]       = useState([]);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState(null);
-  const [selected, setSelected] = useState(null);
-  const [saving, setSaving]     = useState(false);
+  const [items, setItems]         = useState([]);
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState(null);
+  const [selected, setSelected]   = useState(null);
+  const [creditAnalysis, setCreditAnalysis] = useState({});
+  const [saving, setSaving]       = useState(false);
   const [sendingMsg, setSendingMsg] = useState('');
 
   const load = async () => {
@@ -49,7 +50,7 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
     try {
       const res  = await fetch('/api/fact-finds', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'list-queue', statuses: ['pending_review', 'in_review', 'pending_lodgement', 'lodged'] }),
+        body: JSON.stringify({ action: 'list-queue', statuses: ['pending_review', 'in_review', 'pending_qa', 'lodged'] }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -76,14 +77,17 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
     });
     const data = await res.json();
     setSelected({ item, formData: data.item?.form_data || {} });
+    setCreditAnalysis(data.item?.credit_analysis || {});
     setSendingMsg('');
   };
+
+  const updateCA = (field, value) => setCreditAnalysis(prev => ({ ...prev, [field]: value }));
 
   const handleSave = async () => {
     setSaving(true);
     await fetch('/api/fact-finds', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'save-analysis', id: selected.item.id, userEmail: user.email, creditAnalysis: {} }),
+      body: JSON.stringify({ action: 'save-analysis', id: selected.item.id, userEmail: user.email, creditAnalysis }),
     });
     setSaving(false);
     await load();
@@ -93,17 +97,17 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
     setSaving(true);
     await fetch('/api/fact-finds', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'send-to-processor', id: selected.item.id, userEmail: user.email, creditAnalysis: {} }),
+      body: JSON.stringify({ action: 'send-to-processor', id: selected.item.id, userEmail: user.email, creditAnalysis }),
     });
     setSaving(false);
     setSelected(null);
     await load();
   };
 
-  const pending          = items.filter(i => i.status === 'pending_review');
-  const inReview         = items.filter(i => i.status === 'in_review');
-  const pendingLodgement = items.filter(i => i.status === 'pending_lodgement');
-  const lodged           = items.filter(i => i.status === 'lodged').slice(0, 20);
+  const pending  = items.filter(i => i.status === 'pending_review');
+  const inReview = items.filter(i => i.status === 'in_review');
+  const pendingQA = items.filter(i => i.status === 'pending_qa');
+  const lodged   = items.filter(i => i.status === 'lodged').slice(0, 20);
 
   if (selected) {
     const fd   = selected.formData || {};
@@ -114,8 +118,8 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
 
     const totalLoan = secs.reduce((s, sec) => s + (parseFloat(sec.loanAmount) || 0), 0);
     const totalProp = secs.reduce((s, sec) => s + (parseFloat(sec.propertyValue) || 0), 0);
+    const combinedLVR = totalProp > 0 ? (totalLoan / totalProp) * 100 : 0;
 
-    // Income summary per applicant
     const incomeRows = apps.map((a, i) => {
       const emp = emps[i]?.currentEmployment || {};
       const annual = annualise(emp.baseIncome, emp.payFrequency);
@@ -124,21 +128,22 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
     });
     const totalIncome = incomeRows.reduce((s, r) => s + r.annual, 0);
 
-    // Liabilities
-    const ccLimit     = (liab.creditCards || []).reduce((s, c) => s + (parseFloat(String(c.limit || '').replace(/,/g, '')) || 0), 0);
-    const ccAssessed  = ccLimit * 0.038;
-    const personalLoan = (liab.personalLoans || []).reduce((s, l) => s + (parseFloat(String(l.amount || '').replace(/,/g, '')) || 0), 0);
-    const hecsBalance = (liab.hecs || []).reduce((s, h) => s + (parseFloat(String(h.amount || '').replace(/,/g, '')) || 0), 0);
+    const creditCards  = liab.creditCards  || [];
+    const personalLoans = liab.personalLoans || [];
+    const hecsDebts    = liab.hecs          || [];
+    const otherLiab    = liab.otherLiabilities || [];
 
-    // Deal brief details
-    const purpose = [
-      (secs[0]?.primaryTransactionTypes || []).join(', '),
-      secs[0]?.intendedOccupancy,
-      secs[0]?.loanType,
-    ].filter(Boolean).join(' · ') || '—';
+    const ccLimit = creditCards.reduce((s, c) => s + (parseFloat(String(c.limit || '').replace(/,/g, '')) || 0), 0);
 
-    const lenderPrefs = fd.lenderPreference || [];
+    const lenderPrefs  = fd.lenderPreference || [];
     const priorityMeta = PRIORITY_META[fd.priority] || PRIORITY_META.Medium;
+
+    const lvrColor = combinedLVR > 0
+      ? combinedLVR <= 80 ? '#065f46' : combinedLVR <= 90 ? '#92400e' : '#991b1b'
+      : 'var(--text-tertiary)';
+    const lvrBg = combinedLVR > 0
+      ? combinedLVR <= 80 ? '#d1fae5' : combinedLVR <= 90 ? '#fef3c7' : '#fee2e2'
+      : 'var(--bg-secondary)';
 
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg-tertiary)' }}>
@@ -150,7 +155,7 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
           <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{selected.item.client_name || 'Unnamed'}</span>
         </div>
 
-        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px 24px 48px', display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px', alignItems: 'start' }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px 24px 48px', display: 'grid', gridTemplateColumns: '1fr 280px', gap: '20px', alignItems: 'start' }}>
           {/* Left: deal data */}
           <div>
             {/* Deal Brief */}
@@ -166,8 +171,6 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
                   {fd.priority || 'Medium'} Priority
                 </span>
               </div>
-              <div style={{ fontSize: '11px', color: 'rgba(245,244,242,0.4)', marginBottom: '4px' }}>Purpose</div>
-              <div style={{ fontSize: '13px', color: 'rgba(245,244,242,0.75)', marginBottom: '12px' }}>{purpose}</div>
               {lenderPrefs.length > 0 && (
                 <>
                   <div style={{ fontSize: '11px', color: 'rgba(245,244,242,0.4)', marginBottom: '6px' }}>Lender preference</div>
@@ -178,21 +181,36 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
                   </div>
                 </>
               )}
-              <div style={{ borderTop: '1px solid rgba(203,178,107,0.1)', paddingTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px' }}>
+              {/* KPI tiles */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px' }}>
                 {[
-                  { l: 'Total loan',      v: fmt(totalLoan) },
-                  { l: 'Property value', v: fmt(totalProp) },
-                  { l: 'Securities',     v: secs.length },
-                ].map(({ l, v }) => (
-                  <div key={l} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '7px', padding: '8px 12px' }}>
+                  { l: 'Total loan',    v: fmt(totalLoan),   bg: 'rgba(255,255,255,0.05)', vc: '#F5F4F2' },
+                  { l: 'Combined LVR', v: combinedLVR > 0 ? `${combinedLVR.toFixed(1)}%` : '—', bg: lvrBg, vc: lvrColor },
+                  { l: 'Gross income', v: totalIncome > 0 ? `${fmt(totalIncome)} p.a.` : '—', bg: 'rgba(255,255,255,0.05)', vc: '#F5F4F2' },
+                  { l: 'Applicants',   v: apps.length,      bg: 'rgba(255,255,255,0.05)', vc: '#F5F4F2' },
+                ].map(({ l, v, bg, vc }) => (
+                  <div key={l} style={{ background: bg, borderRadius: '7px', padding: '8px 12px' }}>
                     <div style={{ fontSize: '10px', color: 'rgba(245,244,242,0.4)', marginBottom: '2px' }}>{l}</div>
-                    <div style={{ fontSize: '16px', fontWeight: '700', color: '#F5F4F2' }}>{v}</div>
+                    <div style={{ fontSize: '15px', fontWeight: '700', color: vc }}>{v}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Income Summary */}
+            {/* Credit memo */}
+            <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '12px', padding: '20px 24px', marginBottom: '14px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '8px' }}>Credit assessment</div>
+              <textarea
+                value={creditAnalysis.creditWriteup || ''}
+                onChange={e => updateCA('creditWriteup', e.target.value)}
+                placeholder="Write your credit assessment — deal summary, income story, key risks, recommendation…"
+                rows={6}
+                style={{ width: '100%', border: '1px solid var(--border-primary)', borderRadius: '8px', padding: '10px 12px', fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-secondary)', resize: 'vertical', boxSizing: 'border-box', lineHeight: '1.6', fontFamily: 'inherit' }}
+              />
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '6px' }}>Visible to loan processor and admin</div>
+            </div>
+
+            {/* Income summary */}
             {incomeRows.length > 0 && (
               <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '12px', padding: '20px 24px', marginBottom: '14px' }}>
                 <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>Income summary</div>
@@ -202,9 +220,7 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
                       <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{r.name}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{r.empType} · {r.employer}</div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{r.annual > 0 ? `${fmt(r.annual)} p.a.` : '—'}</div>
-                    </div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{r.annual > 0 ? `${fmt(r.annual)} p.a.` : '—'}</div>
                   </div>
                 ))}
                 {incomeRows.length > 1 && (
@@ -239,23 +255,79 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
               </div>
             ))}
 
-            {/* Liabilities snapshot */}
-            {(ccLimit > 0 || personalLoan > 0 || hecsBalance > 0) && (
+            {/* Liabilities — individual items */}
+            {(creditCards.length > 0 || personalLoans.length > 0 || hecsDebts.length > 0 || otherLiab.length > 0) && (
               <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '12px', padding: '20px 24px', marginBottom: '14px' }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>Liabilities snapshot</div>
-                {[
-                  { l: 'Credit card limits', v: fmt(ccLimit), sub: ccLimit > 0 ? `~${fmt(ccAssessed)}/mo assessed` : null },
-                  { l: 'Personal loans', v: fmt(personalLoan) },
-                  { l: 'HECS balance', v: fmt(hecsBalance) },
-                ].filter(r => r.v !== '—').map(({ l, v, sub }) => (
-                  <div key={l} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-primary)' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{l}</span>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{v}</div>
-                      {sub && <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{sub}</div>}
-                    </div>
-                  </div>
-                ))}
+                <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>Liabilities</div>
+
+                {creditCards.length > 0 && (
+                  <>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px', marginTop: '4px' }}>Credit cards</div>
+                    {creditCards.map((c, i) => {
+                      const limit = parseFloat(String(c.limit || '').replace(/,/g, '')) || 0;
+                      return (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid var(--border-primary)' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--text-primary)' }}>{c.lender || c.description || `Card ${i + 1}`}</span>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>Limit: {fmt(limit)}</div>
+                            {limit > 0 && <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>~{fmt(limit * 0.038)}/mo assessed</div>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {ccLimit > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: personalLoans.length > 0 || hecsDebts.length > 0 || otherLiab.length > 0 ? '1px solid var(--border-primary)' : 'none' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Total CC limits</span>
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)' }}>{fmt(ccLimit)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {personalLoans.length > 0 && (
+                  <>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px', marginTop: '10px' }}>Personal loans</div>
+                    {personalLoans.map((l, i) => {
+                      const amt = parseFloat(String(l.amount || l.limit || '').replace(/,/g, '')) || 0;
+                      return (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid var(--border-primary)' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--text-primary)' }}>{l.lender || l.description || `Loan ${i + 1}`}</span>
+                          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{fmt(amt)}</span>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+
+                {hecsDebts.length > 0 && (
+                  <>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px', marginTop: '10px' }}>HECS</div>
+                    {hecsDebts.map((h, i) => {
+                      const amt = parseFloat(String(h.amount || '').replace(/,/g, '')) || 0;
+                      return (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid var(--border-primary)' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--text-primary)' }}>{h.description || `HECS ${i + 1}`}</span>
+                          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{fmt(amt)}</span>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+
+                {otherLiab.length > 0 && (
+                  <>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px', marginTop: '10px' }}>Other liabilities</div>
+                    {otherLiab.map((l, i) => {
+                      const amt = parseFloat(String(l.amount || l.limit || '').replace(/,/g, '')) || 0;
+                      return (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: i < otherLiab.length - 1 ? '1px solid var(--border-primary)' : 'none' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--text-primary)' }}>{l.description || l.type || `Other ${i + 1}`}</span>
+                          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{fmt(amt)}</span>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
               </div>
             )}
 
@@ -268,12 +340,10 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
             )}
           </div>
 
-          {/* Right: slim action panel */}
-          <div style={{ position: 'sticky', top: '16px' }}>
-            <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '12px', padding: '20px' }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '14px', fontFamily: 'var(--font-heading)' }}>Actions</div>
-
-              {/* Quickli shortcut */}
+          {/* Right: action panel */}
+          <div style={{ position: 'sticky', top: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Quickli shortcut */}
+            <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '12px', padding: '16px' }}>
               <div style={{ background: 'rgba(28,90,140,0.07)', border: '1px solid rgba(28,90,140,0.18)', borderRadius: '8px', padding: '12px', marginBottom: '14px' }}>
                 <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-tertiary)', marginBottom: '8px' }}>Key figures for Quickli</div>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.7' }}>
@@ -281,20 +351,53 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
                   {totalIncome > 0 && <div>Income: <strong style={{ color: 'var(--text-primary)' }}>{fmt(totalIncome)} p.a.</strong></div>}
                   {ccLimit > 0 && <div>CC limits: <strong style={{ color: 'var(--text-primary)' }}>{fmt(ccLimit)}</strong></div>}
                 </div>
-                <a
-                  href="https://app.quickli.com.au"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', padding: '8px 12px', background: '#1a3a5c', color: '#7cc8f8', border: '1px solid #2a5a8c', borderRadius: '7px', fontSize: '12px', fontWeight: '700', textDecoration: 'none', justifyContent: 'center' }}
-                >
+                <a href="https://app.quickli.com.au" target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', padding: '8px 12px', background: '#1a3a5c', color: '#7cc8f8', border: '1px solid #2a5a8c', borderRadius: '7px', fontSize: '12px', fontWeight: '700', textDecoration: 'none', justifyContent: 'center' }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                   Open Quickli ↗
                 </a>
               </div>
 
-              {sendingMsg && <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '10px' }}>{sendingMsg}</div>}
+              {/* Analyst fields */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>Lender</label>
+                  <input
+                    type="text"
+                    value={creditAnalysis.lender || ''}
+                    onChange={e => updateCA('lender', e.target.value)}
+                    placeholder="e.g. CBA, ANZ, Westpac…"
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '12px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>Serviceability</label>
+                  <select
+                    value={creditAnalysis.serviceability || ''}
+                    onChange={e => updateCA('serviceability', e.target.value)}
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '12px', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="">— Select —</option>
+                    <option value="Pass">Pass</option>
+                    <option value="Borderline">Borderline</option>
+                    <option value="Fail">Fail</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)', display: 'block', marginBottom: '4px' }}>Confirmed LVR (%)</label>
+                  <input
+                    type="text"
+                    value={creditAnalysis.lvrConfirmed || ''}
+                    onChange={e => updateCA('lvrConfirmed', e.target.value)}
+                    placeholder="e.g. 78.5"
+                    style={{ width: '100%', padding: '7px 10px', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '12px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {sendingMsg && <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '10px' }}>{sendingMsg}</div>}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '14px' }}>
                 <button onClick={handleSave} disabled={saving}
                   style={{ padding: '10px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
                   {saving ? 'Saving…' : 'Save analysis'}
@@ -361,17 +464,16 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
               </div>
             ))}
 
-            {/* Pending QA — ready for compliance checklist */}
-            {pendingLodgement.length > 0 && (
+            {/* Quality Assurance — ready for credit checklist */}
+            {pendingQA.length > 0 && (
               <div style={{ marginBottom: '32px' }}>
                 <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
-                  Pending QA — Ready for Credit Checklist ({pendingLodgement.length})
+                  Quality Assurance — Ready for Credit Checklist ({pendingQA.length})
                 </div>
-                {pendingLodgement.map(item => {
-                  const meta = STATUS_META.pending_lodgement;
+                {pendingQA.map(item => {
                   const existingScore = item.compliance_qa?.score;
                   return (
-                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', background: 'var(--bg-primary)', border: '1px solid #ede9fe', borderRadius: '10px', marginBottom: '8px' }}>
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', background: 'var(--bg-primary)', border: '1px solid #e0f2fe', borderRadius: '10px', marginBottom: '8px' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {item.client_name || 'Unnamed'}
@@ -386,13 +488,13 @@ const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
                           {existingScore.toFixed(1)}%
                         </span>
                       )}
-                      <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 10px', borderRadius: '10px', background: meta.bg, color: meta.color, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                        {meta.label}
+                      <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 10px', borderRadius: '10px', background: '#e0f2fe', color: '#0369a1', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        Quality Assurance
                       </span>
                       <button
                         type="button"
                         onClick={() => onStartQA?.(item)}
-                        style={{ padding: '7px 16px', background: '#5b21b6', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', flexShrink: 0, fontFamily: 'var(--font-heading)' }}
+                        style={{ padding: '7px 16px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', flexShrink: 0, fontFamily: 'var(--font-heading)' }}
                       >
                         {existingScore != null ? 'Continue QA →' : 'Start QA →'}
                       </button>

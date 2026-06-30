@@ -10,14 +10,12 @@ const CLS_META = {
   minor:           { label: 'Minor',              bg: '#f3f4f6', color: '#374151' },
 };
 
-const STAGE_LABELS = ['Fact find', 'Credit review', 'Loan processing', 'Credit QA', 'Lodge'];
-
 // ── Sidebar category nav ──────────────────────────────────────────────────────
 function CategoryNav({ categories, activeCategory, responses, onSelect }) {
   return (
     <nav style={{
-      width: 220, flexShrink: 0, background: '#12110D',
-      borderRight: '1px solid rgba(203,178,107,0.12)',
+      width: 220, flexShrink: 0, background: 'var(--bg-primary)',
+      borderRight: '1px solid var(--border-primary)',
       display: 'flex', flexDirection: 'column', overflowY: 'auto',
     }}>
       {categories.map(cat => {
@@ -37,19 +35,19 @@ function CategoryNav({ categories, activeCategory, responses, onSelect }) {
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '10px 16px', background: 'none', border: 'none',
               textAlign: 'left', cursor: 'pointer',
-              borderLeft: `3px solid ${isActive ? '#CBB26B' : 'transparent'}`,
-              background: isActive ? 'rgba(203,178,107,0.08)' : 'transparent',
+              borderLeft: `3px solid ${isActive ? '#1d6fb8' : 'transparent'}`,
+              backgroundColor: isActive ? 'rgba(29,111,184,0.06)' : 'transparent',
             }}
           >
-            {dot || <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'rgba(245,244,242,0.12)', flexShrink: 0 }} />}
+            {dot || <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--border-primary)', flexShrink: 0 }} />}
             <span style={{
               fontSize: 12, fontWeight: isActive ? 700 : 400,
-              color: isActive ? '#CBB26B' : 'rgba(245,244,242,0.65)',
+              color: isActive ? '#1d6fb8' : 'var(--text-secondary)',
               lineHeight: 1.3, flex: 1,
             }}>
               {cat}
             </span>
-            <span style={{ fontSize: 10, color: 'rgba(245,244,242,0.3)', flexShrink: 0 }}>
+            <span style={{ fontSize: 10, color: 'var(--text-tertiary)', flexShrink: 0 }}>
               {done}/{catItems.length}
             </span>
           </button>
@@ -267,51 +265,22 @@ const ComplianceChecklist = ({ factFindId, factFind, onBack, onComplete }) => {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-tertiary)', display: 'flex', flexDirection: 'column' }}>
 
-      {/* Top bar */}
-      <div style={{ background: '#12110D', borderBottom: '1px solid rgba(203,178,107,0.15)', padding: '0 20px', flexShrink: 0 }}>
-        {/* Client info row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0 8px' }}>
+      {/* Top bar — slim, light */}
+      <div style={{ background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-primary)', padding: '0 20px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0' }}>
           <button onClick={onBack}
-            style={{ fontSize: 11, color: 'rgba(203,178,107,0.7)', background: 'none', border: '1px solid rgba(203,178,107,0.25)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
+            style={{ fontSize: 11, color: 'var(--text-secondary)', background: 'none', border: '1px solid var(--border-primary)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}>
             ← Queue
           </button>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#F5F4F2' }}>{clientName}</div>
-            <div style={{ fontSize: 11, color: 'rgba(245,244,242,0.4)', marginTop: 1 }}>
-              Broker: {broker} · {lender} · Credit QA
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{clientName}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 1 }}>
+              Broker: {broker} · {lender} · Quality Assurance
             </div>
           </div>
-          <div style={{ marginLeft: 'auto', fontSize: 11, color: saving ? 'rgba(245,244,242,0.4)' : '#CBB26B' }}>
+          <div style={{ marginLeft: 'auto', fontSize: 11, color: saving ? 'var(--text-tertiary)' : '#0369a1' }}>
             {saving ? 'Saving…' : reviewed > 0 ? '✓ Saved' : ''}
           </div>
-        </div>
-
-        {/* Workflow bar */}
-        <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 12 }}>
-          {STAGE_LABELS.map((label, i) => {
-            const done = i < 3; const active = i === 3;
-            return (
-              <React.Fragment key={label}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, flex: i < STAGE_LABELS.length - 1 ? 1 : 'none' }}>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 9, fontWeight: 700, flexShrink: 0,
-                    background: done ? '#CBB26B' : 'transparent',
-                    border: `2px solid ${done ? '#CBB26B' : active ? '#CBB26B' : 'rgba(245,244,242,0.2)'}`,
-                    color: done ? '#12110D' : active ? '#CBB26B' : 'rgba(245,244,242,0.3)',
-                  }}>
-                    {done ? '✓' : i + 1}
-                  </div>
-                  <span style={{ fontSize: 10, color: active ? '#CBB26B' : 'rgba(245,244,242,0.4)', fontWeight: active ? 700 : 400, whiteSpace: 'nowrap' }}>
-                    {label}
-                  </span>
-                </div>
-                {i < STAGE_LABELS.length - 1 && (
-                  <div style={{ flex: 1, height: 1, background: done ? 'rgba(203,178,107,0.4)' : 'rgba(245,244,242,0.1)', margin: '0 8px' }} />
-                )}
-              </React.Fragment>
-            );
-          })}
         </div>
       </div>
 

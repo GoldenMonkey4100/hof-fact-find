@@ -14,11 +14,12 @@ vercel dev       # Test API functions locally (requires Vercel CLI)
 
 `src/main.jsx` → `src/App.jsx` owns all state as a single `formData` object, passed down to each step via props.
 
-**Screen routing** (`src/App.jsx`): `screen` state — `'dashboard' | 'full' | 'quick' | 'compliance'`
+**Screen routing** (`src/App.jsx`): `screen` state — `'dashboard' | 'full' | 'quick' | 'compliance' | 'reports'`
 - `dashboard`: `src/pages/Dashboard.jsx` — role-based routing; shows broker queue, analyst queue, or processor queue depending on `localStorage.hof_user.role`
 - `full`: steps 0–4 wrapped in a 264px left sidebar
 - `quick`: `src/pages/QuickFactFind.jsx` — standalone lead capture form (still submits to Mercury)
-- `compliance`: `src/pages/ComplianceChecklist.jsx` — 57-item credit QA checklist, analyst role only; opened via `onStartQA` from AnalystDashboard; `complianceTarget` state holds `{ id, item }`
+- `compliance`: `src/pages/ComplianceChecklist.jsx` — 57-item credit QA checklist; opened via `onStartQA` from AnalystDashboard or AdminDashboard; `complianceTarget` state holds `{ id, item }`
+- `reports`: `src/pages/ReportsPage.jsx` — admin-only KPI reports page; monthly QA scores by analyst
 
 **Identity:** `src/lib/utils.js` → `PEOPLE` array (`{ name, email, role }`), `getStoredUser()` reads `localStorage.hof_user`. Migration from legacy `hof_broker` key is handled automatically.
 
@@ -28,9 +29,18 @@ vercel dev       # Test API functions locally (requires Vercel CLI)
 - `processor` → `src/pages/ProcessorDashboard.jsx` — lodgement queue, Mercury entry
 
 **Fact find pipeline statuses:**
-`draft` → `pending_review` → `in_review` → `pending_lodgement` → `[compliance QA]` → `lodged`
+`draft` → `pending_review` → `in_review` → `pending_lodgement` → `pending_qa` → `lodged`
 
-`pending_lodgement` is set by ProcessorDashboard when LP work is complete. The analyst (or admin) opens `ComplianceChecklist` to complete the 57-item QA; on lodge the status moves to `lodged`. The pipeline terminates here — post-lodgement progression continues in Mercury Nexus (external CRM).
+| DB status | Display label | Owner |
+|-----------|--------------|-------|
+| `draft` | Draft | Broker |
+| `pending_review` | Credit Analysis | Analyst |
+| `in_review` | Credit Analysis | Analyst (in progress) |
+| `pending_lodgement` | Loan Processing | Loan Processor |
+| `pending_qa` | Quality Assurance | Analyst |
+| `lodged` | Lodged | — terminal — |
+
+`pending_lodgement` is set when the analyst sends to processor. ProcessorDashboard lodges in Mercury then sets `pending_qa`. The analyst (or admin) opens `ComplianceChecklist` from the QA queue; on completion the status moves to `lodged`. The pipeline terminates here — post-lodgement progression continues in Mercury Nexus (external CRM).
 
 **Step components:**
 
@@ -42,7 +52,7 @@ vercel dev       # Test API functions locally (requires Vercel CLI)
 | `src/steps/Step3-AssetsLiabilities.jsx` | Accordion per asset/liability category + sticky 240px net summary panel |
 | `src/steps/Step4-Review.jsx` | Summary view + "Submit to Credit Team" (internal handoff — no Mercury) |
 
-**Pages:** `src/pages/Dashboard.jsx`, `src/pages/AnalystDashboard.jsx`, `src/pages/ProcessorDashboard.jsx`, `src/pages/QuickFactFind.jsx`, `src/pages/ComplianceChecklist.jsx`
+**Pages:** `src/pages/Dashboard.jsx`, `src/pages/AnalystDashboard.jsx`, `src/pages/ProcessorDashboard.jsx`, `src/pages/QuickFactFind.jsx`, `src/pages/ComplianceChecklist.jsx`, `src/pages/ReportsPage.jsx`
 
 **Shared:** `SmartCard.jsx` (collapsible card + status badges), `AddressAutocomplete.jsx` (Google Maps Places)
 
@@ -112,7 +122,7 @@ SMTP_FROM=notifications@houseoffinance.com.au
 | `id` | UUID | PK |
 | `broker_email` | text | Owner |
 | `broker_name` | text | |
-| `status` | text | `draft \| pending_review \| in_review \| pending_lodgement \| lodged` |
+| `status` | text | `draft \| pending_review \| in_review \| pending_lodgement \| pending_qa \| lodged` |
 | `form_data` | JSONB | Full broker form state |
 | `client_name` | text | First applicant name (denormalised) |
 | `mercury_url` | text | Set by Loan Processor after lodgement |

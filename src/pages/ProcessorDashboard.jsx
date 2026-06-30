@@ -24,7 +24,7 @@ const ProcessorDashboard = ({ user, onChangeUser }) => {
     try {
       const res  = await fetch('/api/fact-finds', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'list-queue', statuses: ['pending_lodgement', 'lodged', 'approved'] }),
+        body: JSON.stringify({ action: 'list-queue', statuses: ['pending_lodgement', 'pending_qa'] }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -53,35 +53,22 @@ const ProcessorDashboard = ({ user, onChangeUser }) => {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      // Update status to lodged
       await fetch('/api/fact-finds', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update-status', id: selected.item.id, status: 'lodged', mercuryUrl: data.mercuryUrl, mercuryTitle: data.title }),
+        body: JSON.stringify({ action: 'update-status', id: selected.item.id, status: 'pending_qa', mercuryUrl: data.mercuryUrl, mercuryTitle: data.title }),
       });
-      setSelected(s => ({ ...s, mercuryUrl: data.mercuryUrl, item: { ...s.item, status: 'lodged' } }));
+      setSelected(s => ({ ...s, mercuryUrl: data.mercuryUrl, item: { ...s.item, status: 'pending_qa' } }));
       await load();
     } catch (e) { alert('Mercury submission failed: ' + e.message); } finally { setSubmitting(false); }
   };
 
-  const handleMarkApproved = async () => {
-    if (!window.confirm('Mark this file as formally approved?')) return;
-    await fetch('/api/fact-finds', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'update-status', id: selected.item.id, status: 'approved' }),
-    });
-    setSelected(s => ({ ...s, item: { ...s.item, status: 'approved' } }));
-    await load();
-  };
-
   const STATUS_META = {
-    pending_lodgement: { label: 'Ready to Lodge', bg: '#ede9fe', color: '#5b21b6' },
-    lodged:            { label: 'Lodged',          bg: '#ccfbf1', color: '#0f766e' },
-    approved:          { label: 'Approved',         bg: '#dcfce7', color: '#16a34a' },
+    pending_lodgement: { label: 'Loan Processing', bg: '#ede9fe', color: '#5b21b6' },
+    pending_qa:        { label: 'Sent to QA',      bg: '#e0f2fe', color: '#0369a1' },
   };
 
-  const pending = items.filter(i => i.status === 'pending_lodgement');
-  const lodged  = items.filter(i => i.status === 'lodged');
-  const approved = items.filter(i => i.status === 'approved');
+  const pending  = items.filter(i => i.status === 'pending_lodgement');
+  const sentToQA = items.filter(i => i.status === 'pending_qa');
 
   const fd = selected?.formData || {};
   const ca = selected?.creditAnalysis || {};
@@ -107,10 +94,17 @@ const ProcessorDashboard = ({ user, onChangeUser }) => {
         <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 10px', borderRadius: '10px', background: meta.bg, color: meta.color, whiteSpace: 'nowrap', flexShrink: 0 }}>
           {meta.label}
         </span>
-        <button type="button" onClick={() => openItem(item)}
-          style={{ padding: '7px 16px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', flexShrink: 0 }}>
-          Open →
-        </button>
+        {item.status === 'pending_lodgement' ? (
+          <button type="button" onClick={() => openItem(item)}
+            style={{ padding: '7px 16px', background: 'var(--color-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', flexShrink: 0 }}>
+            Open →
+          </button>
+        ) : (
+          <button type="button" onClick={() => openItem(item)}
+            style={{ padding: '7px 16px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', flexShrink: 0 }}>
+            View
+          </button>
+        )}
       </div>
     );
   };
@@ -123,6 +117,9 @@ const ProcessorDashboard = ({ user, onChangeUser }) => {
             ← Queue
           </button>
           <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{selected.item.client_name || 'Unnamed'}</span>
+          <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 10px', borderRadius: '10px', background: STATUS_META[selected.item.status]?.bg || '#f3f4f6', color: STATUS_META[selected.item.status]?.color || '#374151' }}>
+            {STATUS_META[selected.item.status]?.label || selected.item.status}
+          </span>
         </div>
 
         <div style={{ maxWidth: '900px', margin: '0 auto', padding: '32px 24px' }}>
@@ -132,12 +129,10 @@ const ProcessorDashboard = ({ user, onChangeUser }) => {
               <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: '#166534', marginBottom: '12px' }}>Credit Analyst Recommendation</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', fontSize: '12px' }}>
                 {[
-                  { l: 'Lender',       v: ca.lender || '—' },
-                  { l: 'Product',      v: ca.product || '—' },
-                  { l: 'Rate',         v: ca.rate ? `${ca.rate}% ${ca.rateType || ''}` : '—' },
-                  { l: 'Repayment',    v: ca.repaymentType || '—' },
-                  { l: 'LVR',          v: ca.lvrConfirmed ? `${ca.lvrConfirmed}%` : '—' },
+                  { l: 'Lender',         v: ca.lender || '—' },
+                  { l: 'LVR',            v: ca.lvrConfirmed ? `${ca.lvrConfirmed}%` : '—' },
                   { l: 'Serviceability', v: ca.serviceability || '—' },
+                  { l: 'Product',        v: ca.product || '—' },
                 ].map(({ l, v }) => (
                   <div key={l}>
                     <div style={{ color: '#166534', marginBottom: '2px' }}>{l}</div>
@@ -211,32 +206,23 @@ const ProcessorDashboard = ({ user, onChangeUser }) => {
           {/* Actions */}
           <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '12px', padding: '24px' }}>
             <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '16px' }}>Actions</div>
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
               {selected.item.status === 'pending_lodgement' && (
                 <button onClick={handleLodgeInMercury} disabled={submitting}
                   style={{ padding: '11px 24px', background: 'var(--color-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', color: 'var(--bg-primary)', cursor: 'pointer', fontFamily: 'var(--font-heading)', opacity: submitting ? 0.6 : 1 }}>
                   {submitting ? 'Lodging…' : 'Lodge in Mercury →'}
                 </button>
               )}
-              {selected.item.status === 'lodged' && (
-                <>
-                  {selected.mercuryUrl && (
-                    <a href={selected.mercuryUrl} target="_blank" rel="noopener noreferrer"
-                      style={{ padding: '11px 24px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', textDecoration: 'none', display: 'inline-block' }}>
-                      Open in Mercury ↗
-                    </a>
-                  )}
-                  <button onClick={handleMarkApproved}
-                    style={{ padding: '11px 24px', background: '#16a34a', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700', color: 'white', cursor: 'pointer', fontFamily: 'var(--font-heading)' }}>
-                    Mark as Approved ✓
-                  </button>
-                </>
-              )}
-              {selected.item.status === 'approved' && (
-                <div style={{ fontSize: '14px', fontWeight: '600', color: '#16a34a' }}>
-                  ✓ File approved
-                  {selected.mercuryUrl && <a href={selected.mercuryUrl} target="_blank" rel="noopener noreferrer" style={{ marginLeft: '16px', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'underline' }}>Open in Mercury ↗</a>}
+              {selected.item.status === 'pending_qa' && (
+                <div style={{ fontSize: '13px', color: '#0369a1', fontWeight: '600' }}>
+                  ✓ Lodged in Mercury — file is now with the Credit QA team
                 </div>
+              )}
+              {selected.mercuryUrl && (
+                <a href={selected.mercuryUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ padding: '11px 24px', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', textDecoration: 'none', display: 'inline-block' }}>
+                  Open in Mercury ↗
+                </a>
               )}
             </div>
           </div>
@@ -249,7 +235,7 @@ const ProcessorDashboard = ({ user, onChangeUser }) => {
     <div style={{ minHeight: '100vh', background: 'var(--bg-tertiary)' }}>
       <div style={{ maxWidth: '860px', margin: '0 auto', padding: '40px 24px' }}>
         <div style={{ marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '24px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px' }}>Lodgement Queue</h1>
+          <h1 style={{ fontSize: '24px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px' }}>Loan Processing Queue</h1>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>Files ready for Mercury data entry and lodgement</p>
         </div>
 
@@ -258,22 +244,25 @@ const ProcessorDashboard = ({ user, onChangeUser }) => {
 
         {!loading && !error && (
           <>
-            {[
-              { label: 'Ready to Lodge', items: pending, emptyText: 'No files ready for lodgement.' },
-              { label: 'Lodged', items: lodged, emptyText: 'No lodged files.' },
-              { label: 'Approved', items: approved, emptyText: 'No approved files.' },
-            ].map(({ label, items: group, emptyText }) => (
-              <div key={label} style={{ marginBottom: '32px' }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
-                  {label} ({group.length})
-                </div>
-                {group.length === 0 ? (
-                  <div style={{ padding: '32px', textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '10px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-                    {emptyText}
-                  </div>
-                ) : group.map(item => <ItemCard key={item.id} item={item} />)}
+            <div style={{ marginBottom: '32px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
+                Loan Processing ({pending.length})
               </div>
-            ))}
+              {pending.length === 0 ? (
+                <div style={{ padding: '32px', textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: '10px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                  No files ready for lodgement.
+                </div>
+              ) : pending.map(item => <ItemCard key={item.id} item={item} />)}
+            </div>
+
+            {sentToQA.length > 0 && (
+              <div style={{ marginBottom: '32px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
+                  Sent to Quality Assurance ({sentToQA.length})
+                </div>
+                {sentToQA.map(item => <ItemCard key={item.id} item={item} />)}
+              </div>
+            )}
           </>
         )}
       </div>

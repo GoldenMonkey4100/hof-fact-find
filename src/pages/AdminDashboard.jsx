@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PEOPLE } from '../lib/utils';
 
+const annualise = (income, freq) => {
+  const n = parseFloat(String(income || '').replace(/,/g, ''));
+  if (!n) return 0;
+  if (freq === 'Weekly')      return n * 52;
+  if (freq === 'Fortnightly') return n * 26;
+  if (freq === 'Monthly')     return n * 12;
+  return n;
+};
+const fmtMoney = (n) => n > 0 ? `$${Math.round(n).toLocaleString()}` : '—';
+
 const relativeTime = (iso) => {
   if (!iso) return '—';
   const diff  = Date.now() - new Date(iso).getTime();
@@ -16,9 +26,10 @@ const relativeTime = (iso) => {
 
 const STATUS_META = {
   draft:             { label: 'Draft',             bg: 'var(--color-gold-light)', color: 'var(--color-primary)' },
-  pending_review:    { label: 'With Credit Team',  bg: '#fef3c7', color: '#92400e' },
-  in_review:         { label: 'In Analysis',       bg: '#dbeafe', color: '#1e40af' },
-  pending_lodgement: { label: 'Ready to Lodge',    bg: '#ede9fe', color: '#5b21b6' },
+  pending_review:    { label: 'Credit Analysis',   bg: '#fef3c7', color: '#92400e' },
+  in_review:         { label: 'Credit Analysis',   bg: '#dbeafe', color: '#1e40af' },
+  pending_lodgement: { label: 'Loan Processing',   bg: '#ede9fe', color: '#5b21b6' },
+  pending_qa:        { label: 'Quality Assurance', bg: '#e0f2fe', color: '#0369a1' },
   lodged:            { label: 'Lodged',             bg: '#ccfbf1', color: '#0f766e' },
 };
 
@@ -40,7 +51,7 @@ const STAGE_CONFIG = [
   },
   {
     key: 'credit',
-    label: 'Credit Analysts',
+    label: 'Credit Analysis',
     statuses: ['pending_review', 'in_review'],
     description: 'Submitted fact finds awaiting or undergoing credit analysis.',
   },
@@ -48,25 +59,32 @@ const STAGE_CONFIG = [
     key: 'processing',
     label: 'Loan Processing',
     statuses: ['pending_lodgement'],
-    description: 'Files cleared for credit QA, ready to be lodged with a lender.',
+    description: 'Files ready to be lodged with a lender in Mercury.',
+  },
+  {
+    key: 'qa',
+    label: 'Quality Assurance',
+    statuses: ['pending_qa'],
+    description: 'Lodged files awaiting credit QA checklist sign-off.',
   },
   {
     key: 'lodged',
     label: 'Lodged',
     statuses: ['lodged'],
-    description: 'Files lodged with a lender. Application continues in Mercury Nexus.',
+    description: 'Files lodged and QA complete. Application continues in Mercury Nexus.',
     collapsible: true,
   },
 ];
 
-const ALL_STATUSES = ['draft', 'pending_review', 'in_review', 'pending_lodgement', 'lodged'];
+const ALL_STATUSES = ['draft', 'pending_review', 'in_review', 'pending_lodgement', 'pending_qa', 'lodged'];
 
 const STATUS_MOVE_OPTIONS = {
   draft:             ['pending_review'],
   pending_review:    ['in_review', 'draft'],
   in_review:         ['pending_lodgement', 'pending_review'],
-  pending_lodgement: ['lodged', 'in_review'],
-  lodged:            ['pending_lodgement'],
+  pending_lodgement: ['pending_qa', 'in_review'],
+  pending_qa:        ['lodged', 'pending_lodgement'],
+  lodged:            ['pending_qa'],
 };
 
 const analysts   = PEOPLE.filter(p => p.role === 'analyst');
@@ -159,10 +177,19 @@ const DetailView = ({ item, detail, onBack, onUpdate, onEditAsBroker, onStartQA 
   const fd   = detail || {};
   const secs = fd.securities  || [];
   const apps = fd.applicants  || [];
+  const emps = fd.employment  || [];
+  const liab = fd.liabilities || {};
 
   const totalLoan = secs.reduce((s, sec) => s + (parseFloat(String(sec.loanAmount  || '').replace(/,/g, '')) || 0), 0);
   const totalProp = secs.reduce((s, sec) => s + (parseFloat(String(sec.propertyValue || '').replace(/,/g, '')) || 0), 0);
-  const fmtC = (n) => n > 0 ? `$${Math.round(n).toLocaleString()}` : '—';
+  const fmtC = fmtMoney;
+
+  const incomeRows = apps.map((a, i) => {
+    const emp = emps[i]?.currentEmployment || {};
+    return annualise(emp.baseIncome, emp.payFrequency);
+  });
+  const totalIncome = incomeRows.reduce((s, n) => s + n, 0);
+  const ccLimit = (liab.creditCards || []).reduce((s, c) => s + (parseFloat(String(c.limit || '').replace(/,/g, '')) || 0), 0);
 
   const [newStatus, setNewStatus] = useState(item.status);
   const [newAnalyst, setNewAnalyst]   = useState(item.assigned_analyst || '');
@@ -272,7 +299,22 @@ const DetailView = ({ item, detail, onBack, onUpdate, onEditAsBroker, onStartQA 
             </button>
           </div>
 
-          {onStartQA && (item.status === 'pending_lodgement' || item.status === 'lodged') && (
+          {/* Quickli shortcut */}
+          <div style={{ background: 'rgba(28,90,140,0.07)', border: '1px solid rgba(28,90,140,0.18)', borderRadius: '8px', padding: '12px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-tertiary)', marginBottom: '8px' }}>Key figures for Quickli</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.7' }}>
+              {totalLoan > 0 && <div>Loan: <strong style={{ color: 'var(--text-primary)' }}>{fmtC(totalLoan)}</strong></div>}
+              {totalIncome > 0 && <div>Income: <strong style={{ color: 'var(--text-primary)' }}>{fmtC(totalIncome)} p.a.</strong></div>}
+              {ccLimit > 0 && <div>CC limits: <strong style={{ color: 'var(--text-primary)' }}>{fmtC(ccLimit)}</strong></div>}
+            </div>
+            <a href="https://app.quickli.com.au" target="_blank" rel="noopener noreferrer"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', padding: '8px 12px', background: '#1a3a5c', color: '#7cc8f8', border: '1px solid #2a5a8c', borderRadius: '7px', fontSize: '12px', fontWeight: '700', textDecoration: 'none', justifyContent: 'center' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              Open Quickli ↗
+            </a>
+          </div>
+
+          {onStartQA && (item.status === 'pending_qa' || item.status === 'lodged') && (
             <button
               onClick={onStartQA}
               style={{ width: '100%', padding: '10px', background: item.compliance_qa ? 'var(--bg-secondary)' : '#12110D', border: item.compliance_qa ? '1px solid var(--border-primary)' : 'none', borderRadius: '7px', fontSize: '12px', fontWeight: '700', color: item.compliance_qa ? 'var(--text-primary)' : '#CBB26B', cursor: 'pointer', textAlign: 'center' }}>
@@ -294,9 +336,6 @@ const DetailView = ({ item, detail, onBack, onUpdate, onEditAsBroker, onStartQA 
               Open in Mercury ↗
             </a>
           )}
-
-          {/* Password reset panel */}
-          <PasswordResetPanel adminEmail={item.assigned_analyst} />
         </div>
       </div>
     </div>
@@ -351,7 +390,7 @@ const PasswordResetPanel = ({ adminEmail }) => {
 };
 
 // ── AdminDashboard ────────────────────────────────────────────────────────────
-const AdminDashboard = ({ user, onEditAsBroker, onStartQA }) => {
+const AdminDashboard = ({ user, onEditAsBroker, onStartQA, onViewReports }) => {
   const [items, setItems]       = useState([]);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
@@ -433,13 +472,21 @@ const AdminDashboard = ({ user, onEditAsBroker, onStartQA }) => {
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px' }}>
 
         {/* Header */}
-        <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px' }}>Pipeline Overview</h1>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>All fact finds across all brokers · admin view</p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px' }}>
+          <div>
+            <h1 style={{ fontSize: '24px', fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 4px' }}>Pipeline Overview</h1>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>All fact finds across all brokers · admin view</p>
+          </div>
+          {onViewReports && (
+            <button onClick={onViewReports}
+              style={{ padding: '8px 18px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', cursor: 'pointer' }}>
+              Reports →
+            </button>
+          )}
         </div>
 
         {/* Stats bar */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', marginBottom: '24px' }}>
           {STAGE_CONFIG.map((stage, i) => {
             const count = stageItems(stage.statuses).length;
             return (

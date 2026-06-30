@@ -10,6 +10,7 @@ import WelcomeScreen from './pages/WelcomeScreen';
 import QuickFactFind from './pages/QuickFactFind';
 import Dashboard from './pages/Dashboard';
 import ComplianceChecklist from './pages/ComplianceChecklist';
+import ReportsPage from './pages/ReportsPage';
 import { getStoredUser, ROLE_LABELS } from './lib/utils';
 
 const stepVariants = {
@@ -131,7 +132,7 @@ const FactFindApp = () => {
     submittedBy: ''
   });
 
-  const [screen, setScreen] = useState('dashboard'); // 'dashboard' | 'full' | 'quick' | 'compliance'
+  const [screen, setScreen] = useState('dashboard'); // 'dashboard' | 'full' | 'quick' | 'compliance' | 'reports'
   const [complianceTarget, setComplianceTarget] = useState(null); // { id, item } for QA screen
   const [activeUser, setActiveUser] = useState(getStoredUser);
   const [theme, setTheme] = useState(() => localStorage.getItem('hof-theme') || 'light');
@@ -520,7 +521,9 @@ const FactFindApp = () => {
           onSelectQuick={handleNewQuickFactFind}
           onResume={handleResume}
           onUserChange={setActiveUser}
+          activeUser={activeUser}
           onResumeAs={(formData, id, brokerUser) => handleResume(formData, id, brokerUser)}
+          onViewReports={() => setScreen('reports')}
           onStartQA={async (queueItem) => {
             const res  = await fetch('/api/fact-finds', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -602,6 +605,11 @@ const FactFindApp = () => {
           onBack={() => { setScreen('dashboard'); setComplianceTarget(null); }}
           onComplete={() => { setScreen('dashboard'); setComplianceTarget(null); }}
         />
+      )}
+
+      {/* ── Reports Page ────────────────────────────────────────────────── */}
+      {screen === 'reports' && (
+        <ReportsPage onBack={() => setScreen('dashboard')} />
       )}
 
       {/* ── Submission Overlays (shown regardless of screen) ────────────── */}

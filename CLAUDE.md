@@ -28,9 +28,9 @@ vercel dev       # Test API functions locally (requires Vercel CLI)
 - `processor` → `src/pages/ProcessorDashboard.jsx` — lodgement queue, Mercury entry
 
 **Fact find pipeline statuses:**
-`draft` → `pending_review` → `in_review` → `pending_lodgement` → `[compliance QA]` → `lodged` → `approved`
+`draft` → `pending_review` → `in_review` → `pending_lodgement` → `[compliance QA]` → `lodged`
 
-`pending_lodgement` is set by ProcessorDashboard when LP work is complete. The analyst then opens `ComplianceChecklist` to complete the 57-item QA; on lodge the status moves to `lodged`.
+`pending_lodgement` is set by ProcessorDashboard when LP work is complete. The analyst (or admin) opens `ComplianceChecklist` to complete the 57-item QA; on lodge the status moves to `lodged`. The pipeline terminates here — post-lodgement progression continues in Mercury Nexus (external CRM).
 
 **Step components:**
 
@@ -112,7 +112,7 @@ SMTP_FROM=notifications@houseoffinance.com.au
 | `id` | UUID | PK |
 | `broker_email` | text | Owner |
 | `broker_name` | text | |
-| `status` | text | `draft \| pending_review \| in_review \| pending_lodgement \| lodged \| approved` |
+| `status` | text | `draft \| pending_review \| in_review \| pending_lodgement \| lodged` |
 | `form_data` | JSONB | Full broker form state |
 | `client_name` | text | First applicant name (denormalised) |
 | `mercury_url` | text | Set by Loan Processor after lodgement |

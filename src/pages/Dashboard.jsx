@@ -330,7 +330,7 @@ const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange, onResu
 
   // Route by role — "Not you?" is handled by parent App.jsx header button
   if (user.role === 'admin') {
-    return <AdminDashboard user={user} onEditAsBroker={onResumeAs} />;
+    return <AdminDashboard user={user} onEditAsBroker={onResumeAs} onStartQA={onStartQA} />;
   }
   if (user.role === 'analyst') {
     return <AnalystDashboard user={user} onChangeUser={clearUser} onStartQA={onStartQA} />;

@@ -462,22 +462,31 @@ const FactFindApp = () => {
               </button>
             )}
             <span className="app-header-tagline">Broker Fact Find</span>
-            {screen === 'dashboard' && activeUser && (
+            {activeUser && (
               <>
                 <span style={{ fontSize: '0.8125rem', color: 'rgba(245,244,242,0.7)' }}>
                   {activeUser.name} · <span style={{ color: 'rgba(203,178,107,0.8)' }}>{ROLE_LABELS[activeUser.role] || activeUser.role}</span>
                 </span>
+                {screen === 'dashboard' && (
+                  <button
+                    onClick={() => { setShowChangePwd(true); setPwdCurrent(''); setPwdNew(''); setPwdConfirm(''); setPwdError(''); setPwdSuccess(false); }}
+                    style={{ fontSize: '0.75rem', color: 'rgba(203,178,107,0.7)', background: 'none', border: '1px solid rgba(203,178,107,0.25)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}
+                  >
+                    Change password
+                  </button>
+                )}
                 <button
-                  onClick={() => { setShowChangePwd(true); setPwdCurrent(''); setPwdNew(''); setPwdConfirm(''); setPwdError(''); setPwdSuccess(false); }}
-                  style={{ fontSize: '0.75rem', color: 'rgba(203,178,107,0.7)', background: 'none', border: '1px solid rgba(203,178,107,0.25)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}
-                >
-                  Change password
-                </button>
-                <button
-                  onClick={() => { localStorage.removeItem('hof_user'); setActiveUser(null); }}
+                  onClick={() => {
+                    localStorage.removeItem('hof_user');
+                    localStorage.removeItem('hof_admin_restore');
+                    sessionStorage.removeItem('hof_ff_id');
+                    setActiveUser(null);
+                    setScreen('dashboard');
+                    setComplianceTarget(null);
+                  }}
                   style={{ fontSize: '0.75rem', color: 'rgba(245,244,242,0.45)', background: 'none', border: '1px solid rgba(245,244,242,0.15)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}
                 >
-                  Not you?
+                  Logout
                 </button>
               </>
             )}

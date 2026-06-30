@@ -20,8 +20,6 @@ const STATUS_META = {
   in_review:         { label: 'In Analysis',       bg: '#dbeafe', color: '#1e40af' },
   pending_lodgement: { label: 'Ready to Lodge',    bg: '#ede9fe', color: '#5b21b6' },
   lodged:            { label: 'Lodged',             bg: '#ccfbf1', color: '#0f766e' },
-  approved:          { label: 'Approved',           bg: '#dcfce7', color: '#16a34a' },
-  completed:         { label: 'Completed',          bg: '#f3f4f6', color: '#6b7280' },
 };
 
 const StatusBadge = ({ status }) => {
@@ -49,28 +47,26 @@ const STAGE_CONFIG = [
   {
     key: 'processing',
     label: 'Loan Processing',
-    statuses: ['pending_lodgement', 'lodged'],
-    description: 'Files cleared for lodgement or already lodged with a lender.',
+    statuses: ['pending_lodgement'],
+    description: 'Files cleared for credit QA, ready to be lodged with a lender.',
   },
   {
-    key: 'completed',
-    label: 'Completed',
-    statuses: ['approved', 'completed'],
-    description: 'Approved or fully completed applications.',
+    key: 'lodged',
+    label: 'Lodged',
+    statuses: ['lodged'],
+    description: 'Files lodged with a lender. Application continues in Mercury Nexus.',
     collapsible: true,
   },
 ];
 
-const ALL_STATUSES = ['draft', 'pending_review', 'in_review', 'pending_lodgement', 'lodged', 'approved', 'completed'];
+const ALL_STATUSES = ['draft', 'pending_review', 'in_review', 'pending_lodgement', 'lodged'];
 
 const STATUS_MOVE_OPTIONS = {
   draft:             ['pending_review'],
   pending_review:    ['in_review', 'draft'],
   in_review:         ['pending_lodgement', 'pending_review'],
   pending_lodgement: ['lodged', 'in_review'],
-  lodged:            ['approved', 'pending_lodgement'],
-  approved:          ['completed', 'lodged'],
-  completed:         ['approved'],
+  lodged:            ['pending_lodgement'],
 };
 
 const analysts   = PEOPLE.filter(p => p.role === 'analyst');
@@ -159,7 +155,7 @@ const PipelineRow = ({ item, onView, onUpdate }) => {
 };
 
 // ── Detail View (read-only) ───────────────────────────────────────────────────
-const DetailView = ({ item, detail, onBack, onUpdate, onEditAsBroker }) => {
+const DetailView = ({ item, detail, onBack, onUpdate, onEditAsBroker, onStartQA }) => {
   const fd   = detail || {};
   const secs = fd.securities  || [];
   const apps = fd.applicants  || [];
@@ -276,6 +272,14 @@ const DetailView = ({ item, detail, onBack, onUpdate, onEditAsBroker }) => {
             </button>
           </div>
 
+          {onStartQA && (item.status === 'pending_lodgement' || item.status === 'lodged') && (
+            <button
+              onClick={onStartQA}
+              style={{ width: '100%', padding: '10px', background: item.compliance_qa ? 'var(--bg-secondary)' : '#12110D', border: item.compliance_qa ? '1px solid var(--border-primary)' : 'none', borderRadius: '7px', fontSize: '12px', fontWeight: '700', color: item.compliance_qa ? 'var(--text-primary)' : '#CBB26B', cursor: 'pointer', textAlign: 'center' }}>
+              {item.compliance_qa ? '↳ Continue QA review' : '✓ Start QA review'}
+            </button>
+          )}
+
           {onEditAsBroker && (
             <button
               onClick={() => onEditAsBroker(detail, item.id, { name: item.broker_name || 'Broker', email: item.broker_email, role: 'broker' })}
@@ -347,7 +351,7 @@ const PasswordResetPanel = ({ adminEmail }) => {
 };
 
 // ── AdminDashboard ────────────────────────────────────────────────────────────
-const AdminDashboard = ({ user, onEditAsBroker }) => {
+const AdminDashboard = ({ user, onEditAsBroker, onStartQA }) => {
   const [items, setItems]       = useState([]);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
@@ -390,13 +394,15 @@ const AdminDashboard = ({ user, onEditAsBroker }) => {
   };
 
   if (selected) {
+    const currentItem = { ...selected, ...items.find(i => i.id === selected.id) };
     return (
       <DetailView
-        item={{ ...selected, ...items.find(i => i.id === selected.id) }}
+        item={currentItem}
         detail={detail}
         onBack={() => { setSelected(null); setDetail(null); }}
         onUpdate={handleUpdate}
         onEditAsBroker={onEditAsBroker}
+        onStartQA={onStartQA ? () => onStartQA(currentItem) : null}
       />
     );
   }

@@ -222,7 +222,7 @@ const Step4Review = ({ formData, onSubmit, submission = {} }) => {
           >
             {submission.status === 'checking'   ? 'Checking duplicates…' :
              submission.status === 'submitting' ? 'Submitting…'          :
-             isValid                            ? 'Submit to Processing →' :
+             isValid                            ? 'Submit to Credit Team →' :
              'Complete Required Fields'}
           </button>
         )}

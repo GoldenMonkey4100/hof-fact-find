@@ -99,6 +99,13 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    if (action === 'admin-delete') {
+      if (!id) return res.status(400).json({ error: 'id required' });
+      const { error } = await supabase.from('fact_finds').delete().eq('id', id);
+      if (error) throw error;
+      return res.status(200).json({ ok: true });
+    }
+
     // Credit analyst saves their analysis (auto-sets status to in_review)
     if (action === 'save-analysis') {
       if (!id || !userEmail) return res.status(400).json({ error: 'id and userEmail required' });

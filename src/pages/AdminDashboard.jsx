@@ -27,7 +27,7 @@ const relativeTime = (iso) => {
 const STATUS_META = {
   draft:             { label: 'Draft',             bg: 'var(--color-gold-light)', color: 'var(--color-primary)' },
   pending_review:    { label: 'Credit Analysis',   bg: '#fef3c7', color: '#92400e' },
-  in_review:         { label: 'Credit Analysis',   bg: '#dbeafe', color: '#1e40af' },
+  in_review:         { label: 'In Progress',        bg: '#dbeafe', color: '#1e40af' },
   pending_lodgement: { label: 'Loan Processing',   bg: '#ede9fe', color: '#5b21b6' },
   pending_qa:        { label: 'Quality Assurance', bg: '#e0f2fe', color: '#0369a1' },
   lodged:            { label: 'Lodged',             bg: '#ccfbf1', color: '#0f766e' },
@@ -91,7 +91,7 @@ const analysts   = PEOPLE.filter(p => p.role === 'analyst');
 const processors = PEOPLE.filter(p => p.role === 'processor');
 
 // ── Admin Row ─────────────────────────────────────────────────────────────────
-const PipelineRow = ({ item, onView, onUpdate }) => {
+const PipelineRow = ({ item, onView, onUpdate, onDelete }) => {
   const [updating, setUpdating] = useState(false);
 
   const handleStatusChange = async (newStatus) => {
@@ -112,10 +112,10 @@ const PipelineRow = ({ item, onView, onUpdate }) => {
     setUpdating(false);
   };
 
-  const moveOptions = STATUS_MOVE_OPTIONS[item.status] || [];
+  const moveOptions = ALL_STATUSES.filter(s => s !== item.status);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 140px 140px 90px 120px 70px', gap: '8px', alignItems: 'center', padding: '12px 16px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', marginBottom: '6px', opacity: updating ? 0.65 : 1 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 140px 140px 90px 120px 70px 60px', gap: '8px', alignItems: 'center', padding: '12px 16px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '8px', marginBottom: '6px', opacity: updating ? 0.65 : 1 }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {item.client_name || '(unnamed)'}
@@ -168,12 +168,23 @@ const PipelineRow = ({ item, onView, onUpdate }) => {
       >
         View
       </button>
+      <button
+        onClick={() => {
+          if (window.confirm(`Delete "${item.client_name || 'this file'}"? This cannot be undone.`)) {
+            onDelete(item.id);
+          }
+        }}
+        disabled={updating}
+        style={{ padding: '5px 8px', background: 'none', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '5px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+      >
+        Del
+      </button>
     </div>
   );
 };
 
 // ── Detail View (read-only) ───────────────────────────────────────────────────
-const DetailView = ({ item, detail, onBack, onUpdate, onEditAsBroker, onStartQA }) => {
+const DetailView = ({ item, detail, creditAnalysis, onBack, onUpdate, onEditAsBroker, onStartQA, onDelete }) => {
   const fd   = detail || {};
   const secs = fd.securities  || [];
   const apps = fd.applicants  || [];
@@ -235,13 +246,24 @@ const DetailView = ({ item, detail, onBack, onUpdate, onEditAsBroker, onStartQA 
 
           {apps.length > 0 && (
             <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '10px', padding: '16px 20px', marginBottom: '12px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '10px' }}>Applicants</div>
-              {apps.map((a, i) => (
-                <div key={i} style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '4px' }}>
-                  {[a.firstName, a.lastName].filter(Boolean).join(' ') || `Applicant ${i + 1}`}
-                  {a.email ? <span style={{ color: 'var(--text-secondary)', marginLeft: '8px', fontSize: '12px' }}>{a.email}</span> : null}
-                </div>
-              ))}
+              <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '10px' }}>
+                Income{totalIncome > 0 ? ` — ${fmtMoney(totalIncome)} p.a. combined` : ''}
+              </div>
+              {apps.map((a, i) => {
+                const emp = emps[i]?.currentEmployment || {};
+                const annual = annualise(emp.baseIncome, emp.payFrequency);
+                const name = [a.firstName, a.lastName].filter(Boolean).join(' ') || `Applicant ${i + 1}`;
+                const types = Array.isArray(emp.employmentType) ? emp.employmentType.join(' / ') : (emp.employmentType || '—');
+                return (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: i < apps.length - 1 ? '1px solid var(--border-primary)' : 'none' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{name}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{emp.employer || '—'} · {types}</div>
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{annual > 0 ? fmtMoney(annual) : '—'}</div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -257,6 +279,62 @@ const DetailView = ({ item, detail, onBack, onUpdate, onEditAsBroker, onStartQA 
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {(() => {
+            const cards = liab.creditCards || [];
+            const loans = liab.personalLoans || [];
+            const hecs  = liab.hecs || [];
+            const other = liab.otherLiabilities || [];
+            const allLiabs = [...cards, ...loans, ...hecs, ...other];
+            if (!allLiabs.length) return null;
+            return (
+              <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '10px', padding: '16px 20px', marginBottom: '12px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '10px' }}>Liabilities</div>
+                {cards.length > 0 && <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>Credit Cards</div>}
+                {cards.map((c, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-primary)', padding: '4px 0' }}>
+                    <span>{c.lender || c.description || `Card ${i + 1}`}</span>
+                    <span>Limit {fmtMoney(parseFloat(String(c.limit || '').replace(/,/g, '')) || 0)}</span>
+                  </div>
+                ))}
+                {loans.length > 0 && <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', margin: '8px 0 6px' }}>Personal Loans</div>}
+                {loans.map((l, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-primary)', padding: '4px 0' }}>
+                    <span>{l.lender || l.description || `Loan ${i + 1}`}</span>
+                    <span>{fmtMoney(parseFloat(String(l.amount || '').replace(/,/g, '')) || 0)}</span>
+                  </div>
+                ))}
+                {hecs.length > 0 && <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', margin: '8px 0 6px' }}>HECS / Student Debt</div>}
+                {hecs.map((h, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-primary)', padding: '4px 0' }}>
+                    <span>{h.description || `HECS ${i + 1}`}</span>
+                    <span>{fmtMoney(parseFloat(String(h.amount || '').replace(/,/g, '')) || 0)}</span>
+                  </div>
+                ))}
+                {other.length > 0 && <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', margin: '8px 0 6px' }}>Other</div>}
+                {other.map((o, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-primary)', padding: '4px 0' }}>
+                    <span>{o.description || o.type || `Other ${i + 1}`}</span>
+                    <span>{fmtMoney(parseFloat(String(o.amount || o.limit || '').replace(/,/g, '')) || 0)}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {creditAnalysis?.creditWriteup && (
+            <div style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '10px', padding: '16px 20px', marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '8px' }}>Credit Assessment</div>
+              {creditAnalysis.lender && (
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                  Lender: <strong>{creditAnalysis.lender}</strong>
+                  {creditAnalysis.serviceability ? ` · Serviceability: ${creditAnalysis.serviceability}` : ''}
+                  {creditAnalysis.lvrConfirmed ? ` · LVR: ${creditAnalysis.lvrConfirmed}%` : ''}
+                </div>
+              )}
+              <p style={{ fontSize: '13px', color: 'var(--text-primary)', margin: 0, lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{creditAnalysis.creditWriteup}</p>
             </div>
           )}
 
@@ -336,6 +414,20 @@ const DetailView = ({ item, detail, onBack, onUpdate, onEditAsBroker, onStartQA 
               Open in Mercury ↗
             </a>
           )}
+
+          {onDelete && (
+            <button
+              onClick={() => {
+                if (window.confirm(`Delete "${item.client_name || 'this file'}"? This cannot be undone.`)) {
+                  onDelete(item.id);
+                  onBack();
+                }
+              }}
+              style={{ width: '100%', padding: '9px', background: 'none', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '7px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', textAlign: 'center' }}
+            >
+              Delete fact find
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -391,12 +483,13 @@ const PasswordResetPanel = ({ adminEmail }) => {
 
 // ── AdminDashboard ────────────────────────────────────────────────────────────
 const AdminDashboard = ({ user, onEditAsBroker, onStartQA, onViewReports }) => {
-  const [items, setItems]       = useState([]);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState(null);
-  const [search, setSearch]     = useState('');
-  const [selected, setSelected] = useState(null);
-  const [detail, setDetail]     = useState(null);
+  const [items, setItems]           = useState([]);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState(null);
+  const [search, setSearch]         = useState('');
+  const [selected, setSelected]     = useState(null);
+  const [detail, setDetail]         = useState(null);
+  const [creditAnalysis, setCreditAnalysis] = useState({});
   const [completedOpen, setCompletedOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -422,6 +515,15 @@ const AdminDashboard = ({ user, onEditAsBroker, onStartQA, onViewReports }) => {
     const data = await res.json();
     setSelected(item);
     setDetail(data.item?.form_data || null);
+    setCreditAnalysis(data.item?.credit_analysis || {});
+  };
+
+  const handleDelete = async (id) => {
+    await fetch('/api/fact-finds', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'admin-delete', id }),
+    });
+    await load();
   };
 
   const handleUpdate = async (id, changes) => {
@@ -438,10 +540,12 @@ const AdminDashboard = ({ user, onEditAsBroker, onStartQA, onViewReports }) => {
       <DetailView
         item={currentItem}
         detail={detail}
-        onBack={() => { setSelected(null); setDetail(null); }}
+        creditAnalysis={creditAnalysis}
+        onBack={() => { setSelected(null); setDetail(null); setCreditAnalysis({}); }}
         onUpdate={handleUpdate}
         onEditAsBroker={onEditAsBroker}
         onStartQA={onStartQA ? () => onStartQA(currentItem) : null}
+        onDelete={handleDelete}
       />
     );
   }
@@ -460,8 +564,8 @@ const AdminDashboard = ({ user, onEditAsBroker, onStartQA, onViewReports }) => {
   const stageCounts = STAGE_CONFIG.map(s => ({ key: s.key, count: stageItems(s.statuses).length }));
 
   const columnHeader = (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 140px 140px 90px 120px 70px', gap: '8px', padding: '6px 16px', marginBottom: '4px' }}>
-      {['Client', 'Status', 'Analyst', 'Processor', 'Updated', 'Move', ''].map((h, i) => (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px 140px 140px 90px 120px 70px 60px', gap: '8px', padding: '6px 16px', marginBottom: '4px' }}>
+      {['Client', 'Status', 'Analyst', 'Processor', 'Updated', 'Move', '', ''].map((h, i) => (
         <div key={i} style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-tertiary)' }}>{h}</div>
       ))}
     </div>
@@ -541,7 +645,7 @@ const AdminDashboard = ({ user, onEditAsBroker, onStartQA, onViewReports }) => {
                     <>
                       {columnHeader}
                       {rows.map(item => (
-                        <PipelineRow key={item.id} item={item} onView={handleView} onUpdate={async (id, changes) => { await handleUpdate(id, changes); }} />
+                        <PipelineRow key={item.id} item={item} onView={handleView} onUpdate={async (id, changes) => { await handleUpdate(id, changes); }} onDelete={handleDelete} />
                       ))}
                     </>
                   )}

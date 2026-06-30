@@ -1404,7 +1404,7 @@ label {
 .sidebar-step-sub.pending   { color: transparent; }
 
 .sidebar-footer {
-  padding: 16px 20px 0;
+  padding: 16px 20px 16px;
   border-top: 1px solid rgba(203, 178, 107, 0.08);
   margin-top: 8px;
 }
@@ -1429,19 +1429,25 @@ label {
   align-items: center;
   gap: 6px;
   background: none;
-  border: none;
+  border: 1px solid rgba(203, 178, 107, 0.25);
+  border-radius: 6px;
   cursor: pointer;
   font-family: var(--font-heading);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: rgba(203, 178, 107, 0.40);
-  padding: 0;
-  transition: color 0.15s ease;
+  color: rgba(203, 178, 107, 0.75);
+  padding: 7px 12px;
+  width: 100%;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
-.sidebar-back-btn:hover { color: rgba(203, 178, 107, 0.80); }
+.sidebar-back-btn:hover {
+  color: rgba(203, 178, 107, 1);
+  border-color: rgba(203, 178, 107, 0.5);
+  background: rgba(203, 178, 107, 0.06);
+}
 
 .main-content {
   flex: 1;

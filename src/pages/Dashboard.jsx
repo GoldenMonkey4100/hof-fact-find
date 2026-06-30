@@ -19,7 +19,7 @@ const relativeTime = (iso) => {
 const STATUS_META = {
   draft:             { label: 'Draft',             bg: 'var(--color-gold-light)', color: 'var(--color-primary)' },
   pending_review:    { label: 'Credit Analysis',   bg: '#fef3c7',                color: '#92400e' },
-  in_review:         { label: 'Credit Analysis',   bg: '#dbeafe',                color: '#1e40af' },
+  in_review:         { label: 'In Progress',        bg: '#dbeafe',                color: '#1e40af' },
   pending_lodgement: { label: 'Loan Processing',   bg: '#ede9fe',                color: '#5b21b6' },
   pending_qa:        { label: 'Quality Assurance', bg: '#e0f2fe',                color: '#0369a1' },
   lodged:            { label: 'Lodged',             bg: '#ccfbf1',                color: '#0f766e' },

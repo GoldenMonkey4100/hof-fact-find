@@ -13,8 +13,10 @@ const relativeTime = (iso) => {
 };
 
 const STATUS_META = {
-  pending_review: { label: 'Pending Review', bg: '#fef3c7', color: '#92400e' },
-  in_review:      { label: 'In Review',      bg: '#dbeafe', color: '#1e40af' },
+  pending_review:    { label: 'Pending Review',    bg: '#fef3c7', color: '#92400e' },
+  in_review:         { label: 'In Review',         bg: '#dbeafe', color: '#1e40af' },
+  pending_lodgement: { label: 'Pending QA',        bg: '#ede9fe', color: '#5b21b6' },
+  lodged:            { label: 'Lodged',             bg: '#d1fae5', color: '#065f46' },
 };
 
 const PRIORITY_META = {
@@ -34,7 +36,7 @@ const annualise = (income, freq) => {
 
 const fmt = (n) => n > 0 ? `$${Math.round(n).toLocaleString()}` : '—';
 
-const AnalystDashboard = ({ user, onChangeUser }) => {
+const AnalystDashboard = ({ user, onChangeUser, onStartQA }) => {
   const [items, setItems]       = useState([]);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState(null);
@@ -47,7 +49,7 @@ const AnalystDashboard = ({ user, onChangeUser }) => {
     try {
       const res  = await fetch('/api/fact-finds', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'list-queue', statuses: ['pending_review', 'in_review'] }),
+        body: JSON.stringify({ action: 'list-queue', statuses: ['pending_review', 'in_review', 'pending_lodgement', 'lodged'] }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -98,8 +100,10 @@ const AnalystDashboard = ({ user, onChangeUser }) => {
     await load();
   };
 
-  const pending  = items.filter(i => i.status === 'pending_review');
-  const inReview = items.filter(i => i.status === 'in_review');
+  const pending          = items.filter(i => i.status === 'pending_review');
+  const inReview         = items.filter(i => i.status === 'in_review');
+  const pendingLodgement = items.filter(i => i.status === 'pending_lodgement');
+  const lodged           = items.filter(i => i.status === 'lodged').slice(0, 20);
 
   if (selected) {
     const fd   = selected.formData || {};
@@ -356,6 +360,81 @@ const AnalystDashboard = ({ user, onChangeUser }) => {
                 })}
               </div>
             ))}
+
+            {/* Pending QA — ready for compliance checklist */}
+            {pendingLodgement.length > 0 && (
+              <div style={{ marginBottom: '32px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
+                  Pending QA — Ready for Credit Checklist ({pendingLodgement.length})
+                </div>
+                {pendingLodgement.map(item => {
+                  const meta = STATUS_META.pending_lodgement;
+                  const existingScore = item.compliance_qa?.score;
+                  return (
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', background: 'var(--bg-primary)', border: '1px solid #ede9fe', borderRadius: '10px', marginBottom: '8px' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.client_name || 'Unnamed'}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                          Broker: {item.broker_name || '—'} · {relativeTime(item.updated_at)}
+                          {item.assigned_processor && ` · Processed by: ${item.assigned_processor}`}
+                        </div>
+                      </div>
+                      {existingScore != null && (
+                        <span style={{ fontSize: '12px', fontWeight: '700', padding: '2px 10px', borderRadius: '10px', background: existingScore >= 90 ? '#d1fae5' : '#fef3c7', color: existingScore >= 90 ? '#065f46' : '#92400e', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                          {existingScore.toFixed(1)}%
+                        </span>
+                      )}
+                      <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 10px', borderRadius: '10px', background: meta.bg, color: meta.color, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        {meta.label}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onStartQA?.(item)}
+                        style={{ padding: '7px 16px', background: '#5b21b6', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', flexShrink: 0, fontFamily: 'var(--font-heading)' }}
+                      >
+                        {existingScore != null ? 'Continue QA →' : 'Start QA →'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Recently lodged */}
+            {lodged.length > 0 && (
+              <div style={{ marginBottom: '32px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-tertiary)', marginBottom: '12px' }}>
+                  Recently Lodged ({lodged.length})
+                </div>
+                {lodged.map(item => {
+                  const qa    = item.compliance_qa || {};
+                  const score = qa.score;
+                  return (
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px 20px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: '10px', marginBottom: '6px' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.client_name || 'Unnamed'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                          {item.broker_name || '—'} · {relativeTime(item.updated_at)}
+                          {qa.reviewed_by_name && ` · QA by ${qa.reviewed_by_name}`}
+                        </div>
+                      </div>
+                      {score != null && (
+                        <span style={{ fontSize: '12px', fontWeight: '700', padding: '2px 10px', borderRadius: '10px', background: score >= 90 ? '#d1fae5' : '#fef3c7', color: score >= 90 ? '#065f46' : '#92400e', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                          QA {score.toFixed(1)}%
+                        </span>
+                      )}
+                      <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 10px', borderRadius: '10px', background: '#d1fae5', color: '#065f46', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        Lodged
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </>
         )}
       </div>

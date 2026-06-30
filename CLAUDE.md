@@ -14,10 +14,23 @@ vercel dev       # Test API functions locally (requires Vercel CLI)
 
 `src/main.jsx` → `src/App.jsx` owns all state as a single `formData` object, passed down to each step via props.
 
-**Screen routing** (`src/App.jsx`): `screen` state — `'welcome' | 'full' | 'quick'`
-- `welcome`: `src/pages/WelcomeScreen.jsx` — two cards: Full Fact Find / Quick Fact Find
-- `full`: steps 0–4 wrapped in a 264px left sidebar (`src/components/Sidebar.jsx`-equivalent inline layout)
-- `quick`: `src/pages/QuickFactFind.jsx` — standalone lead capture form
+**Screen routing** (`src/App.jsx`): `screen` state — `'dashboard' | 'full' | 'quick' | 'compliance'`
+- `dashboard`: `src/pages/Dashboard.jsx` — role-based routing; shows broker queue, analyst queue, or processor queue depending on `localStorage.hof_user.role`
+- `full`: steps 0–4 wrapped in a 264px left sidebar
+- `quick`: `src/pages/QuickFactFind.jsx` — standalone lead capture form (still submits to Mercury)
+- `compliance`: `src/pages/ComplianceChecklist.jsx` — 57-item credit QA checklist, analyst role only; opened via `onStartQA` from AnalystDashboard; `complianceTarget` state holds `{ id, item }`
+
+**Identity:** `src/lib/utils.js` → `PEOPLE` array (`{ name, email, role }`), `getStoredUser()` reads `localStorage.hof_user`. Migration from legacy `hof_broker` key is handled automatically.
+
+**Role-based views:**
+- `broker` → `BrokerDashboard` (inside Dashboard.jsx) — My Fact Finds, Full/Quick FF launch
+- `analyst` → `src/pages/AnalystDashboard.jsx` — pending review queue, credit analysis panel
+- `processor` → `src/pages/ProcessorDashboard.jsx` — lodgement queue, Mercury entry
+
+**Fact find pipeline statuses:**
+`draft` → `pending_review` → `in_review` → `pending_lodgement` → `[compliance QA]` → `lodged` → `approved`
+
+`pending_lodgement` is set by ProcessorDashboard when LP work is complete. The analyst then opens `ComplianceChecklist` to complete the 57-item QA; on lodge the status moves to `lodged`.
 
 **Step components:**
 
@@ -27,19 +40,19 @@ vercel dev       # Test API functions locally (requires Vercel CLI)
 | `src/steps/Step1-Applicants.jsx` | Applicant records, DL upload + Claude vision extraction, address autocomplete |
 | `src/steps/Step2-Employment.jsx` | Employment records; applicant name tabs; multi-select employment type pills (array) |
 | `src/steps/Step3-AssetsLiabilities.jsx` | Accordion per asset/liability category + sticky 240px net summary panel |
-| `src/steps/Step4-Review.jsx` | Summary view + Mercury submit |
+| `src/steps/Step4-Review.jsx` | Summary view + "Submit to Credit Team" (internal handoff — no Mercury) |
 
-**Pages:** `src/pages/WelcomeScreen.jsx`, `src/pages/QuickFactFind.jsx`
+**Pages:** `src/pages/Dashboard.jsx`, `src/pages/AnalystDashboard.jsx`, `src/pages/ProcessorDashboard.jsx`, `src/pages/QuickFactFind.jsx`, `src/pages/ComplianceChecklist.jsx`
 
 **Shared:** `SmartCard.jsx` (collapsible card + status badges), `AddressAutocomplete.jsx` (Google Maps Places)
 
-**Utilities:** `src/lib/utils.js` — `BROKER_EMAILS`, `LEAD_SOURCES` (shared by Step0 and QuickFactFind), currency helpers
+**Utilities:** `src/lib/utils.js` — `PEOPLE`, `ROLE_LABELS`, `getStoredUser()`, `LEAD_SOURCES`, currency helpers; `src/lib/checklist-data.js` — `CHECKLIST_ITEMS` (57-item array), `CATEGORIES`; `src/lib/scoring.js` — `calcScore`, `calcKpi`, `calcDeductions`, `itemDeduction`
 
 ## API Functions (`api/` — Vercel serverless, ES modules)
 
 | File | Purpose |
 |------|---------|
-| `submit.js` | `action:'quick-submit'` Quick FF lead → Mercury + Teams · `action:'submit'` Mercury + email/PDF + Teams |
+| `submit.js` | `action:'quick-submit'` Quick FF → Mercury + Teams · `action:'internal-submit'` Full FF internal handoff → Supabase status + Teams (no Mercury) · `action:'submit'` Full Mercury entry (used by Loan Processor) · `action:'save-compliance'` auto-save QA responses · `action:'complete-compliance'` finalise QA + set status to `lodged` |
 | `documents.js` | HMAC password-gated document proxy (password delivered via Teams card) |
 | `upload-blob.js` | Receives base64 → PUT to Vercel Blob → returns URL |
 | `extract-license.js` | Claude vision: driver's licence → structured JSON |
@@ -91,6 +104,37 @@ SMTP_USER=chris@houseoffinance.com.au
 SMTP_PASS=[M365 app password]
 SMTP_FROM=notifications@houseoffinance.com.au
 ```
+
+## Supabase Schema (fact_finds table)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | PK |
+| `broker_email` | text | Owner |
+| `broker_name` | text | |
+| `status` | text | `draft \| pending_review \| in_review \| pending_lodgement \| lodged \| approved` |
+| `form_data` | JSONB | Full broker form state |
+| `client_name` | text | First applicant name (denormalised) |
+| `mercury_url` | text | Set by Loan Processor after lodgement |
+| `compliance_qa` | JSONB | Set by Credit Analyst QA: `{ reviewed_by, reviewed_by_name, reviewed_at, responses: { [id]: { result, note } }, score, kpi_contribution, lender, broker_name, override_note? }` |
+| `mercury_title` | text | |
+| `credit_analysis` | JSONB | Analyst fields: lender, product, rate, serviceability, writeup |
+| `assigned_analyst` | text | Analyst email |
+| `assigned_processor` | text | Processor email |
+| `created_at` | timestamp | |
+| `updated_at` | timestamp | |
+
+> **Migrations required** (run once in Supabase SQL Editor):
+> ```sql
+> ALTER TABLE fact_finds
+>   ADD COLUMN IF NOT EXISTS credit_analysis JSONB,
+>   ADD COLUMN IF NOT EXISTS assigned_analyst TEXT,
+>   ADD COLUMN IF NOT EXISTS assigned_processor TEXT;
+>
+> -- Compliance QA (run separately)
+> ALTER TABLE fact_finds
+>   ADD COLUMN IF NOT EXISTS compliance_qa JSONB;
+> ```
 
 ## Known Gotchas
 

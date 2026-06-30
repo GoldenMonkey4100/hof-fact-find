@@ -169,7 +169,7 @@ const BrokerDashboard = ({ user, onSelectFull, onSelectQuick, onResume }) => {
 };
 
 // ── Root Dashboard — single source of truth for user identity ─────────────────
-const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange, onResumeAs }) => {
+const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange, onResumeAs, onStartQA }) => {
   const [user, setUser]     = useState(getStoredUser);
   const [email, setEmail]   = useState('');
   const [password, setPassword] = useState('');
@@ -333,7 +333,7 @@ const Dashboard = ({ onSelectFull, onSelectQuick, onResume, onUserChange, onResu
     return <AdminDashboard user={user} onEditAsBroker={onResumeAs} />;
   }
   if (user.role === 'analyst') {
-    return <AnalystDashboard user={user} onChangeUser={clearUser} />;
+    return <AnalystDashboard user={user} onChangeUser={clearUser} onStartQA={onStartQA} />;
   }
   if (user.role === 'processor') {
     return <ProcessorDashboard user={user} onChangeUser={clearUser} />;

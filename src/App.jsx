@@ -9,6 +9,7 @@ import Step4Review from './steps/Step4-Review';
 import WelcomeScreen from './pages/WelcomeScreen';
 import QuickFactFind from './pages/QuickFactFind';
 import Dashboard from './pages/Dashboard';
+import ComplianceChecklist from './pages/ComplianceChecklist';
 import { getStoredUser, ROLE_LABELS } from './lib/utils';
 
 const stepVariants = {
@@ -130,7 +131,8 @@ const FactFindApp = () => {
     submittedBy: ''
   });
 
-  const [screen, setScreen] = useState('dashboard'); // 'dashboard' | 'full' | 'quick'
+  const [screen, setScreen] = useState('dashboard'); // 'dashboard' | 'full' | 'quick' | 'compliance'
+  const [complianceTarget, setComplianceTarget] = useState(null); // { id, item } for QA screen
   const [activeUser, setActiveUser] = useState(getStoredUser);
   const [theme, setTheme] = useState(() => localStorage.getItem('hof-theme') || 'light');
   const [showChangePwd, setShowChangePwd] = useState(false);
@@ -451,7 +453,7 @@ const FactFindApp = () => {
             >
               ← Staff Portal
             </a>
-            {screen !== 'dashboard' && (
+            {screen !== 'dashboard' && screen !== 'compliance' && (
               <button
                 onClick={handleBackToStart}
                 style={{ fontSize: '0.8125rem', color: 'rgba(203,178,107,0.75)', background: 'none', border: '1px solid rgba(203,178,107,0.3)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', marginRight: '0.75rem' }}
@@ -510,6 +512,15 @@ const FactFindApp = () => {
           onResume={handleResume}
           onUserChange={setActiveUser}
           onResumeAs={(formData, id, brokerUser) => handleResume(formData, id, brokerUser)}
+          onStartQA={async (queueItem) => {
+            const res  = await fetch('/api/fact-finds', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'get', id: queueItem.id }),
+            });
+            const data = await res.json();
+            setComplianceTarget({ id: queueItem.id, item: data.item || queueItem });
+            setScreen('compliance');
+          }}
         />
       )}
 
@@ -572,6 +583,16 @@ const FactFindApp = () => {
         <div className="quick-ff-page">
           <QuickFactFind onBack={() => setScreen('dashboard')} />
         </div>
+      )}
+
+      {/* ── Compliance QA Checklist ──────────────────────────────────────────── */}
+      {screen === 'compliance' && complianceTarget && (
+        <ComplianceChecklist
+          factFindId={complianceTarget.id}
+          factFind={complianceTarget.item}
+          onBack={() => { setScreen('dashboard'); setComplianceTarget(null); }}
+          onComplete={() => { setScreen('dashboard'); setComplianceTarget(null); }}
+        />
       )}
 
       {/* ── Submission Overlays (shown regardless of screen) ────────────── */}

@@ -824,6 +824,30 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, mercuryUrl, title: opportunityName });
     }
 
+    // ── Save compliance QA responses (auto-save, debounced from client) ──────
+    if (action === 'save-compliance') {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+      const supabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_KEY);
+      const { id, compliance_qa } = req.body || {};
+      if (!id) return res.status(400).json({ error: 'id required' });
+      await supabase.from('fact_finds').update({ compliance_qa, updated_at: new Date().toISOString() }).eq('id', id);
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── Complete compliance QA — marks file as lodged ─────────────────────
+    if (action === 'complete-compliance') {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = (process.env.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+      const supabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_KEY);
+      const { id, compliance_qa } = req.body || {};
+      if (!id) return res.status(400).json({ error: 'id required' });
+      await supabase.from('fact_finds')
+        .update({ compliance_qa, status: 'lodged', updated_at: new Date().toISOString() })
+        .eq('id', id);
+      return res.status(200).json({ ok: true });
+    }
+
     return res.status(400).json({ error: 'Invalid action. Use "quick-submit" or "submit".' });
 
   } catch (err) {
